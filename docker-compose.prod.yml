@@ -1,0 +1,75 @@
+services:
+  db:
+    container_name: "ideal-db-prod"
+    image: postgres:18.4-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:${DB_PORT}:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      start_period: 10s
+      interval: 5s
+      retries: 5
+    networks:
+      - network-default
+    restart: unless-stopped
+    env_file:
+      - .env
+
+  redis:
+    container_name: "ideal-redis-prod"
+    image: redis:8.8.0-alpine3.23
+    volumes:
+      - redis_data:/data
+    networks:
+      - network-default
+    restart: unless-stopped
+
+  qcluster:
+    image: ideal-web-prod:latest
+    container_name: "ideal-qcluster-prod"
+    command: python manage.py qcluster
+    volumes:
+      - app_data:/app/cdn
+    depends_on:
+      - db
+      - redis
+    networks:
+      - network-default
+    restart: unless-stopped
+    env_file:
+      - .env
+  web:
+    container_name: "ideal-web-prod"
+    image: ideal-web-prod:latest
+    entrypoint: /app/scripts/entrypoint.sh
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    volumes:
+      - app_data:/app/cdn
+    ports:
+        - "127.0.0.1:${APP_PORT}:8000"
+    healthcheck:
+      test: [ "CMD-SHELL", "./scripts/healthcheck.sh" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - network-default
+    restart: unless-stopped
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:
+  app_data:
+  redis_data:
+
+networks:
+  network-default:
+    driver: bridge

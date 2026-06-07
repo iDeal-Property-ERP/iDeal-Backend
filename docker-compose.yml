@@ -1,0 +1,53 @@
+services:
+  db:
+    container_name: "ideal-db-dev"
+    image: postgres:18.4-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5400:5432"
+    restart: unless-stopped
+    env_file:
+      - .env
+
+  redis:
+    container_name: "ideal-redis-dev"
+    image: redis:8.8.0-alpine3.23
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  qcluster:
+    build: .
+    container_name: "ideal-qcluster-dev"
+    command: python manage.py qcluster
+    volumes:
+      - app_data:/app/cdn
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    env_file:
+      - .env
+  web:
+    build: .
+    container_name: "ideal-web-dev"
+    entrypoint: /app/scripts/entrypoint.sh
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+    volumes:
+     - app_data:/app/cdn
+    ports:
+      - "8005:8000"
+    depends_on:
+      - db
+    restart: unless-stopped
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:
+  app_data:
+  redis_data:
