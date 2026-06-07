@@ -28,6 +28,7 @@ dependencies = [
     "uvicorn>=0.37.0",
     "django-q2>=1.7.5",
     "redis>=5.2.1",
+    "pillow>=12.2.0",
 ]
 
 [dependency-groups]
@@ -36,6 +37,15 @@ dev = [
     "django-debug-toolbar>=6.0.0",
     "django-extensions>=4.1",
     "django-query-counter>=0.4.1",
+    "factory-boy>=3.3.3",
+    "faker>=40.19.1",
+    "freezegun>=1.5.5",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "pytest-django>=4.12.0",
+    "pytest-mock>=3.15.1",
+    "pytest-sugar>=1.1.1",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.15.15",
 ]
 
@@ -82,8 +92,39 @@ exclude-newer = "7 days"
 
 [tool.ruff.lint.per-file-ignores]
 "src/config/settings/*.py" = ["F405"]
+"*/tests/*" = ["S101"]
+"*/test_*.py" = ["S101"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+pythonpath = ["src", "src/apps"]
+testpaths = "src/tests"
+log_level = "WARNING"
+addopts = "-v --tb=short --strict-markers -ra -q --import-mode=importlib"
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["src/apps", "src/api", "src/core", "src/config"]
+branch = true
+parallel = true
+
+[tool.coverage.report]
+fail_under = 80
+skip_covered = true
+show_missing = true
+
+[tool.coverage.html]
+directory = "htmlcov"

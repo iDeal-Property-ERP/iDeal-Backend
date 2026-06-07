@@ -2,6 +2,7 @@ from account import managers
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import models
 
+from core.constants import UserRole
 from core.models import SoftDeleteModel, TimestampedModel
 
 
@@ -14,7 +15,11 @@ class User(AbstractBaseUser, TimestampedModel, SoftDeleteModel):
     phone = models.CharField(max_length=15, unique=True, null=True, blank=True)
     email = models.EmailField(unique=True)
 
-    # For Django Admin
+    role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.MANAGEMENT)
+    is_verified = models.BooleanField(default=False)
+    nationality = models.CharField(max_length=50, blank=True, null=True)
+    telegram_id = models.CharField(max_length=100, blank=True, null=True)
+
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -23,6 +28,9 @@ class User(AbstractBaseUser, TimestampedModel, SoftDeleteModel):
     REQUIRED_FIELDS = ["first_name", "email"]
 
     objects = managers.UserManager()
+
+    class Meta:
+        db_table = "users"
 
     def __str__(self):
         return f"{self.first_name} (@{self.get_username()})"

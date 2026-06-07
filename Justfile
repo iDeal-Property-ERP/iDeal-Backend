@@ -31,7 +31,16 @@ shell:
     python src/manage.py shell
 
 test:
-    python src/manage.py test
+    pytest src/tests
+
+test-unit:
+    pytest -m unit src/tests
+
+test-integration:
+    pytest -m integration src/tests
+
+test-cov:
+    pytest -n 0 --cov=src/apps --cov=src/api --cov=src/core --cov=src/config --cov-report=html:htmlcov --cov-fail-under=0 src/tests
 
 check:
     python src/manage.py check

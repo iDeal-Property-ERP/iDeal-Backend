@@ -27,7 +27,7 @@ class Command(BaseCommand):
         api_files = {
             "serializers.py": "",
             "views.py": "",
-            "urls.py": f"from django.urls import path\n\n" f'app_name = "{app_name}"\n\n' f"urlpatterns = []\n",
+            "urls.py": f'from django.urls import path\n\napp_name = "{app_name}"\n\nurlpatterns = []\n',
             "__init__.py": "",
         }
 

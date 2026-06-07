@@ -2,6 +2,7 @@ import jwt
 import pydantic
 from django.conf import settings
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from dmr import Body
 from dmr.plugins.pydantic import PydanticFastSerializer
 from dmr.security.jwt.views import (
@@ -18,7 +19,6 @@ from core.api.views import BaseController
 class LoginAPIView(
     JWTMixin, ObtainTokensSyncController[PydanticFastSerializer, ObtainTokensPayload, ObtainTokensResponse]
 ):
-
     def convert_auth_payload(self, payload: ObtainTokensPayload) -> ObtainTokensPayload:
         return {
             "username": payload["username"],
@@ -36,7 +36,6 @@ class LoginAPIView(
 
 
 class RefreshAPIView(JWTMixin, RefreshTokenSyncController[PydanticFastSerializer, dict, ObtainTokensResponse]):
-
     def convert_refresh_payload(self, payload: dict) -> str:
         refresh_token = payload.get("refresh") or payload.get("refresh_token") or ""
         return refresh_token
@@ -62,5 +61,5 @@ class TokenVerifyController(BaseController):
         try:
             jwt.decode(parsed_body.token, settings.SECRET_KEY, algorithms=["HS256"])
         except jwt.InvalidTokenError:
-            return self.fail("Token is invalid")
-        return self.ok("Token is valid")
+            return self.fail(str(_("Token is invalid")))
+        return self.ok(str(_("Token is valid")))

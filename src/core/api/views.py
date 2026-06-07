@@ -2,6 +2,7 @@ from typing import Any
 
 import pydantic
 from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext_lazy as _
 from dmr import Body, Controller, Path, Query
 from dmr.plugins.pydantic import PydanticFastSerializer
 from dmr.security.jwt.auth import JWTSyncAuth
@@ -11,20 +12,22 @@ from core.utils.pagination import build_paginated_response
 
 
 class BaseController(Controller[PydanticFastSerializer]):
-    SUCCESS_MESSAGE = "OK"
-    ERROR_MESSAGE = "NOT OK"
+    SUCCESS_MESSAGE = _("OK")
+    ERROR_MESSAGE = _("NOT OK")
     auth = (JWTSyncAuth(),)
 
     @staticmethod
     def ok(data):
         return {
             "success": True,
-            "message": "OK",
+            "message": str(_("OK")),
             "data": data,
         }
 
     @staticmethod
-    def fail(error, message: str = "NOT OK"):
+    def fail(error, message=None):
+        if message is None:
+            message = str(_("NOT OK"))
         return {
             "success": False,
             "message": message,
@@ -81,7 +84,10 @@ class GenericController(BaseController):
 class CreateAPIView(GenericController):
     def post(self, parsed_body: Body[dict]) -> dict:
         if self.create_schema is not None:
-            validated = self.create_schema.model_validate(parsed_body)
+            try:
+                validated = self.create_schema.model_validate(parsed_body)
+            except pydantic.ValidationError as err:
+                return self.fail(error=err.errors(include_url=False), message=str(_("Validation error")))
             data = validated.model_dump()
         else:
             data = parsed_body
