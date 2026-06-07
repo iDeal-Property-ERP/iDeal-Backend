@@ -1,9 +1,11 @@
+from http import HTTPStatus
+
 import jwt
 import pydantic
 from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from dmr import Body
+from dmr import Body, modify
 from dmr.plugins.pydantic import PydanticFastSerializer
 from dmr.security.jwt.views import (
     ObtainTokensPayload,
@@ -34,6 +36,10 @@ class LoginAPIView(
             ),
         }
 
+    @modify(status_code=HTTPStatus.OK)
+    def post(self, parsed_body: Body[ObtainTokensPayload]) -> dict:
+        return BaseController.ok(self.login(parsed_body))
+
 
 class RefreshAPIView(JWTMixin, RefreshTokenSyncController[PydanticFastSerializer, dict, ObtainTokensResponse]):
     def convert_refresh_payload(self, payload: dict) -> str:
@@ -49,6 +55,10 @@ class RefreshAPIView(JWTMixin, RefreshTokenSyncController[PydanticFastSerializer
             ),
         }
 
+    @modify(status_code=HTTPStatus.OK)
+    def post(self, parsed_body: Body[dict]) -> dict:
+        return BaseController.ok(self.refresh(parsed_body))
+
 
 class TokenVerifyInput(pydantic.BaseModel):
     token: str
@@ -61,5 +71,5 @@ class TokenVerifyController(BaseController):
         try:
             jwt.decode(parsed_body.token, settings.SECRET_KEY, algorithms=["HS256"])
         except jwt.InvalidTokenError:
-            return self.fail(str(_("Token is invalid")))
-        return self.ok(str(_("Token is valid")))
+            return self.fail(str(_("Token is invalid")), status_code=HTTPStatus.UNAUTHORIZED)
+        return self.ok(str(_("Token is valid")), status_code=HTTPStatus.OK)

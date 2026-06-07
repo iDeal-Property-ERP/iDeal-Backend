@@ -7,4 +7,5 @@ urlpatterns = [
     path("auth/", include("api.v1.core.urls.auth", namespace="auth")),
     path("misc/", include("api.v1.core.urls.misc", namespace="health")),
     path("properties/", include("api.v1.property.urls", namespace="property")),
+    path("contracts/", include("api.v1.contract.urls", namespace="contract")),
 ]

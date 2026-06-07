@@ -45,6 +45,7 @@ LOCAL_APPS = [
     "account",
     "core",
     "property",
+    "contract",
 ]
 
 INSTALLED_APPS = UNFOLD_APPS + DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -204,7 +205,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 DMR_SETTINGS = {
     "parsers": [JsonParser()],
     "renderers": [JsonRenderer()],
-    "validate_responses": True,
+    "validate_responses": False,
     "semantic_responses": True,
     "global_error_handler": "core.api.exceptions.global_error_handler",
     "openapi_config": OpenAPIConfig(

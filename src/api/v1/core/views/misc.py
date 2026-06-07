@@ -5,11 +5,11 @@ class HealthAPIView(GenericController):
     auth = ()
 
     def get(self) -> dict:
-        return {"status": "ok"}
+        return self.ok({"status": "ok"})
 
 
 class TestAPIView(GenericController):
     auth = ()
 
     def get(self) -> dict:
-        return {"message": "This is a test endpoint."}
+        return self.ok({"message": "This is a test endpoint."})

@@ -60,3 +60,27 @@ class TariffChoices(ConstantChoices):
         (COMFORT, _("Comfort")),
         (PREMIUM, _("Premium")),
     ]
+
+
+class OwnerAgreementStatus(ConstantChoices):
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    TERMINATED = "terminated"
+    CHOICES = [
+        (ACTIVE, _("Active")),
+        (EXPIRED, _("Expired")),
+        (TERMINATED, _("Terminated")),
+    ]
+
+
+class LeaseStatus(ConstantChoices):
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    RENEWED = "renewed"
+    TERMINATED = "terminated"
+    CHOICES = [
+        (ACTIVE, _("Active")),
+        (EXPIRED, _("Expired")),
+        (RENEWED, _("Renewed")),
+        (TERMINATED, _("Terminated")),
+    ]

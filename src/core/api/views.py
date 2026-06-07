@@ -1,10 +1,13 @@
+from http import HTTPStatus
 from typing import Any
 
 import pydantic
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Controller, Path, Query
 from dmr.plugins.pydantic import PydanticFastSerializer
+from dmr.response import APIError
 from dmr.security.jwt.auth import JWTSyncAuth
 
 from core.models import BaseModel
@@ -17,22 +20,28 @@ class BaseController(Controller[PydanticFastSerializer]):
     auth = (JWTSyncAuth(),)
 
     @staticmethod
-    def ok(data):
-        return {
+    def ok(data, *, status_code=None):
+        raw_data = {
             "success": True,
             "message": str(_("OK")),
             "data": data,
         }
+        if status_code is not None:
+            return JsonResponse(raw_data, status=status_code)
+        return raw_data
 
     @staticmethod
-    def fail(error, message=None):
+    def fail(error, message=None, status_code=HTTPStatus.BAD_REQUEST):
         if message is None:
             message = str(_("NOT OK"))
-        return {
-            "success": False,
-            "message": message,
-            "error": error,
-        }
+        raise APIError(
+            raw_data={
+                "success": False,
+                "message": message,
+                "error": error,
+            },
+            status_code=status_code,
+        )
 
 
 class ListQuery(pydantic.BaseModel):
@@ -87,7 +96,10 @@ class CreateAPIView(GenericController):
             try:
                 validated = self.create_schema.model_validate(parsed_body)
             except pydantic.ValidationError as err:
-                return self.fail(error=err.errors(include_url=False), message=str(_("Validation error")))
+                raw_errors = err.errors(include_url=False)
+                for e in raw_errors:
+                    e.pop("ctx", None)
+                return self.fail(error=raw_errors, message=str(_("Validation error")))
             data = validated.model_dump()
         else:
             data = parsed_body
@@ -119,7 +131,13 @@ class UpdateAPIView(GenericController):
     def put(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
         instance = self.get_object(pk=parsed_path.pk)
         if self.update_schema is not None:
-            validated = self.update_schema.model_validate(parsed_body)
+            try:
+                validated = self.update_schema.model_validate(parsed_body)
+            except pydantic.ValidationError as err:
+                raw_errors = err.errors(include_url=False)
+                for e in raw_errors:
+                    e.pop("ctx", None)
+                return self.fail(error=raw_errors, message=str(_("Validation error")))
             data = validated.model_dump()
         else:
             data = parsed_body
@@ -131,7 +149,13 @@ class PartialUpdateAPIView(GenericController):
     def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
         instance = self.get_object(pk=parsed_path.pk)
         if self.update_schema is not None:
-            validated = self.update_schema.model_validate(parsed_body)
+            try:
+                validated = self.update_schema.model_validate(parsed_body)
+            except pydantic.ValidationError as err:
+                raw_errors = err.errors(include_url=False)
+                for e in raw_errors:
+                    e.pop("ctx", None)
+                return self.fail(error=raw_errors, message=str(_("Validation error")))
             data = validated.model_dump(exclude_unset=True)
         else:
             data = parsed_body

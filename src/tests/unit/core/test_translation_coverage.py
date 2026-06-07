@@ -41,14 +41,23 @@ def _scan_file(filepath):
             if not isinstance(target, ast.Name):
                 continue
 
-            if target.id in ("verbose_name", "verbose_name_plural", "help_text") and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str) and not _is_gettext_call(node.value):
+            if (
+                target.id in ("verbose_name", "verbose_name_plural", "help_text")
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+                and not _is_gettext_call(node.value)
+            ):
                 violations.append((node.lineno, target.id, node.value.value))
 
             if target.id == "CHOICES" and isinstance(node.value, ast.List):
                 for elt in node.value.elts:
                     if isinstance(elt, ast.Tuple) and len(elt.elts) == 2:
                         display = elt.elts[1]
-                        if isinstance(display, ast.Constant) and isinstance(display.value, str) and not _is_gettext_call(display):
+                        if (
+                            isinstance(display, ast.Constant)
+                            and isinstance(display.value, str)
+                            and not _is_gettext_call(display)
+                        ):
                             violations.append((display.lineno, "CHOICES", display.value))
 
     return violations
@@ -83,5 +92,5 @@ def test_no_untranslated_user_facing_strings():
     if violations:
         msg = "Untranslated user-facing strings found:\n"
         for relpath, line, context, text in violations:
-            msg += f"  {relpath}:{line}  [{context}]  \"{text}\"\n"
+            msg += f'  {relpath}:{line}  [{context}]  "{text}"\n'
         pytest.fail(msg)

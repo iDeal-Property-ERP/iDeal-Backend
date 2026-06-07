@@ -4,6 +4,8 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pydantic
+from django.utils.translation import gettext_lazy as _
+from pydantic import field_validator
 
 
 class DistrictOutput(pydantic.BaseModel):
@@ -76,6 +78,24 @@ class PropertyCreateInput(pydantic.BaseModel):
     vacant_since: date | None = None
     vacant_days: int = 0
 
+    @field_validator("district_id")
+    @classmethod
+    def check_district_exists(cls, v: int) -> int:
+        from property.models import District
+
+        if not District.objects.filter(id=v).exists():
+            raise ValueError(_("District with id %s does not exist") % v)
+        return v
+
+    @field_validator("owner_id")
+    @classmethod
+    def check_owner_exists(cls, v: int) -> int:
+        from account.models import User
+
+        if not User.objects.filter(id=v).exists():
+            raise ValueError(_("Owner with id %s does not exist") % v)
+        return v
+
 
 class PropertyUpdateInput(pydantic.BaseModel):
     name: str | None = None
@@ -100,3 +120,25 @@ class PropertyUpdateInput(pydantic.BaseModel):
     tenant_charge_currency: str | None = None
     vacant_since: date | None = None
     vacant_days: int | None = None
+
+    @field_validator("district_id")
+    @classmethod
+    def check_district_exists(cls, v: int | None) -> int | None:
+        if v is None:
+            return v
+        from property.models import District
+
+        if not District.objects.filter(id=v).exists():
+            raise ValueError(_("District with id %s does not exist") % v)
+        return v
+
+    @field_validator("owner_id")
+    @classmethod
+    def check_owner_exists(cls, v: int | None) -> int | None:
+        if v is None:
+            return v
+        from account.models import User
+
+        if not User.objects.filter(id=v).exists():
+            raise ValueError(_("Owner with id %s does not exist") % v)
+        return v

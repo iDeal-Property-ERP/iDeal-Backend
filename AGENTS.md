@@ -61,7 +61,14 @@ This project uses DMR v0.10.0 with `PydanticFastSerializer`, NOT Django REST Fra
 - No `APIView` — controllers extend `BaseController` → DMR `Controller[PydanticFastSerializer]`
 - CRUD mixins at `core/api/views.py`: `CreateAPIView`, `ListAPIView`, `RetrieveAPIView`, `UpdateAPIView`, `PartialUpdateAPIView`, `DeleteAPIView`
 - All views require JWT auth by default (`auth = (JWTSyncAuth(),)` on `BaseController`)
-- Response envelope: `{"success": bool, "message": str, "data": ...}`
+- Response envelope — every endpoint must return (use `self.ok(data)` / `self.fail(error, message)` or `BaseController.ok(data)` / `BaseController.fail(error, message)` if not inheriting from `BaseController`):
+  - Success: `{"success": true, "message": str(_("OK")), "data": data}`
+  - Failure: `{"success": false, "message": message, "error": error}`
+- `ok(data)` returns a plain dict (status code inferred by DMR: POST → 201, others → 200)
+- `ok(data, status_code=HTTPStatus.OK)` returns a `JsonResponse` with explicit status code, bypassing DMR inference
+- `fail(error, message=None, status_code=HTTPStatus.BAD_REQUEST)` raises `dmr.response.APIError` with the failure dict and the given status code. Callers should use `return self.fail(...)` — the exception prevents the return from being reached.
+- `ok(data)` returns a plain dict (status code inferred by DMR: POST → 201, others → 200)
+- `fail(error, message=None, status_code=HTTPStatus.BAD_REQUEST)` raises `dmr.response.APIError` with the failure dict and the given status code. Callers should use `return self.fail(...)` — the exception prevents the return from being reached.
 
 ### Creating a new app + API
 
