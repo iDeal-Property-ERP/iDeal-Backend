@@ -155,3 +155,27 @@ response = client.get("/api/v1/properties/", **auth)
 - **Ruff S101** (assert) is ignored in test files.
 - **Line length**: 120 chars (both ruff and black).
 - **Quote style**: double quotes (ruff format).
+
+## Postman
+
+iDeal API collection: `41924153-ba70da5d-fed9-4973-8e18-6f52381d9c7c`
+Workspace: My Workspace (`b8c8a6f6-fbe6-4203-87bc-0eecfe27a9de`)
+
+Use the `postman_getCollection` tool to fetch the collection, `postman_createCollectionRequest` to add endpoints, etc.
+
+### Syncing endpoints
+
+Whenever you create, update, or delete an API endpoint, you **must** keep the Postman collection in sync:
+
+- **New endpoint** → `postman_createCollectionRequest` + `postman_createCollectionResponse` (at least 1 saved response; add a failure variant for POST/PATCH)
+- **Changed schema** → update the request's `rawModeData` body and replace / add saved responses with the new field shape
+- **Deleted endpoint** → `postman_deleteCollectionRequest`
+- **Changed URL** → `postman_updateCollectionRequest` with the new `url`
+
+**Request conventions (match existing collection style):**
+- URL: `{{BASE_URL}}/api/v1/<resource>/` — use `{{BASE_URL}}` variable
+- Auth: omit `auth` to inherit collection-level Bearer `{{TOKEN}}` (only override to `noauth` for public endpoints)
+- Body: `dataMode: "raw"`, `dataOptions: {"raw": {"language": "json"}}`
+- Comments: inline `//` hints on body fields — `// FK`, `// optional`, `// default = "value"`, `// default: null`
+- Responses: saved under the `response` array with a descriptive `name` (e.g. `"success"`, `"validation error"`, `"already paid (fail)"`)
+- Folder organization: group by resource sub-folder (e.g. `Finance/Payments/`, `Contracts/leases/`)

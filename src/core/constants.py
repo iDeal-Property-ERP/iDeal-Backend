@@ -84,3 +84,73 @@ class LeaseStatus(ConstantChoices):
         (RENEWED, _("Renewed")),
         (TERMINATED, _("Terminated")),
     ]
+
+
+class PaymentStatus(ConstantChoices):
+    PENDING = "pending"
+    PAID = "paid"
+    OVERDUE = "overdue"
+    CANCELLED = "cancelled"
+    CHOICES = [
+        (PENDING, _("Pending")),
+        (PAID, _("Paid")),
+        (OVERDUE, _("Overdue")),
+        (CANCELLED, _("Cancelled")),
+    ]
+
+
+class PaymentMethod(ConstantChoices):
+    CASH = "cash"
+    BANK_TRANSFER = "bank_transfer"
+    ONLINE = "online"
+    CHOICES = [
+        (CASH, _("Cash")),
+        (BANK_TRANSFER, _("Bank Transfer")),
+        (ONLINE, _("Online")),
+    ]
+
+
+class PayoutStatus(ConstantChoices):
+    SCHEDULED = "scheduled"
+    PAID = "paid"
+    CANCELLED = "cancelled"
+    CHOICES = [
+        (SCHEDULED, _("Scheduled")),
+        (PAID, _("Paid")),
+        (CANCELLED, _("Cancelled")),
+    ]
+
+
+class Currency(ConstantChoices):
+    USD = "USD"
+    UZS = "UZS"
+    CHOICES = [
+        (USD, _("USD")),
+        (UZS, _("UZS")),
+    ]
+
+
+class ServiceRequestStatus(ConstantChoices):
+    OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    CANCELLED = "cancelled"
+    CHOICES = [
+        (OPEN, _("Open")),
+        (IN_PROGRESS, _("In Progress")),
+        (RESOLVED, _("Resolved")),
+        (CANCELLED, _("Cancelled")),
+    ]
+
+
+class ServiceRequestPriority(ConstantChoices):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+    CHOICES = [
+        (LOW, _("Low")),
+        (MEDIUM, _("Medium")),
+        (HIGH, _("High")),
+        (CRITICAL, _("Critical")),
+    ]

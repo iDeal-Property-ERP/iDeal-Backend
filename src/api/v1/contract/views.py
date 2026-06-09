@@ -47,6 +47,7 @@ class LeaseDetailView(RetrieveAPIView):
 
 class LeaseRenewView(GenericController):
     model = Lease
+    create_schema = LeaseRenewInput
     output_schema = LeaseOutput
 
     def get_queryset(self):
