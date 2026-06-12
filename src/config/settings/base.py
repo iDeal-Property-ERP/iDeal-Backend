@@ -50,6 +50,8 @@ LOCAL_APPS = [
     "maintenance",
     "marketplace",
     "agent",
+    "owner",
+    "tenant",
 ]
 
 INSTALLED_APPS = UNFOLD_APPS + DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

@@ -12,4 +12,6 @@ urlpatterns = [
     path("maintenance/", include("api.v1.maintenance.urls", namespace="maintenance")),
     path("marketplace/", include("api.v1.marketplace.urls", namespace="marketplace")),
     path("agents/", include("api.v1.agent.urls", namespace="agent")),
+    path("owner/", include("api.v1.owner.urls", namespace="owner")),
+    path("tenant/", include("api.v1.tenant.urls", namespace="tenant")),
 ]
