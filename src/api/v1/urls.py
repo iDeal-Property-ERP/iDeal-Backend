@@ -11,4 +11,5 @@ urlpatterns = [
     path("finance/", include("api.v1.finance.urls", namespace="finance")),
     path("maintenance/", include("api.v1.maintenance.urls", namespace="maintenance")),
     path("marketplace/", include("api.v1.marketplace.urls", namespace="marketplace")),
+    path("agents/", include("api.v1.agent.urls", namespace="agent")),
 ]

@@ -1,4 +1,5 @@
 from .account import AgentFactory, OwnerFactory, TenantFactory, UserFactory
+from .agent import AgentDealFactory, AgentProfileFactory
 from .contract import LeaseFactory, LeaseRenewalFactory, OwnerAgreementFactory
 from .finance import ExchangeRateFactory, PaymentFactory, PayoutScheduleFactory
 from .maintenance import ServiceRequestFactory, ServiceRequestPhotoFactory
@@ -10,6 +11,8 @@ __all__ = [
     "OwnerFactory",
     "TenantFactory",
     "AgentFactory",
+    "AgentProfileFactory",
+    "AgentDealFactory",
     "DistrictFactory",
     "PropertyFactory",
     "PropertyPhotoFactory",

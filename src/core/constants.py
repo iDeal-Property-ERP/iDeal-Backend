@@ -156,6 +156,17 @@ class ServiceRequestPriority(ConstantChoices):
     ]
 
 
+class AgentDealStatus(ConstantChoices):
+    CLOSED = "closed"
+    PENDING = "pending"
+    CANCELLED = "cancelled"
+    CHOICES = [
+        (CLOSED, _("Closed")),
+        (PENDING, _("Pending")),
+        (CANCELLED, _("Cancelled")),
+    ]
+
+
 class ViewingRequestStatus(ConstantChoices):
     PENDING = "pending"
     CONFIRMED = "confirmed"
