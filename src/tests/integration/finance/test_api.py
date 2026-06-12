@@ -125,7 +125,7 @@ class TestPaymentAPI:
             f"/api/v1/finance/payments/{payment.id}/mark-paid/",
             **_make_jwt(owner),
         )
-        assert response.status_code == 201
+        assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
         assert body["data"]["status"] == "paid"
