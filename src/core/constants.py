@@ -154,3 +154,14 @@ class ServiceRequestPriority(ConstantChoices):
         (HIGH, _("High")),
         (CRITICAL, _("Critical")),
     ]
+
+
+class ViewingRequestStatus(ConstantChoices):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"
+    CHOICES = [
+        (PENDING, _("Pending")),
+        (CONFIRMED, _("Confirmed")),
+        (CANCELLED, _("Cancelled")),
+    ]
