@@ -6,6 +6,7 @@ app_name = "management"
 
 urlpatterns = [
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
+    path("pnl/", views.PnLSummaryView.as_view(), name="pnl"),
     path("users/", views.ManagementUserListView.as_view(), name="user-list"),
     path("users/<int:pk>/", views.ManagementUserDetailUpdateView.as_view(), name="user-detail"),
     path("properties/", views.ManagementPropertyListView.as_view(), name="property-list"),

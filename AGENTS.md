@@ -81,6 +81,8 @@ This project uses DMR v0.10.0 with `PydanticFastSerializer`, NOT Django REST Fra
 7. Register in admin: `src/apps/<name>/admin.py` (extend `core.admin.BaseModelAdmin` or `BaseSoftDeleteModelAdmin`)
 8. `just makemigrations` + `just migrate`
 
+**Always include `id` in API responses for any entity** (payment, service request, etc.) — the frontend relies on stable IDs for keys, updates, and navigation.
+
 ## Models
 
 - Every model that persists data inherits `TimestampedModel` and `SoftDeleteModel` from `core.models`
@@ -163,9 +165,8 @@ The iDeal frontend lives at `/home/mehroj/WebstormProjects/iDeal-Frontend`.
 **Breaking API changes** (schema changes, URL changes, response format changes, new required fields, removed fields, renamed keys, changed status codes) **must** be adjusted in the frontend as well. After making backend API changes, check and update the corresponding frontend code.
 
 ## Postman
-
-iDeal API collection: `41924153-ba70da5d-fed9-4973-8e18-6f52381d9c7c`
-Workspace: My Workspace (`b8c8a6f6-fbe6-4203-87bc-0eecfe27a9de`)
+iDeal API collection: `47796254-67fe0405-7142-4fc5-8a5d-ccccd8807359`
+Workspace: My Workspace (`a41d1a8d-6bd0-44b7-8323-8c345f25e7a4`)
 
 Use the `postman_getCollection` tool to fetch the collection, `postman_createCollectionRequest` to add endpoints, etc.
 
