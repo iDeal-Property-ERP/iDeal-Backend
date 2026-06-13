@@ -219,22 +219,13 @@ class ManagementUserListView(BaseController):
 
 
 class ManagementUserDetailUpdateView(BaseController):
-    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementUserUpdateInput]) -> dict:
         user = self.request.user
         if not _ensure_management(user):
             return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
 
         instance = self._get_user(parsed_path.pk)
-        import pydantic
-
-        try:
-            validated = ManagementUserUpdateInput.model_validate(parsed_body)
-        except pydantic.ValidationError as err:
-            raw_errors = err.errors(include_url=False)
-            for e in raw_errors:
-                e.pop("ctx", None)
-            return self.fail(error=raw_errors, message=str(_("Validation error")))
-        data = validated.model_dump(exclude_unset=True)
+        data = parsed_body.model_dump(exclude_unset=True)
         for attr, value in data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -384,10 +375,7 @@ class ManagementServiceRequestListView(BaseController):
             return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
         from maintenance.models import ServiceRequest
 
-        qs = (
-            ServiceRequest.objects.select_related("property", "tenant", "assigned_to")
-            .order_by("-created_at")
-        )
+        qs = ServiceRequest.objects.select_related("property", "tenant", "assigned_to").order_by("-created_at")
         status = self.request.GET.get("status")
         priority = self.request.GET.get("priority")
         property_id = self.request.GET.get("property_id")

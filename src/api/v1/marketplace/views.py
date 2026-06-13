@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pydantic
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 from marketplace.models import Listing, ViewingRequest
 from property.models import Property
@@ -144,16 +143,11 @@ class BookViewingView(GenericController):
     def get_queryset(self):
         return Listing.objects.filter(is_active=True).all()
 
-    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
+    def post(
+        self, parsed_path: Path[DetailPath], parsed_body: Body[ViewingRequestCreateInput]
+    ) -> dict:
         listing = self.get_object(pk=parsed_path.pk)
-        try:
-            validated = ViewingRequestCreateInput.model_validate(parsed_body)
-        except pydantic.ValidationError as err:
-            raw_errors = err.errors(include_url=False)
-            for e in raw_errors:
-                e.pop("ctx", None)
-            return self.fail(error=raw_errors, message=str(_("Validation error")))
-        vr = ViewingRequest.objects.create(listing=listing, **validated.model_dump())
+        vr = ViewingRequest.objects.create(listing=listing, **parsed_body.model_dump())
         return self.ok(
             {
                 "id": vr.id,

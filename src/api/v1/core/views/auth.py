@@ -11,6 +11,7 @@ from dmr.security.jwt.views import (
     ObtainTokensPayload,
     ObtainTokensResponse,
     ObtainTokensSyncController,
+    RefreshTokenPayload,
     RefreshTokenSyncController,
 )
 
@@ -56,7 +57,7 @@ class RefreshAPIView(JWTMixin, RefreshTokenSyncController[PydanticFastSerializer
         }
 
     @modify(status_code=HTTPStatus.OK)
-    def post(self, parsed_body: Body[dict]) -> dict:
+    def post(self, parsed_body: Body[RefreshTokenPayload]) -> dict:
         return BaseController.ok(self.refresh(parsed_body))
 
 

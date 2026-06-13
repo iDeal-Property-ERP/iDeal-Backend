@@ -1,7 +1,6 @@
 import pydantic
 from agent.models import Agent, AgentDeal
 from django.shortcuts import get_object_or_404
-from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 
 from api.v1.agent.schemas import AgentDealCreateInput, AgentDealOutput, AgentOutput
@@ -95,22 +94,15 @@ class AgentDealListCreateView(GenericController):
             return self.ok(paginated)
         return self.ok(items)
 
-    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[AgentDealCreateInput]) -> dict:
         agent = get_object_or_404(Agent.objects.all(), pk=parsed_path.pk)
-        try:
-            validated = AgentDealCreateInput.model_validate(parsed_body)
-        except pydantic.ValidationError as err:
-            raw_errors = err.errors(include_url=False)
-            for e in raw_errors:
-                e.pop("ctx", None)
-            return self.fail(error=raw_errors, message=str(_("Validation error")))
-        commission_amount = validated.rent_amount * agent.commission_rate / 100
+        commission_amount = parsed_body.rent_amount * agent.commission_rate / 100
         deal = AgentDeal.objects.create(
             agent=agent,
-            property_id=validated.property_id,
-            deal_date=validated.deal_date,
-            rent_amount=validated.rent_amount,
+            property_id=parsed_body.property_id,
+            deal_date=parsed_body.deal_date,
+            rent_amount=parsed_body.rent_amount,
             commission_amount=commission_amount,
-            status=validated.status,
+            status=parsed_body.status,
         )
         return self.ok(_build_deal_output(deal))

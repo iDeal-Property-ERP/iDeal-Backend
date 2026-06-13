@@ -156,6 +156,12 @@ response = client.get("/api/v1/properties/", **auth)
 - **Line length**: 120 chars (both ruff and black).
 - **Quote style**: double quotes (ruff format).
 
+## Frontend
+
+The iDeal frontend lives at `/home/mehroj/WebstormProjects/iDeal-Frontend`.
+
+**Breaking API changes** (schema changes, URL changes, response format changes, new required fields, removed fields, renamed keys, changed status codes) **must** be adjusted in the frontend as well. After making backend API changes, check and update the corresponding frontend code.
+
 ## Postman
 
 iDeal API collection: `41924153-ba70da5d-fed9-4973-8e18-6f52381d9c7c`

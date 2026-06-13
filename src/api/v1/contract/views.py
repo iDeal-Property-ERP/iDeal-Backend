@@ -1,7 +1,6 @@
-import pydantic
 from contract.models import Lease, OwnerAgreement
-from django.utils.translation import gettext_lazy as _
-from dmr import Body, Path
+from dmr import Body, Path, Query
+from dmr.pagination import Paginated
 
 from api.v1.contract.schemas import (
     LeaseCreateInput,
@@ -15,6 +14,7 @@ from core.api.views import (
     DetailPath,
     GenericController,
     ListAPIView,
+    ListQuery,
     RetrieveAPIView,
 )
 
@@ -27,6 +27,14 @@ class OwnerAgreementListCreateView(CreateAPIView, ListAPIView):
     def get_queryset(self):
         return OwnerAgreement.objects.select_related("owner", "property").all()
 
+    def post(self, parsed_body: Body[OwnerAgreementCreateInput]) -> OwnerAgreementOutput:
+        return super().post(parsed_body)
+
+    def get(
+        self, parsed_query: Query[ListQuery]
+    ) -> list[OwnerAgreementOutput] | Paginated[OwnerAgreementOutput]:
+        return super().get(parsed_query)
+
 
 class LeaseListCreateView(CreateAPIView, ListAPIView):
     model = Lease
@@ -36,6 +44,12 @@ class LeaseListCreateView(CreateAPIView, ListAPIView):
     def get_queryset(self):
         return Lease.objects.select_related("property", "owner_agreement", "tenant").all()
 
+    def post(self, parsed_body: Body[LeaseCreateInput]) -> LeaseOutput:
+        return super().post(parsed_body)
+
+    def get(self, parsed_query: Query[ListQuery]) -> list[LeaseOutput] | Paginated[LeaseOutput]:
+        return super().get(parsed_query)
+
 
 class LeaseDetailView(RetrieveAPIView):
     model = Lease
@@ -43,6 +57,9 @@ class LeaseDetailView(RetrieveAPIView):
 
     def get_queryset(self):
         return Lease.objects.select_related("property", "owner_agreement", "tenant").all()
+
+    def get(self, parsed_path: Path[DetailPath]) -> LeaseOutput:
+        return super().get(parsed_path)
 
 
 class LeaseRenewView(GenericController):
@@ -53,16 +70,12 @@ class LeaseRenewView(GenericController):
     def get_queryset(self):
         return Lease.objects.select_related("property", "owner_agreement", "tenant").all()
 
-    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[LeaseRenewInput]) -> LeaseOutput:
         lease = self.get_object(pk=parsed_path.pk)
-        try:
-            validated = LeaseRenewInput.model_validate(parsed_body)
-        except pydantic.ValidationError as err:
-            return self.fail(error=err.errors(include_url=False), message=str(_("Validation error")))
         new_lease = lease.renew(
-            new_start_date=validated.new_start_date,
-            new_end_date=validated.new_end_date,
-            new_monthly_rent=validated.new_monthly_rent,
-            deposit=validated.deposit,
+            new_start_date=parsed_body.new_start_date,
+            new_end_date=parsed_body.new_end_date,
+            new_monthly_rent=parsed_body.new_monthly_rent,
+            deposit=parsed_body.deposit,
         )
         return self.ok(self.to_output(new_lease))

@@ -100,24 +100,16 @@ class TenantServiceRequestListCreateView(BaseController):
         items = [_build_service_request_output(obj) for obj in qs]
         return self.ok(items)
 
-    def post(self, parsed_body: Body[dict]) -> dict:
+    def post(self, parsed_body: Body[TenantServiceRequestCreateInput]) -> dict:
         user = self.request.user
         if user.role != UserRole.TENANT:
             return self.fail(error=str(_("Only tenants can access this endpoint")), status_code=403)
-        import pydantic
 
-        try:
-            validated = TenantServiceRequestCreateInput.model_validate(parsed_body)
-        except pydantic.ValidationError as err:
-            raw_errors = err.errors(include_url=False)
-            for e in raw_errors:
-                e.pop("ctx", None)
-            return self.fail(error=raw_errors, message=str(_("Validation error")))
         from contract.models import Lease
 
         has_active = Lease.objects.filter(
             tenant=user,
-            property_id=validated.property_id,
+            property_id=parsed_body.property_id,
             status=LeaseStatus.ACTIVE,
         ).exists()
         if not has_active:
@@ -128,10 +120,10 @@ class TenantServiceRequestListCreateView(BaseController):
         from maintenance.models import ServiceRequest
 
         sr = ServiceRequest.objects.create(
-            property_id=validated.property_id,
+            property_id=parsed_body.property_id,
             tenant=user,
-            title=validated.title,
-            description=validated.description,
-            priority=validated.priority,
+            title=parsed_body.title,
+            description=parsed_body.description,
+            priority=parsed_body.priority,
         )
         return self.ok(_build_service_request_output(sr))

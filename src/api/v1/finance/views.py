@@ -2,10 +2,10 @@ from datetime import date as date_type
 from decimal import Decimal
 from http import HTTPStatus
 
-import pydantic
 from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
+from dmr.pagination import Paginated
 from finance.models import ExchangeRate, Payment, PayoutSchedule
 from finance.utils import convert_amount
 
@@ -25,6 +25,7 @@ from core.api.views import (
     DetailPath,
     GenericController,
     ListAPIView,
+    ListQuery,
 )
 from core.constants import Currency, PaymentStatus, PayoutStatus
 
@@ -37,6 +38,12 @@ class PaymentListCreateView(CreateAPIView, ListAPIView):
     def get_queryset(self):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
 
+    def post(self, parsed_body: Body[PaymentCreateInput]) -> PaymentOutput:
+        return super().post(parsed_body)
+
+    def get(self, parsed_query: Query[ListQuery]) -> list[PaymentOutput] | Paginated[PaymentOutput]:
+        return super().get(parsed_query)
+
 
 class PaymentPartialUpdateView(GenericController):
     model = Payment
@@ -45,13 +52,11 @@ class PaymentPartialUpdateView(GenericController):
     def get_queryset(self):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
 
-    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
+    def patch(
+        self, parsed_path: Path[DetailPath], parsed_body: Body[PaymentPartialUpdateInput]
+    ) -> PaymentOutput:
         payment = self.get_object(pk=parsed_path.pk)
-        try:
-            validated = PaymentPartialUpdateInput.model_validate(parsed_body)
-        except pydantic.ValidationError as err:
-            return self.fail(error=err.errors(include_url=False), message=str(_("Validation error")))
-        data = validated.model_dump(exclude_unset=True)
+        data = parsed_body.model_dump(exclude_unset=True)
         for attr, value in data.items():
             setattr(payment, attr, value)
         payment.save()
@@ -65,7 +70,7 @@ class PaymentMarkPaidView(GenericController):
     def get_queryset(self):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
 
-    def post(self, parsed_path: Path[DetailPath]) -> dict:
+    def post(self, parsed_path: Path[DetailPath]) -> PaymentOutput:
         payment = self.get_object(pk=parsed_path.pk)
         if payment.status == PaymentStatus.PAID:
             return self.fail(
@@ -83,6 +88,14 @@ class ExchangeRateListCreateView(CreateAPIView, ListAPIView):
     output_schema = ExchangeRateOutput
     create_schema = ExchangeRateCreateInput
 
+    def post(self, parsed_body: Body[ExchangeRateCreateInput]) -> ExchangeRateOutput:
+        return super().post(parsed_body)
+
+    def get(
+        self, parsed_query: Query[ListQuery]
+    ) -> list[ExchangeRateOutput] | Paginated[ExchangeRateOutput]:
+        return super().get(parsed_query)
+
 
 class PayoutScheduleListView(ListAPIView):
     model = PayoutSchedule
@@ -90,6 +103,11 @@ class PayoutScheduleListView(ListAPIView):
 
     def get_queryset(self):
         return PayoutSchedule.objects.select_related("owner_agreement", "owner").all()
+
+    def get(
+        self, parsed_query: Query[ListQuery]
+    ) -> list[PayoutScheduleOutput] | Paginated[PayoutScheduleOutput]:
+        return super().get(parsed_query)
 
 
 def _safe_convert(amount, from_currency, to_currency):
@@ -102,7 +120,7 @@ def _safe_convert(amount, from_currency, to_currency):
 
 
 class DashboardView(GenericController):
-    def get(self) -> dict:
+    def get(self) -> DashboardMetrics:
         paid_payments = Payment.objects.filter(status=PaymentStatus.PAID)
         total_payments = paid_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         total_payments_uzs = Decimal("0.00")
@@ -142,7 +160,7 @@ class DashboardView(GenericController):
 
 
 class PnLView(GenericController):
-    def get(self, parsed_query: Query[PnLFilter]) -> dict:
+    def get(self, parsed_query: Query[PnLFilter]) -> PnLBreakdown:
         year = parsed_query.year
         month = parsed_query.month
 
