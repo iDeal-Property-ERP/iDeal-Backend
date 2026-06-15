@@ -5,7 +5,7 @@
 All commands run from project root with `just` (loads `.env` automatically).
 
 ```bash
-just test              # pytest src/tests (all 19 tests)
+just test              # pytest src/tests
 just test-unit         # pytest -m unit src/tests
 just test-integration  # pytest -m integration src/tests
 just test-cov          # sequential coverage with HTML report

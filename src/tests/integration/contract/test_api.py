@@ -23,7 +23,7 @@ def _make_jwt(user):
 
 @pytest.mark.django_db
 class TestOwnerAgreementAPI:
-    def test_create_owner_agreement(self, api_client, owner, property_obj):
+    def test_create_owner_agreement(self, api_client, management, owner, property_obj):
         payload = json.dumps(
             {
                 "owner_id": owner.id,
@@ -39,7 +39,7 @@ class TestOwnerAgreementAPI:
             "/api/v1/contracts/owner-agreements/",
             payload,
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 201
         body = response.json()
@@ -66,12 +66,12 @@ class TestOwnerAgreementAPI:
         )
         assert response.status_code in (401, 403)
 
-    def test_list_owner_agreements(self, api_client, owner):
+    def test_list_owner_agreements(self, api_client, management, owner):
         OwnerAgreementFactory(owner=owner)
         OwnerAgreementFactory(owner=owner)
         response = api_client.get(
             "/api/v1/contracts/owner-agreements/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -81,7 +81,7 @@ class TestOwnerAgreementAPI:
 
 @pytest.mark.django_db
 class TestLeaseAPI:
-    def test_create_lease_property_status_rented(self, api_client, tenant, property_obj):
+    def test_create_lease_property_status_rented(self, api_client, management, tenant, property_obj):
         agreement = OwnerAgreementFactory(property=property_obj)
         property_obj.status = "vacant"
         property_obj.save()
@@ -101,7 +101,7 @@ class TestLeaseAPI:
             "/api/v1/contracts/leases/",
             payload,
             content_type="application/json",
-            **_make_jwt(tenant),
+            **_make_jwt(management),
         )
         assert response.status_code == 201
         body = response.json()
@@ -131,12 +131,12 @@ class TestLeaseAPI:
         )
         assert response.status_code in (401, 403)
 
-    def test_list_leases(self, api_client, owner):
+    def test_list_leases(self, api_client, management):
         LeaseFactory()
         LeaseFactory()
         response = api_client.get(
             "/api/v1/contracts/leases/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -144,31 +144,31 @@ class TestLeaseAPI:
         assert isinstance(body["data"], list)
         assert len(body["data"]) >= 2
 
-    def test_retrieve_lease(self, api_client, owner):
+    def test_retrieve_lease(self, api_client, management):
         lease = LeaseFactory()
         response = api_client.get(
             f"/api/v1/contracts/leases/{lease.id}/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
         assert body["data"]["id"] == lease.id
 
-    def test_retrieve_lease_404(self, api_client, owner):
+    def test_retrieve_lease_404(self, api_client, management):
         response = api_client.get(
             "/api/v1/contracts/leases/99999/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 404
 
-    def test_invalid_lease_data(self, api_client, tenant):
+    def test_invalid_lease_data(self, api_client, management):
         payload = json.dumps({"property_id": 1})
         response = api_client.post(
             "/api/v1/contracts/leases/",
             payload,
             content_type="application/json",
-            **_make_jwt(tenant),
+            **_make_jwt(management),
         )
         assert response.status_code == 400
         body = response.json()
@@ -178,7 +178,7 @@ class TestLeaseAPI:
 
 @pytest.mark.django_db
 class TestLeaseRenewAPI:
-    def test_renew_lease(self, api_client, owner, property_obj, tenant):
+    def test_renew_lease(self, api_client, management, owner, property_obj, tenant):
         agreement = OwnerAgreementFactory(property=property_obj)
         lease = LeaseFactory(
             property=property_obj,
@@ -199,7 +199,7 @@ class TestLeaseRenewAPI:
             f"/api/v1/contracts/leases/{lease.id}/renew/",
             payload,
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 201
         body = response.json()
@@ -211,7 +211,7 @@ class TestLeaseRenewAPI:
         lease.refresh_from_db()
         assert lease.status == "renewed"
 
-    def test_renew_lease_requires_auth(self, api_client, owner):
+    def test_renew_lease_requires_auth(self, api_client):
         lease = LeaseFactory()
         payload = json.dumps(
             {
@@ -227,7 +227,7 @@ class TestLeaseRenewAPI:
         )
         assert response.status_code in (401, 403)
 
-    def test_renew_lease_404(self, api_client, owner):
+    def test_renew_lease_404(self, api_client, management):
         payload = json.dumps(
             {
                 "new_start_date": "2027-07-01",
@@ -239,6 +239,6 @@ class TestLeaseRenewAPI:
             "/api/v1/contracts/leases/99999/renew/",
             payload,
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 404

@@ -4,6 +4,7 @@ from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 from dmr import Query
 
+from core.api.permissions import RoleAuth
 from core.api.views import BaseController, ListQuery
 from core.constants import PayoutStatus, UserRole
 
@@ -33,10 +34,10 @@ def _build_owner_property(prop):
 
 
 class OwnerPropertyListView(BaseController):
+    auth = (RoleAuth(UserRole.OWNER),)
+
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         user = self.request.user
-        if user.role != UserRole.OWNER:
-            return self.fail(error=str(_("Only owners can access this endpoint")), status_code=403)
         from property.models import Property
 
         qs = Property.objects.filter(owner=user).select_related("district").order_by("-created_at")
@@ -45,10 +46,10 @@ class OwnerPropertyListView(BaseController):
 
 
 class OwnerEarningsView(BaseController):
+    auth = (RoleAuth(UserRole.OWNER),)
+
     def get(self) -> dict:
         user = self.request.user
-        if user.role != UserRole.OWNER:
-            return self.fail(error=str(_("Only owners can access this endpoint")), status_code=403)
         from finance.models import PayoutSchedule
         from property.models import Property
 
@@ -73,10 +74,9 @@ class OwnerEarningsView(BaseController):
 
 
 class OwnerWhyView(BaseController):
+    auth = (RoleAuth(UserRole.OWNER),)
+
     def get(self) -> dict:
-        user = self.request.user
-        if user.role != UserRole.OWNER:
-            return self.fail(error=str(_("Only owners can access this endpoint")), status_code=403)
         return self.ok(
             {
                 "title": str(_("Guaranteed Rental Income")),

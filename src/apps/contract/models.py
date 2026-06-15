@@ -23,6 +23,11 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
         verbose_name_plural = _("Owner Agreements")
         ordering = ["-created_at"]
         db_table = "owner_agreements"
+        indexes = [
+            models.Index(fields=["owner"]),
+            models.Index(fields=["property"]),
+            models.Index(fields=["status"]),
+        ]
 
     def __str__(self):
         return f"{self.agreement_number} — {self.property.name}"
@@ -56,23 +61,24 @@ class Lease(TimestampedModel, SoftDeleteModel):
         is_new = self.pk is None
         old_instance = type(self).objects.filter(pk=self.pk).first() if not is_new else None
 
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            super().save(*args, **kwargs)
 
-        if is_new and self.status == LeaseStatus.ACTIVE:
-            self.property.status = PropertyStatus.RENTED
-            self.property.vacant_since = None
-            self.property.vacant_days = 0
-            self.property.save(update_fields=["status", "vacant_since", "vacant_days"])
+            if is_new and self.status == LeaseStatus.ACTIVE:
+                self.property.status = PropertyStatus.RENTED
+                self.property.vacant_since = None
+                self.property.vacant_days = 0
+                self.property.save(update_fields=["status", "vacant_since", "vacant_days"])
 
-        if (
-            old_instance
-            and old_instance.status != self.status
-            and self.status in (LeaseStatus.EXPIRED, LeaseStatus.TERMINATED)
-        ):
-            self.property.status = PropertyStatus.VACANT
-            self.property.vacant_since = date.today()
-            self.property.vacant_days = 0
-            self.property.save(update_fields=["status", "vacant_since", "vacant_days"])
+            if (
+                old_instance
+                and old_instance.status != self.status
+                and self.status in (LeaseStatus.EXPIRED, LeaseStatus.TERMINATED)
+            ):
+                self.property.status = PropertyStatus.VACANT
+                self.property.vacant_since = date.today()
+                self.property.vacant_days = 0
+                self.property.save(update_fields=["status", "vacant_since", "vacant_days"])
 
     def renew(self, new_start_date, new_end_date, new_monthly_rent, deposit=None):
         with transaction.atomic():
@@ -111,6 +117,10 @@ class LeaseRenewal(TimestampedModel, SoftDeleteModel):
         verbose_name_plural = _("Lease Renewals")
         ordering = ["-renewal_date"]
         db_table = "lease_renewals"
+        indexes = [
+            models.Index(fields=["previous_lease"]),
+            models.Index(fields=["new_lease"]),
+        ]
 
     def __str__(self):
         return f"Renewal #{self.id}: Lease #{self.previous_lease_id} → #{self.new_lease_id}"

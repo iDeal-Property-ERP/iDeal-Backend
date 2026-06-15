@@ -2,7 +2,6 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db.models import Count, F, Q, Sum
-from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 
 from api.v1.management.schemas import (
@@ -23,16 +22,17 @@ from api.v1.management.schemas import (
     PnLSummaryOutput,
     RecentPaymentRow,
 )
+from core.api.permissions import RoleAuth
 from core.api.views import BaseController, DetailPath, ListQuery
 from core.constants import UserRole
 
 
+class ManagementView(BaseController):
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+
 def _d(value):
     return str(value.quantize(Decimal("0.01")))
-
-
-def _ensure_management(user):
-    return user.role == UserRole.MANAGEMENT
 
 
 def _build_user_output(u):
@@ -174,11 +174,9 @@ def _build_service_request_output(sr):
     }
 
 
-class DashboardView(BaseController):
+class DashboardView(ManagementView):
     def get(self) -> dict:
         user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
 
         today = date.today()
 
@@ -312,12 +310,8 @@ class DashboardView(BaseController):
         return self.ok(output.model_dump(mode="json"))
 
 
-class PnLSummaryView(BaseController):
+class PnLSummaryView(ManagementView):
     def get(self) -> dict:
-        user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
-
         today = date.today()
         current_year = today.year
         current_month = today.month
@@ -431,11 +425,8 @@ class PnLSummaryView(BaseController):
         return self.ok(output.model_dump(mode="json"))
 
 
-class ManagementUserListView(BaseController):
+class ManagementUserListView(ManagementView):
     def get(self, parsed_query: Query[ListQuery]) -> dict:
-        user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
         from account.models import User
 
         qs = User.objects.all().order_by("-created_at")
@@ -464,12 +455,8 @@ class ManagementUserListView(BaseController):
         return self.ok(paginated)
 
 
-class ManagementUserDetailUpdateView(BaseController):
+class ManagementUserDetailUpdateView(ManagementView):
     def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementUserUpdateInput]) -> dict:
-        user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
-
         instance = self._get_user(parsed_path.pk)
         data = parsed_body.model_dump(exclude_unset=True)
         for attr, value in data.items():
@@ -485,11 +472,8 @@ class ManagementUserDetailUpdateView(BaseController):
         return get_object_or_404(User, pk=pk)
 
 
-class ManagementPropertyListView(BaseController):
+class ManagementPropertyListView(ManagementView):
     def get(self, parsed_query: Query[ListQuery]) -> dict:
-        user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
         from property.models import Property
 
         qs = Property.objects.select_related("district", "owner").order_by("-created_at")
@@ -512,11 +496,8 @@ class ManagementPropertyListView(BaseController):
         return self.ok(paginated)
 
 
-class LeaseListView(BaseController):
+class LeaseListView(ManagementView):
     def get(self, parsed_query: Query[ListQuery]) -> dict:
-        user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
         from contract.models import Lease
 
         qs = Lease.objects.select_related("property", "tenant").order_by("-created_at")
@@ -536,11 +517,8 @@ class LeaseListView(BaseController):
         return self.ok(paginated)
 
 
-class OwnerAgreementListView(BaseController):
+class OwnerAgreementListView(ManagementView):
     def get(self, parsed_query: Query[ListQuery]) -> dict:
-        user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
         from contract.models import OwnerAgreement
 
         qs = OwnerAgreement.objects.select_related("owner", "property").order_by("-created_at")
@@ -560,11 +538,8 @@ class OwnerAgreementListView(BaseController):
         return self.ok(paginated)
 
 
-class PaymentListView(BaseController):
+class PaymentListView(ManagementView):
     def get(self, parsed_query: Query[ListQuery]) -> dict:
-        user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
         from finance.models import Payment
 
         qs = Payment.objects.select_related("tenant").order_by("-payment_date")
@@ -593,11 +568,8 @@ class PaymentListView(BaseController):
         return self.ok(paginated)
 
 
-class PayoutListView(BaseController):
+class PayoutListView(ManagementView):
     def get(self, parsed_query: Query[ListQuery]) -> dict:
-        user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
         from finance.models import PayoutSchedule
 
         qs = PayoutSchedule.objects.select_related("owner").order_by("-scheduled_date")
@@ -614,11 +586,8 @@ class PayoutListView(BaseController):
         return self.ok(paginated)
 
 
-class ManagementServiceRequestListView(BaseController):
+class ManagementServiceRequestListView(ManagementView):
     def get(self, parsed_query: Query[ListQuery]) -> dict:
-        user = self.request.user
-        if not _ensure_management(user):
-            return self.fail(error=str(_("Only management can access this endpoint")), status_code=403)
         from maintenance.models import ServiceRequest
 
         qs = ServiceRequest.objects.select_related("property", "tenant", "assigned_to").order_by("-created_at")

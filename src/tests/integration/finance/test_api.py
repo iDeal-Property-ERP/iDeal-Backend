@@ -24,7 +24,7 @@ def _make_jwt(user):
 
 @pytest.mark.django_db
 class TestPaymentAPI:
-    def test_create_payment(self, api_client, tenant, property_obj):
+    def test_create_payment(self, api_client, management, tenant, property_obj):
         from tests.factories import LeaseFactory, OwnerAgreementFactory
 
         agreement = OwnerAgreementFactory(property=property_obj)
@@ -52,7 +52,7 @@ class TestPaymentAPI:
             "/api/v1/finance/payments/",
             payload,
             content_type="application/json",
-            **_make_jwt(tenant),
+            **_make_jwt(management),
         )
         assert response.status_code == 201
         body = response.json()
@@ -88,12 +88,12 @@ class TestPaymentAPI:
         )
         assert response.status_code in (401, 403)
 
-    def test_list_payments(self, api_client, owner):
+    def test_list_payments(self, api_client, management):
         PaymentFactory()
         PaymentFactory()
         response = api_client.get(
             "/api/v1/finance/payments/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -105,25 +105,25 @@ class TestPaymentAPI:
         response = api_client.get("/api/v1/finance/payments/")
         assert response.status_code in (401, 403)
 
-    def test_partial_update_payment(self, api_client, owner):
+    def test_partial_update_payment(self, api_client, management):
         payment = PaymentFactory(status=PaymentStatus.PENDING, notes="original")
         payload = json.dumps({"notes": "updated notes"})
         response = api_client.patch(
             f"/api/v1/finance/payments/{payment.id}/",
             payload,
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
         assert body["data"]["notes"] == "updated notes"
 
-    def test_mark_paid(self, api_client, owner):
+    def test_mark_paid(self, api_client, management):
         payment = PaymentFactory(status=PaymentStatus.PENDING)
         response = api_client.post(
             f"/api/v1/finance/payments/{payment.id}/mark-paid/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -133,30 +133,30 @@ class TestPaymentAPI:
         payment.refresh_from_db()
         assert payment.status == PaymentStatus.PAID
 
-    def test_mark_paid_already_paid(self, api_client, owner):
+    def test_mark_paid_already_paid(self, api_client, management):
         payment = PaymentFactory(status=PaymentStatus.PAID)
         response = api_client.post(
             f"/api/v1/finance/payments/{payment.id}/mark-paid/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 400
         body = response.json()
         assert body["success"] is False
 
-    def test_mark_paid_404(self, api_client, owner):
+    def test_mark_paid_404(self, api_client, management):
         response = api_client.post(
             "/api/v1/finance/payments/99999/mark-paid/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 404
 
-    def test_invalid_payment_data(self, api_client, tenant):
+    def test_invalid_payment_data(self, api_client, management):
         payload = json.dumps({"lease_id": 1})
         response = api_client.post(
             "/api/v1/finance/payments/",
             payload,
             content_type="application/json",
-            **_make_jwt(tenant),
+            **_make_jwt(management),
         )
         assert response.status_code == 400
         body = response.json()
@@ -166,7 +166,7 @@ class TestPaymentAPI:
 
 @pytest.mark.django_db
 class TestExchangeRateAPI:
-    def test_create_exchange_rate(self, api_client, owner):
+    def test_create_exchange_rate(self, api_client, management):
         payload = json.dumps(
             {
                 "currency": "USD",
@@ -178,19 +178,19 @@ class TestExchangeRateAPI:
             "/api/v1/finance/exchange-rates/",
             payload,
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 201
         body = response.json()
         assert body["success"] is True
         assert body["data"]["currency"] == "USD"
 
-    def test_list_exchange_rates(self, api_client, owner):
+    def test_list_exchange_rates(self, api_client, management):
         ExchangeRateFactory(currency=Currency.USD)
         ExchangeRateFactory(currency=Currency.UZS, rate=1.0000)
         response = api_client.get(
             "/api/v1/finance/exchange-rates/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -216,12 +216,12 @@ class TestExchangeRateAPI:
 
 @pytest.mark.django_db
 class TestPayoutAPI:
-    def test_list_payouts(self, api_client, owner):
+    def test_list_payouts(self, api_client, management):
         PayoutScheduleFactory()
         PayoutScheduleFactory()
         response = api_client.get(
             "/api/v1/finance/payouts/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -236,7 +236,7 @@ class TestPayoutAPI:
 
 @pytest.mark.django_db
 class TestDashboardAPI:
-    def test_dashboard(self, api_client, owner):
+    def test_dashboard(self, api_client, management):
         ExchangeRateFactory(currency=Currency.USD, rate=12500.00)
         PaymentFactory(status=PaymentStatus.PAID, amount=500.00, currency=Currency.USD)
         PaymentFactory(status=PaymentStatus.PENDING, amount=300.00, currency=Currency.USD)
@@ -244,7 +244,7 @@ class TestDashboardAPI:
 
         response = api_client.get(
             "/api/v1/finance/dashboard/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -259,10 +259,10 @@ class TestDashboardAPI:
         assert data["pending_count"] >= 1
         assert data["overdue_count"] >= 0
 
-    def test_dashboard_no_data(self, api_client, owner):
+    def test_dashboard_no_data(self, api_client, management):
         response = api_client.get(
             "/api/v1/finance/dashboard/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -278,7 +278,7 @@ class TestDashboardAPI:
 
 @pytest.mark.django_db
 class TestPnLAPI:
-    def test_pnl(self, api_client, owner):
+    def test_pnl(self, api_client, management):
         ExchangeRateFactory(currency=Currency.USD, rate=12500.00)
         PaymentFactory(
             status=PaymentStatus.PAID,
@@ -295,7 +295,7 @@ class TestPnLAPI:
 
         response = api_client.get(
             "/api/v1/finance/pnl/?year=2026&month=6",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -308,14 +308,14 @@ class TestPnLAPI:
         assert "tax_estimate" in data
         assert data["payment_count"] >= 1
 
-    def test_pnl_no_filters(self, api_client, owner):
+    def test_pnl_no_filters(self, api_client, management):
         ExchangeRateFactory(currency=Currency.USD, rate=12500.00)
         PaymentFactory(status=PaymentStatus.PAID, amount=500.00, currency=Currency.USD)
         PayoutScheduleFactory(status=PayoutStatus.PAID, amount=380.00, currency=Currency.USD)
 
         response = api_client.get(
             "/api/v1/finance/pnl/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()

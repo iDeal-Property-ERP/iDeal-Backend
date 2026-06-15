@@ -42,13 +42,13 @@ def _create_payload(district, owner, **overrides):
 
 @pytest.mark.django_db
 class TestPropertyCreate:
-    def test_create_property(self, api_client, owner):
+    def test_create_property(self, api_client, management, owner):
         district = DistrictFactory()
         response = api_client.post(
             "/api/v1/properties/",
             _create_payload(district, owner),
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 201
         body = response.json()
@@ -65,39 +65,39 @@ class TestPropertyCreate:
         )
         assert response.status_code in (401, 403)
 
-    def test_create_property_invalid_data(self, api_client, owner):
+    def test_create_property_invalid_data(self, api_client, management):
         payload = json.dumps({"name": "No Required Fields"})
         response = api_client.post(
             "/api/v1/properties/",
             payload,
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 400
         body = response.json()
         assert body["success"] is False
         assert "error" in body
 
-    def test_create_property_nonexistent_district(self, api_client, owner):
+    def test_create_property_nonexistent_district(self, api_client, management, owner):
         district = DistrictFactory()
         response = api_client.post(
             "/api/v1/properties/",
             _create_payload(district, owner, district_id=99999),
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 400
         body = response.json()
         assert body["success"] is False
         assert any("district_id" in str(e.get("loc", [])) for e in body.get("error", []))
 
-    def test_create_property_nonexistent_owner(self, api_client, owner):
+    def test_create_property_nonexistent_owner(self, api_client, management, owner):
         district = DistrictFactory()
         response = api_client.post(
             "/api/v1/properties/",
             _create_payload(district, owner, owner_id=99999),
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 400
         body = response.json()
@@ -141,14 +141,13 @@ class TestPropertyRetrieve:
 
 @pytest.mark.django_db
 class TestPropertyUpdate:
-    def test_partial_update_property(self, api_client, property_obj):
-        owner = property_obj.owner
+    def test_partial_update_property(self, api_client, management, property_obj):
         payload = json.dumps({"name": "New Name", "status": "maintenance"})
         response = api_client.patch(
             f"/api/v1/properties/{property_obj.id}/",
             payload,
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -156,28 +155,26 @@ class TestPropertyUpdate:
         assert body["data"]["name"] == "New Name"
         assert body["data"]["status"] == "maintenance"
 
-    def test_partial_update_nonexistent_district(self, api_client, property_obj):
-        owner = property_obj.owner
+    def test_partial_update_nonexistent_district(self, api_client, management, property_obj):
         payload = json.dumps({"district_id": 99999})
         response = api_client.patch(
             f"/api/v1/properties/{property_obj.id}/",
             payload,
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 400
         body = response.json()
         assert body["success"] is False
         assert any("district_id" in str(e.get("loc", [])) for e in body.get("error", []))
 
-    def test_partial_update_nonexistent_owner(self, api_client, property_obj):
-        owner = property_obj.owner
+    def test_partial_update_nonexistent_owner(self, api_client, management, property_obj):
         payload = json.dumps({"owner_id": 99999})
         response = api_client.patch(
             f"/api/v1/properties/{property_obj.id}/",
             payload,
             content_type="application/json",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 400
         body = response.json()
@@ -187,11 +184,10 @@ class TestPropertyUpdate:
 
 @pytest.mark.django_db
 class TestPropertyDelete:
-    def test_delete_property(self, api_client, property_obj):
-        owner = property_obj.owner
+    def test_delete_property(self, api_client, management, property_obj):
         response = api_client.delete(
             f"/api/v1/properties/{property_obj.id}/",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()
@@ -202,13 +198,14 @@ class TestPropertyDelete:
 
 @pytest.mark.django_db
 class TestPropertyPagination:
-    def test_list_pagination(self, api_client, owner):
+    def test_list_pagination(self, api_client, management):
         district = DistrictFactory()
+        owner = PropertyFactory().owner
         for i in range(25):
             PropertyFactory(district=district, owner=owner, name=f"P{i}")
         response = api_client.get(
             "/api/v1/properties/?page=2&per_page=10",
-            **_make_jwt(owner),
+            **_make_jwt(management),
         )
         assert response.status_code == 200
         body = response.json()

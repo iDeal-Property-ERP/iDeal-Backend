@@ -20,6 +20,7 @@ from api.v1.finance.schemas import (
     PnLBreakdown,
     PnLFilter,
 )
+from core.api.permissions import RoleAuth
 from core.api.views import (
     CreateAPIView,
     DetailPath,
@@ -27,13 +28,14 @@ from core.api.views import (
     ListAPIView,
     ListQuery,
 )
-from core.constants import Currency, PaymentStatus, PayoutStatus
+from core.constants import Currency, PaymentStatus, PayoutStatus, UserRole
 
 
 class PaymentListCreateView(CreateAPIView, ListAPIView):
     model = Payment
     output_schema = PaymentOutput
     create_schema = PaymentCreateInput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
@@ -48,6 +50,7 @@ class PaymentListCreateView(CreateAPIView, ListAPIView):
 class PaymentPartialUpdateView(GenericController):
     model = Payment
     output_schema = PaymentOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
@@ -66,6 +69,7 @@ class PaymentPartialUpdateView(GenericController):
 class PaymentMarkPaidView(GenericController):
     model = Payment
     output_schema = PaymentOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
@@ -87,6 +91,7 @@ class ExchangeRateListCreateView(CreateAPIView, ListAPIView):
     model = ExchangeRate
     output_schema = ExchangeRateOutput
     create_schema = ExchangeRateCreateInput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def post(self, parsed_body: Body[ExchangeRateCreateInput]) -> ExchangeRateOutput:
         return super().post(parsed_body)
@@ -100,6 +105,7 @@ class ExchangeRateListCreateView(CreateAPIView, ListAPIView):
 class PayoutScheduleListView(ListAPIView):
     model = PayoutSchedule
     output_schema = PayoutScheduleOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return PayoutSchedule.objects.select_related("owner_agreement", "owner").all()
@@ -120,6 +126,8 @@ def _safe_convert(amount, from_currency, to_currency):
 
 
 class DashboardView(GenericController):
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
     def get(self) -> DashboardMetrics:
         paid_payments = Payment.objects.filter(status=PaymentStatus.PAID)
         total_payments = paid_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -160,6 +168,8 @@ class DashboardView(GenericController):
 
 
 class PnLView(GenericController):
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
     def get(self, parsed_query: Query[PnLFilter]) -> PnLBreakdown:
         year = parsed_query.year
         month = parsed_query.month

@@ -9,8 +9,12 @@ from dmr.renderers import JsonRenderer
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DEBUG = config("DEBUG", default=False, cast=bool)
-SECRET_KEY = config("SECRET_KEY", default="django-insecure-change-me")
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="").split(",")
+_secret_key = config("SECRET_KEY", default="django-insecure-change-me-in-production")
+if not DEBUG and _secret_key == "django-insecure-change-me-in-production":
+    raise RuntimeError("SECRET_KEY must be set to a secure value in production (DEBUG=False)")
+SECRET_KEY = _secret_key
+_allowed_hosts_raw = config("ALLOWED_HOSTS", default="localhost,127.0.0.1")
+ALLOWED_HOSTS = [h for h in _allowed_hosts_raw.split(",") if h]
 DATABASE_URL = f"postgres://{config('POSTGRES_USER')}:{config('POSTGRES_PASSWORD')}@{config('POSTGRES_HOST')}/{config('POSTGRES_DB')}"
 
 UNFOLD_APPS = [

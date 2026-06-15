@@ -12,8 +12,9 @@ from api.v1.maintenance.schemas import (
     ServiceRequestResolveInput,
     ServiceRequestUpdateInput,
 )
+from core.api.permissions import RoleAuth
 from core.api.views import CreateAPIView, DetailPath, GenericController, ListAPIView, RetrieveAPIView
-from core.constants import ServiceRequestStatus
+from core.constants import ServiceRequestStatus, UserRole
 from core.utils.pagination import build_paginated_response
 
 
@@ -28,6 +29,7 @@ class ServiceRequestListCreateView(CreateAPIView, ListAPIView):
     model = ServiceRequest
     output_schema = ServiceRequestOutput
     create_schema = ServiceRequestCreateInput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return ServiceRequest.objects.select_related("property", "tenant", "assigned_to").all()
@@ -53,6 +55,7 @@ class ServiceRequestListCreateView(CreateAPIView, ListAPIView):
 class ServiceRequestDetailUpdateView(RetrieveAPIView, GenericController):
     model = ServiceRequest
     output_schema = ServiceRequestOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return ServiceRequest.objects.select_related("property", "tenant", "assigned_to").all()
@@ -74,6 +77,7 @@ class ServiceRequestDetailUpdateView(RetrieveAPIView, GenericController):
 class ServiceRequestAssignView(GenericController):
     model = ServiceRequest
     output_schema = ServiceRequestOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return ServiceRequest.objects.select_related("property", "tenant", "assigned_to").all()
@@ -91,6 +95,7 @@ class ServiceRequestAssignView(GenericController):
 class ServiceRequestResolveView(GenericController):
     model = ServiceRequest
     output_schema = ServiceRequestOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return ServiceRequest.objects.select_related("property", "tenant", "assigned_to").all()

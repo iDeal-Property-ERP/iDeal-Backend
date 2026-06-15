@@ -1,8 +1,7 @@
 import json
+from decimal import Decimal
 
 import pytest
-
-from decimal import Decimal
 
 from core.constants import LeaseStatus
 from tests.factories import (

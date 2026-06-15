@@ -4,7 +4,9 @@ from django.shortcuts import get_object_or_404
 from dmr import Body, Path, Query
 
 from api.v1.agent.schemas import AgentDealCreateInput, AgentDealOutput, AgentOutput
+from core.api.permissions import RoleAuth
 from core.api.views import DetailPath, GenericController, ListAPIView, RetrieveAPIView
+from core.constants import UserRole
 from core.utils.pagination import build_paginated_response
 
 
@@ -46,6 +48,7 @@ class AgentListQuery(pydantic.BaseModel):
 class AgentListView(ListAPIView):
     model = Agent
     output_schema = AgentOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return Agent.objects.select_related("user").all()
@@ -64,6 +67,7 @@ class AgentListView(ListAPIView):
 class AgentDetailView(RetrieveAPIView):
     model = Agent
     output_schema = AgentOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return Agent.objects.select_related("user").all()
@@ -81,6 +85,7 @@ class AgentDealListQuery(pydantic.BaseModel):
 class AgentDealListCreateView(GenericController):
     model = AgentDeal
     output_schema = AgentDealOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return AgentDeal.objects.select_related("agent", "property").all()

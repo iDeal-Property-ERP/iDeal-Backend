@@ -20,6 +20,10 @@ class Listing(TimestampedModel, SoftDeleteModel):
         verbose_name_plural = _("Listings")
         ordering = ["-is_featured", "-created_at"]
         db_table = "listings"
+        indexes = [
+            models.Index(fields=["is_active"]),
+            models.Index(fields=["is_featured"]),
+        ]
 
     def __str__(self):
         return f"Listing #{self.id} — {self.property.name}"
@@ -39,6 +43,10 @@ class ViewingRequest(TimestampedModel, SoftDeleteModel):
         verbose_name_plural = _("Viewing Requests")
         ordering = ["-created_at"]
         db_table = "viewing_requests"
+        indexes = [
+            models.Index(fields=["listing"]),
+            models.Index(fields=["status"]),
+        ]
 
     def __str__(self):
         return f"Viewing #{self.id} — {self.full_name} ({self.get_status_display()})"

@@ -9,6 +9,7 @@ from api.v1.contract.schemas import (
     OwnerAgreementCreateInput,
     OwnerAgreementOutput,
 )
+from core.api.permissions import RoleAuth
 from core.api.views import (
     CreateAPIView,
     DetailPath,
@@ -17,12 +18,14 @@ from core.api.views import (
     ListQuery,
     RetrieveAPIView,
 )
+from core.constants import UserRole
 
 
 class OwnerAgreementListCreateView(CreateAPIView, ListAPIView):
     model = OwnerAgreement
     output_schema = OwnerAgreementOutput
     create_schema = OwnerAgreementCreateInput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return OwnerAgreement.objects.select_related("owner", "property").all()
@@ -40,6 +43,7 @@ class LeaseListCreateView(CreateAPIView, ListAPIView):
     model = Lease
     output_schema = LeaseOutput
     create_schema = LeaseCreateInput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return Lease.objects.select_related("property", "owner_agreement", "tenant").all()
@@ -54,6 +58,7 @@ class LeaseListCreateView(CreateAPIView, ListAPIView):
 class LeaseDetailView(RetrieveAPIView):
     model = Lease
     output_schema = LeaseOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return Lease.objects.select_related("property", "owner_agreement", "tenant").all()
@@ -66,6 +71,7 @@ class LeaseRenewView(GenericController):
     model = Lease
     create_schema = LeaseRenewInput
     output_schema = LeaseOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
         return Lease.objects.select_related("property", "owner_agreement", "tenant").all()

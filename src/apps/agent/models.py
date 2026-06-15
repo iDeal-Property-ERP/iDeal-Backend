@@ -35,6 +35,11 @@ class AgentDeal(TimestampedModel, SoftDeleteModel):
         verbose_name_plural = _("Agent Deals")
         ordering = ["-deal_date"]
         db_table = "agent_deals"
+        indexes = [
+            models.Index(fields=["agent"]),
+            models.Index(fields=["property"]),
+            models.Index(fields=["status"]),
+        ]
 
     def __str__(self):
         return f"Deal #{self.id} — Agent: {self.agent.user.first_name}, Property: {self.property.name}"

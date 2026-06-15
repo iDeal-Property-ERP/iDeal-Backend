@@ -5,6 +5,7 @@ from api.v1.tenant.schemas import (
     TenantPaymentOutput,
     TenantServiceRequestCreateInput,
 )
+from core.api.permissions import RoleAuth
 from core.api.views import BaseController, ListQuery
 from core.constants import LeaseStatus, UserRole
 
@@ -45,10 +46,10 @@ def _build_service_request_output(sr):
 
 
 class TenantHomeView(BaseController):
+    auth = (RoleAuth(UserRole.TENANT),)
+
     def get(self) -> dict:
         user = self.request.user
-        if user.role != UserRole.TENANT:
-            return self.fail(error=str(_("Only tenants can access this endpoint")), status_code=403)
         from contract.models import Lease
 
         lease = Lease.objects.filter(tenant=user, status=LeaseStatus.ACTIVE).select_related("property").first()
@@ -72,10 +73,10 @@ class TenantHomeView(BaseController):
 
 
 class TenantPaymentListCreateView(BaseController):
+    auth = (RoleAuth(UserRole.TENANT),)
+
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         user = self.request.user
-        if user.role != UserRole.TENANT:
-            return self.fail(error=str(_("Only tenants can access this endpoint")), status_code=403)
         from finance.models import Payment
 
         qs = Payment.objects.filter(tenant=user).order_by("-payment_date")
@@ -83,17 +84,14 @@ class TenantPaymentListCreateView(BaseController):
         return self.ok(items)
 
     def post(self) -> dict:
-        user = self.request.user
-        if user.role != UserRole.TENANT:
-            return self.fail(error=str(_("Only tenants can access this endpoint")), status_code=403)
         return self.ok({"message": str(_("Online payment coming soon. Please contact management."))})
 
 
 class TenantServiceRequestListCreateView(BaseController):
+    auth = (RoleAuth(UserRole.TENANT),)
+
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         user = self.request.user
-        if user.role != UserRole.TENANT:
-            return self.fail(error=str(_("Only tenants can access this endpoint")), status_code=403)
         from maintenance.models import ServiceRequest
 
         qs = ServiceRequest.objects.filter(tenant=user).select_related("property").order_by("-created_at")
@@ -102,8 +100,6 @@ class TenantServiceRequestListCreateView(BaseController):
 
     def post(self, parsed_body: Body[TenantServiceRequestCreateInput]) -> dict:
         user = self.request.user
-        if user.role != UserRole.TENANT:
-            return self.fail(error=str(_("Only tenants can access this endpoint")), status_code=403)
 
         from contract.models import Lease
 

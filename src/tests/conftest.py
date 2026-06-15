@@ -29,6 +29,11 @@ def user():
 
 
 @pytest.fixture
+def management():
+    return UserFactory()
+
+
+@pytest.fixture
 def owner():
     return OwnerFactory()
 

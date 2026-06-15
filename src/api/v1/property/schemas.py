@@ -92,8 +92,10 @@ class PropertyCreateInput(pydantic.BaseModel):
     def check_owner_exists(cls, v: int) -> int:
         from account.models import User
 
-        if not User.objects.filter(id=v).exists():
-            raise ValueError(_("Owner with id %s does not exist") % v)
+        from core.constants import UserRole
+
+        if not User.objects.filter(id=v, role=UserRole.OWNER).exists():
+            raise ValueError(_("No active owner found with id %s") % v)
         return v
 
 
