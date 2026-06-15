@@ -7,36 +7,6 @@ from api.v1.agent.schemas import AgentDealCreateInput, AgentDealOutput, AgentOut
 from core.api.permissions import RoleAuth
 from core.api.views import DetailPath, GenericController, ListAPIView, RetrieveAPIView
 from core.constants import UserRole
-from core.utils.pagination import build_paginated_response
-
-
-def _build_agent_output(agent):
-    return {
-        "id": agent.id,
-        "user_id": agent.user_id,
-        "user_name": agent.user.first_name,
-        "total_deals": agent.total_deals,
-        "total_revenue": str(agent.total_revenue),
-        "commission_rate": str(agent.commission_rate),
-        "is_active": agent.is_active,
-        "created_at": agent.created_at.isoformat(),
-        "updated_at": agent.updated_at.isoformat(),
-    }
-
-
-def _build_deal_output(deal):
-    return {
-        "id": deal.id,
-        "agent_id": deal.agent_id,
-        "property_id": deal.property_id,
-        "property_name": deal.property.name,
-        "deal_date": deal.deal_date.isoformat(),
-        "rent_amount": str(deal.rent_amount),
-        "commission_amount": str(deal.commission_amount),
-        "status": deal.status,
-        "created_at": deal.created_at.isoformat(),
-        "updated_at": deal.updated_at.isoformat(),
-    }
 
 
 class AgentListQuery(pydantic.BaseModel):
@@ -57,11 +27,7 @@ class AgentListView(ListAPIView):
         qs = self.get_queryset()
         if parsed_query.is_active is not None:
             qs = qs.filter(is_active=parsed_query.is_active)
-        items = [_build_agent_output(obj) for obj in qs]
-        if parsed_query.page is not None:
-            paginated = build_paginated_response(items, parsed_query.page, parsed_query.per_page)
-            return self.ok(paginated)
-        return self.ok(items)
+        return self.list_response(qs, parsed_query)
 
 
 class AgentDetailView(RetrieveAPIView):
@@ -74,7 +40,7 @@ class AgentDetailView(RetrieveAPIView):
 
     def get(self, parsed_path: Path[DetailPath]) -> dict:
         instance = self.get_object(pk=parsed_path.pk)
-        return self.ok(_build_agent_output(instance))
+        return self.ok(self.to_output(instance))
 
 
 class AgentDealListQuery(pydantic.BaseModel):
@@ -93,11 +59,7 @@ class AgentDealListCreateView(GenericController):
     def get(self, parsed_path: Path[DetailPath], parsed_query: Query[AgentDealListQuery]) -> dict:
         agent = get_object_or_404(Agent.objects.all(), pk=parsed_path.pk)
         qs = self.get_queryset().filter(agent=agent)
-        items = [_build_deal_output(obj) for obj in qs]
-        if parsed_query.page is not None:
-            paginated = build_paginated_response(items, parsed_query.page, parsed_query.per_page)
-            return self.ok(paginated)
-        return self.ok(items)
+        return self.list_response(qs, parsed_query)
 
     def post(self, parsed_path: Path[DetailPath], parsed_body: Body[AgentDealCreateInput]) -> dict:
         agent = get_object_or_404(Agent.objects.all(), pk=parsed_path.pk)
@@ -110,4 +72,4 @@ class AgentDealListCreateView(GenericController):
             commission_amount=commission_amount,
             status=parsed_body.status,
         )
-        return self.ok(_build_deal_output(deal))
+        return self.ok(self.to_output(deal))

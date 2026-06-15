@@ -89,20 +89,27 @@ class GenericController(BaseController):
     def perform_destroy(self, instance):
         instance.delete()
 
+    def list_response(self, qs, parsed_query) -> dict:
+        items = [self.to_output(obj) for obj in qs]
+        if parsed_query.page is not None:
+            paginated = build_paginated_response(items, parsed_query.page, parsed_query.per_page)
+            return self.ok(paginated)
+        return self.ok(items)
+
+    def _validate_body(self, schema_cls, data, *, exclude_unset=False):
+        try:
+            validated = schema_cls.model_validate(data)
+        except pydantic.ValidationError as err:
+            raw_errors = err.errors(include_url=False)
+            for e in raw_errors:
+                e.pop("ctx", None)
+            self.fail(error=raw_errors, message=str(_("Validation error")))
+        return validated.model_dump(exclude_unset=exclude_unset) if exclude_unset else validated.model_dump()
+
 
 class CreateAPIView(GenericController):
     def post(self, parsed_body: Body[dict]) -> dict:
-        if self.create_schema is not None:
-            try:
-                validated = self.create_schema.model_validate(parsed_body)
-            except pydantic.ValidationError as err:
-                raw_errors = err.errors(include_url=False)
-                for e in raw_errors:
-                    e.pop("ctx", None)
-                return self.fail(error=raw_errors, message=str(_("Validation error")))
-            data = validated.model_dump()
-        else:
-            data = parsed_body
+        data = self._validate_body(self.create_schema, parsed_body) if self.create_schema is not None else parsed_body
         instance = self.perform_create(data)
         return self.ok(self.to_output(instance))
 
@@ -130,17 +137,7 @@ class RetrieveAPIView(GenericController):
 class UpdateAPIView(GenericController):
     def put(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
         instance = self.get_object(pk=parsed_path.pk)
-        if self.update_schema is not None:
-            try:
-                validated = self.update_schema.model_validate(parsed_body)
-            except pydantic.ValidationError as err:
-                raw_errors = err.errors(include_url=False)
-                for e in raw_errors:
-                    e.pop("ctx", None)
-                return self.fail(error=raw_errors, message=str(_("Validation error")))
-            data = validated.model_dump()
-        else:
-            data = parsed_body
+        data = self._validate_body(self.update_schema, parsed_body) if self.update_schema is not None else parsed_body
         instance = self.perform_update(instance, data)
         return self.ok(self.to_output(instance))
 
@@ -149,14 +146,7 @@ class PartialUpdateAPIView(GenericController):
     def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
         instance = self.get_object(pk=parsed_path.pk)
         if self.update_schema is not None:
-            try:
-                validated = self.update_schema.model_validate(parsed_body)
-            except pydantic.ValidationError as err:
-                raw_errors = err.errors(include_url=False)
-                for e in raw_errors:
-                    e.pop("ctx", None)
-                return self.fail(error=raw_errors, message=str(_("Validation error")))
-            data = validated.model_dump(exclude_unset=True)
+            data = self._validate_body(self.update_schema, parsed_body, exclude_unset=True)
         else:
             data = parsed_body
         instance = self.perform_update(instance, data)

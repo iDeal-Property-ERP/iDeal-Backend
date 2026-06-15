@@ -4,9 +4,10 @@ from dmr import Body, Query
 from api.v1.tenant.schemas import (
     TenantPaymentOutput,
     TenantServiceRequestCreateInput,
+    TenantServiceRequestOutput,
 )
 from core.api.permissions import RoleAuth
-from core.api.views import BaseController, ListQuery
+from core.api.views import BaseController, GenericController, ListQuery
 from core.constants import LeaseStatus, UserRole
 
 
@@ -26,22 +27,6 @@ def _build_lease_output(lease):
         "status": lease.status,
         "next_payment_due": next_payment.due_date.isoformat() if next_payment else lease.end_date.isoformat(),
         "rent_due": str(next_payment.amount) if next_payment else str(lease.monthly_rent),
-    }
-
-
-def _build_service_request_output(sr):
-    return {
-        "id": sr.id,
-        "property_id": sr.property_id,
-        "property_name": sr.property.name,
-        "title": sr.title,
-        "description": sr.description,
-        "priority": sr.priority,
-        "status": sr.status,
-        "cost": str(sr.cost) if sr.cost else None,
-        "resolution_notes": sr.resolution_notes,
-        "created_at": sr.created_at.isoformat(),
-        "updated_at": sr.updated_at.isoformat(),
     }
 
 
@@ -87,16 +72,18 @@ class TenantPaymentListCreateView(BaseController):
         return self.ok({"message": str(_("Online payment coming soon. Please contact management."))})
 
 
-class TenantServiceRequestListCreateView(BaseController):
+class TenantServiceRequestListCreateView(GenericController):
     auth = (RoleAuth(UserRole.TENANT),)
+    output_schema = TenantServiceRequestOutput
 
-    def get(self, parsed_query: Query[ListQuery]) -> dict:
-        user = self.request.user
+    def get_queryset(self):
         from maintenance.models import ServiceRequest
 
-        qs = ServiceRequest.objects.filter(tenant=user).select_related("property").order_by("-created_at")
-        items = [_build_service_request_output(obj) for obj in qs]
-        return self.ok(items)
+        user = self.request.user
+        return ServiceRequest.objects.filter(tenant=user).select_related("property").order_by("-created_at")
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return self.list_response(self.get_queryset(), parsed_query)
 
     def post(self, parsed_body: Body[TenantServiceRequestCreateInput]) -> dict:
         user = self.request.user
@@ -122,4 +109,4 @@ class TenantServiceRequestListCreateView(BaseController):
             description=parsed_body.description,
             priority=parsed_body.priority,
         )
-        return self.ok(_build_service_request_output(sr))
+        return self.ok(self.to_output(sr))

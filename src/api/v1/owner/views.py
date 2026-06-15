@@ -4,45 +4,24 @@ from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 from dmr import Query
 
+from api.v1.owner.schemas import OwnerPropertyOutput
 from core.api.permissions import RoleAuth
-from core.api.views import BaseController, ListQuery
+from core.api.views import BaseController, ListAPIView, ListQuery
 from core.constants import PayoutStatus, UserRole
 
 
-def _build_owner_property(prop):
-    return {
-        "id": prop.id,
-        "name": prop.name,
-        "address": prop.address,
-        "rooms": prop.rooms,
-        "area_sqm": prop.area_sqm,
-        "floor": prop.floor,
-        "total_floors": prop.total_floors,
-        "status": prop.status,
-        "tariff": prop.tariff,
-        "ask_price": str(prop.ask_price),
-        "ask_currency": prop.ask_currency,
-        "owner_guaranteed_price": str(prop.owner_guaranteed_price),
-        "owner_guaranteed_currency": prop.owner_guaranteed_currency,
-        "tenant_charge_price": str(prop.tenant_charge_price),
-        "tenant_charge_currency": prop.tenant_charge_currency,
-        "vacant_since": prop.vacant_since.isoformat() if prop.vacant_since else None,
-        "vacant_days": prop.vacant_days,
-        "created_at": prop.created_at.isoformat(),
-        "updated_at": prop.updated_at.isoformat(),
-    }
-
-
-class OwnerPropertyListView(BaseController):
+class OwnerPropertyListView(ListAPIView):
     auth = (RoleAuth(UserRole.OWNER),)
+    output_schema = OwnerPropertyOutput
 
-    def get(self, parsed_query: Query[ListQuery]) -> dict:
-        user = self.request.user
+    def get_queryset(self):
         from property.models import Property
 
-        qs = Property.objects.filter(owner=user).select_related("district").order_by("-created_at")
-        items = [_build_owner_property(obj) for obj in qs]
-        return self.ok(items)
+        user = self.request.user
+        return Property.objects.filter(owner=user).select_related("district").order_by("-created_at")
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return super().get(parsed_query)
 
 
 class OwnerEarningsView(BaseController):

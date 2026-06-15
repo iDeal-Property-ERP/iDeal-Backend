@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pydantic
+from pydantic import model_validator
 
 
 class TenantHomeOutput(pydantic.BaseModel):
@@ -52,6 +53,25 @@ class TenantServiceRequestOutput(pydantic.BaseModel):
     updated_at: datetime
 
     model_config = pydantic.ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_related(cls, v):
+        if isinstance(v, dict):
+            return v
+        return {
+            "id": v.id,
+            "property_id": v.property_id,
+            "property_name": v.property.name,
+            "title": v.title,
+            "description": v.description,
+            "priority": v.priority,
+            "status": v.status,
+            "cost": v.cost,
+            "resolution_notes": v.resolution_notes,
+            "created_at": v.created_at,
+            "updated_at": v.updated_at,
+        }
 
 
 class TenantServiceRequestCreateInput(pydantic.BaseModel):
