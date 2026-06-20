@@ -116,6 +116,15 @@ VAS_CATALOG = [
     (VASServiceType.MOVING, "Apartment Moving Service", "MoveEasy", 120, 18, 4),
 ]
 
+# Stable demo logins, recreated idempotently every run (login is by username).
+# (username, role, first_name)
+DEMO_ACCOUNTS = [
+    ("manager", UserRole.MANAGEMENT, "Demo Manager"),
+    ("owner", UserRole.OWNER, "Demo Owner"),
+    ("tenant", UserRole.TENANT, "Demo Tenant"),
+    ("agent", UserRole.AGENT, "Demo Agent"),
+]
+
 SCALES = {
     "small": {"mgmt": 2, "owners": 5, "tenants": 8, "agents": 2},
     "medium": {"mgmt": 5, "owners": 15, "tenants": 25, "agents": 6},
@@ -187,7 +196,6 @@ class Command(BaseCommand):
         Faker.seed(int(self.token, 16))
         self.rng = self.faker.random  # the shared, seeded Random instance
         self._used_phones = set()
-        self._samples = {}
 
         before = {label: model.objects.count() for label, model in REPORT_MODELS}
 
@@ -195,10 +203,15 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             districts = self._seed_districts()
-            mgmt = self._seed_users(UserRole.MANAGEMENT, self.counts["mgmt"])
-            owners = self._seed_users(UserRole.OWNER, self.counts["owners"])
-            tenants = self._seed_users(UserRole.TENANT, self.counts["agents"] + self.counts["tenants"])
-            agent_users = self._seed_users(UserRole.AGENT, self.counts["agents"])
+            # Stable, memorable demo accounts (idempotent) participate in the data
+            # alongside the randomized bulk users so you always have known logins.
+            self.demo = self._seed_demo_accounts()
+            mgmt = [self.demo[UserRole.MANAGEMENT]] + self._seed_users(UserRole.MANAGEMENT, self.counts["mgmt"])
+            owners = [self.demo[UserRole.OWNER]] + self._seed_users(UserRole.OWNER, self.counts["owners"])
+            tenants = [self.demo[UserRole.TENANT]] + self._seed_users(
+                UserRole.TENANT, self.counts["agents"] + self.counts["tenants"]
+            )
+            agent_users = [self.demo[UserRole.AGENT]] + self._seed_users(UserRole.AGENT, self.counts["agents"])
             offer = self._seed_public_offer()
 
             properties = self._seed_properties(owners, districts, mgmt, offer)
@@ -281,8 +294,30 @@ class Command(BaseCommand):
                 is_superuser=False,
             )
             users.append(user)
-        self._samples.setdefault(role, users[0].username if users else None)
         return users
+
+    def _seed_demo_accounts(self):
+        """Create/refresh the fixed demo logins. Idempotent across runs.
+
+        Keyed by username so repeat runs reuse the same accounts and simply reset
+        the password; they then join the bulk pools to receive data.
+        """
+        demo = {}
+        for username, role, first_name in DEMO_ACCOUNTS:
+            user, _ = User.objects.get_or_create(
+                username=username,
+                defaults={
+                    "email": f"{username}@ideal.uz",
+                    "first_name": first_name,
+                    "role": role,
+                    "is_verified": True,
+                    "is_staff": role == UserRole.MANAGEMENT,
+                },
+            )
+            user.set_password(self.password)
+            user.save()
+            demo[role] = user
+        return demo
 
     def _seed_public_offer(self):
         return PublicOffer.objects.create(
@@ -610,9 +645,10 @@ class Command(BaseCommand):
     def _seed_agents(self, agent_users, properties):
         all_props = [e["obj"] for e in properties]
         for user in agent_users:
-            agent = Agent.objects.create(
+            # get_or_create because the demo agent persists across runs (OneToOne).
+            agent, _ = Agent.objects.get_or_create(
                 user=user,
-                commission_rate=Decimal(self.rng.choice([8, 10, 12])),
+                defaults={"commission_rate": Decimal(self.rng.choice([8, 10, 12]))},
             )
             for _ in range(self.rng.randint(1, 5)):
                 rent = self._money(300, 1500)
@@ -664,8 +700,7 @@ class Command(BaseCommand):
             delta = model.objects.count() - before[label]
             self.stdout.write(f"  {label.ljust(width)}  +{delta}")
 
-        self.stdout.write(self.style.SUCCESS(f"\nSample logins (password: {self.password})"))
-        for role in (UserRole.MANAGEMENT, UserRole.OWNER, UserRole.TENANT, UserRole.AGENT):
-            username = self._samples.get(role)
-            if username:
-                self.stdout.write(f"  {role.ljust(6)}: {username}")
+        self.stdout.write(self.style.SUCCESS("\nDemo logins — sign in by USERNAME (not email)"))
+        self.stdout.write(f"  password: {self.password}")
+        for username, role, _ in DEMO_ACCOUNTS:
+            self.stdout.write(f"  {role.ljust(6)}: {username}")
