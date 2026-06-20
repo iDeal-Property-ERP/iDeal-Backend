@@ -143,9 +143,7 @@ class BookViewingView(GenericController):
     def get_queryset(self):
         return Listing.objects.filter(is_active=True).all()
 
-    def post(
-        self, parsed_path: Path[DetailPath], parsed_body: Body[ViewingRequestCreateInput]
-    ) -> dict:
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ViewingRequestCreateInput]) -> dict:
         listing = self.get_object(pk=parsed_path.pk)
         vr = ViewingRequest.objects.create(listing=listing, **parsed_body.model_dump())
         return self.ok(

@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contract", "0002_leaserenewal_lease_renew_previou_092051_idx_and_more"),
         ("marketplace", "0001_initial"),

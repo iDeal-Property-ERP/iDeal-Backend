@@ -1,7 +1,7 @@
 import factory
-from contract.models import Lease, LeaseRenewal, OwnerAgreement
+from contract.models import Lease, LeaseRenewal, OwnerAgreement, OwnerOnboarding, PublicOffer
 
-from core.constants import LeaseStatus, OwnerAgreementStatus
+from core.constants import LeaseStatus, OnboardingStatus, OwnerAgreementStatus
 
 from .account import OwnerFactory, TenantFactory
 from .property import PropertyFactory
@@ -46,3 +46,21 @@ class LeaseRenewalFactory(factory.django.DjangoModelFactory):
     new_start_date = factory.Faker("date_this_year")
     new_end_date = factory.Faker("date_this_year")
     new_monthly_rent = 550.00
+
+
+class PublicOfferFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PublicOffer
+
+    version = factory.Sequence(lambda n: f"v{n}")
+    body = factory.Faker("text", max_nb_chars=500)
+    is_active = True
+
+
+class OwnerOnboardingFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = OwnerOnboarding
+
+    owner = factory.SubFactory(OwnerFactory)
+    property = factory.SubFactory(PropertyFactory)
+    status = OnboardingStatus.SUBMITTED

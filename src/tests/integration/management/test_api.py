@@ -289,8 +289,12 @@ class TestManagementPnLAPI:
         today = date.today()
         PaymentFactory(lease=lease, tenant=tenant, status="paid", amount=500, payment_date=today, due_date=today)
         PayoutScheduleFactory(
-            owner_agreement=agreement, owner=owner, amount=200, status="paid",
-            scheduled_date=today, paid_date=today,
+            owner_agreement=agreement,
+            owner=owner,
+            amount=200,
+            status="paid",
+            scheduled_date=today,
+            paid_date=today,
         )
         response = api_client.get("/api/v1/management/pnl/", **_make_jwt(mgmt))
         body = response.json()

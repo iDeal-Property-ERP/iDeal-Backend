@@ -44,10 +44,12 @@ class PropertyStatus(ConstantChoices):
     RENTED = "rented"
     VACANT = "vacant"
     MAINTENANCE = "maintenance"
+    PENDING_REVIEW = "pending_review"
     CHOICES = [
         (RENTED, _("Rented")),
         (VACANT, _("Vacant")),
         (MAINTENANCE, _("Maintenance")),
+        (PENDING_REVIEW, _("Pending Review")),
     ]
 
 
@@ -175,4 +177,122 @@ class ViewingRequestStatus(ConstantChoices):
         (PENDING, _("Pending")),
         (CONFIRMED, _("Confirmed")),
         (CANCELLED, _("Cancelled")),
+    ]
+
+
+class OnboardingStatus(ConstantChoices):
+    SUBMITTED = "submitted"
+    OFFER_ACCEPTED = "offer_accepted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CHOICES = [
+        (SUBMITTED, _("Submitted")),
+        (OFFER_ACCEPTED, _("Offer Accepted")),
+        (APPROVED, _("Approved")),
+        (REJECTED, _("Rejected")),
+    ]
+
+
+class InventoryActStatus(ConstantChoices):
+    DRAFT = "draft"
+    FINALIZED = "finalized"
+    CHOICES = [
+        (DRAFT, _("Draft")),
+        (FINALIZED, _("Finalized")),
+    ]
+
+
+class InventoryActType(ConstantChoices):
+    HANDOVER = "handover"
+    RETURN = "return"
+    GENERAL = "general"
+    CHOICES = [
+        (HANDOVER, _("Handover")),
+        (RETURN, _("Return")),
+        (GENERAL, _("General")),
+    ]
+
+
+class ConditionRating(ConstantChoices):
+    EXCELLENT = "excellent"
+    GOOD = "good"
+    FAIR = "fair"
+    POOR = "poor"
+    DAMAGED = "damaged"
+    CHOICES = [
+        (EXCELLENT, _("Excellent")),
+        (GOOD, _("Good")),
+        (FAIR, _("Fair")),
+        (POOR, _("Poor")),
+        (DAMAGED, _("Damaged")),
+    ]
+
+
+class VASServiceType(ConstantChoices):
+    CLEANING = "cleaning"
+    HANDYMAN = "handyman"
+    UTILITY = "utility"
+    INTERNET = "internet"
+    MOVING = "moving"
+    OTHER = "other"
+    CHOICES = [
+        (CLEANING, _("Cleaning")),
+        (HANDYMAN, _("Handyman")),
+        (UTILITY, _("Utility")),
+        (INTERNET, _("Internet")),
+        (MOVING, _("Moving")),
+        (OTHER, _("Other")),
+    ]
+
+
+class VASOrderStatus(ConstantChoices):
+    REQUESTED = "requested"
+    CONFIRMED = "confirmed"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    CHOICES = [
+        (REQUESTED, _("Requested")),
+        (CONFIRMED, _("Confirmed")),
+        (IN_PROGRESS, _("In Progress")),
+        (COMPLETED, _("Completed")),
+        (CANCELLED, _("Cancelled")),
+    ]
+
+
+class BookingStatus(ConstantChoices):
+    REQUESTED = "requested"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CONVERTED = "converted"
+    CANCELLED = "cancelled"
+    CHOICES = [
+        (REQUESTED, _("Requested")),
+        (APPROVED, _("Approved")),
+        (REJECTED, _("Rejected")),
+        (CONVERTED, _("Converted")),
+        (CANCELLED, _("Cancelled")),
+    ]
+
+
+class NotificationType(ConstantChoices):
+    PAYMENT_DUE = "payment_due"
+    PAYMENT_PAID = "payment_paid"
+    PAYOUT_PAID = "payout_paid"
+    BOOKING_STATUS = "booking_status"
+    SERVICE_REQUEST_STATUS = "service_request_status"
+    LEASE_RENEWAL = "lease_renewal"
+    OWNER_ONBOARDING = "owner_onboarding"
+    SERVICE_ORDER_STATUS = "service_order_status"
+    GENERAL = "general"
+    CHOICES = [
+        (PAYMENT_DUE, _("Payment Due")),
+        (PAYMENT_PAID, _("Payment Paid")),
+        (PAYOUT_PAID, _("Payout Paid")),
+        (BOOKING_STATUS, _("Booking Status")),
+        (SERVICE_REQUEST_STATUS, _("Service Request Status")),
+        (LEASE_RENEWAL, _("Lease Renewal")),
+        (OWNER_ONBOARDING, _("Owner Onboarding")),
+        (SERVICE_ORDER_STATUS, _("Service Order Status")),
+        (GENERAL, _("General")),
     ]

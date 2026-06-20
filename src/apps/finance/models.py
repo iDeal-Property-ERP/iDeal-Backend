@@ -33,6 +33,10 @@ class Payment(TimestampedModel, SoftDeleteModel):
         verbose_name=_("Method"),
     )
     notes = models.TextField(null=True, blank=True, verbose_name=_("Notes"))
+    # Seam for online payment gateways (Click / Payme / Uzum). The gateway
+    # callback would set this reference and flip status to PAID.
+    # TODO: wire gateway callback to mark the payment PAID using gateway_ref.
+    gateway_ref = models.CharField(max_length=128, null=True, blank=True, verbose_name=_("Gateway Reference"))
 
     class Meta:
         verbose_name = _("Payment")
@@ -76,6 +80,16 @@ class PayoutSchedule(TimestampedModel, SoftDeleteModel):
         on_delete=models.PROTECT,
         related_name="payout_schedules",
         verbose_name=_("Owner"),
+    )
+    # Links a payout accrual to the tenant payment that triggered it. The
+    # OneToOne enforces one-payout-per-payment at the DB level (idempotency).
+    source_payment = models.OneToOneField(
+        "finance.Payment",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="owner_payout",
+        verbose_name=_("Source Payment"),
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name=_("Amount"))
     currency = models.CharField(

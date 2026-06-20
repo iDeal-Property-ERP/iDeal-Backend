@@ -14,7 +14,7 @@ class RoleAuth(JWTSyncAuth):
             auth = (RoleAuth(UserRole.MANAGEMENT),)
     """
 
-    __slots__ = ('allowed_roles',)
+    __slots__ = ("allowed_roles",)
 
     def __init__(self, *roles, **kwargs):
         super().__init__(**kwargs)
@@ -49,6 +49,7 @@ def require_role(*roles):
             def post(self, ...):
                 ...
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -58,5 +59,7 @@ def require_role(*roles):
                     status_code=HTTPStatus.FORBIDDEN,
                 )
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator

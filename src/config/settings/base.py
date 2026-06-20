@@ -57,6 +57,9 @@ LOCAL_APPS = [
     "owner",
     "tenant",
     "management",
+    "notification",
+    "inventory",
+    "vas",
 ]
 
 INSTALLED_APPS = UNFOLD_APPS + DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

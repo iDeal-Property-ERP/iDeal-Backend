@@ -93,7 +93,7 @@ class TestTenantPaymentsAPI:
         response = api_client.get("/api/v1/tenant/payments/", **_make_jwt(owner))
         assert response.status_code == 403
 
-    def test_tenant_payment_placeholder(self, api_client):
+    def test_tenant_payment_without_active_lease_fails(self, api_client):
         tenant = TenantFactory()
         from tests.integration.property.test_api import _make_jwt
 
@@ -103,10 +103,9 @@ class TestTenantPaymentsAPI:
             content_type="application/json",
             **_make_jwt(tenant),
         )
-        assert response.status_code == 201
+        assert response.status_code == 400
         body = response.json()
-        assert body["success"] is True
-        assert "coming soon" in body["data"]["message"].lower()
+        assert body["success"] is False
 
 
 @pytest.mark.django_db

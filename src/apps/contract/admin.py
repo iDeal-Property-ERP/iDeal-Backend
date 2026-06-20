@@ -1,4 +1,4 @@
-from contract.models import Lease, LeaseRenewal, OwnerAgreement
+from contract.models import Lease, LeaseRenewal, OwnerAgreement, OwnerOnboarding, PublicOffer
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
@@ -38,4 +38,26 @@ class LeaseRenewalAdmin(BaseSoftDeleteModelAdmin):
     fieldsets = (
         (_("Renewal Info"), {"fields": ("previous_lease", "new_lease", "renewal_date")}),
         (_("New Lease Terms"), {"fields": ("new_start_date", "new_end_date", "new_monthly_rent")}),
+    )
+
+
+@admin.register(PublicOffer)
+class PublicOfferAdmin(BaseSoftDeleteModelAdmin):
+    list_display = ("id", "version", "is_active", "created_at", "is_deleted")
+    list_filter = ("is_active",)
+    search_fields = ("version",)
+    ordering = ("-created_at",)
+    fieldsets = ((_("Offer Info"), {"fields": ("version", "is_active", "body")}),)
+
+
+@admin.register(OwnerOnboarding)
+class OwnerOnboardingAdmin(BaseSoftDeleteModelAdmin):
+    list_display = ("id", "owner", "property", "status", "offer_accepted_at", "created_at", "is_deleted")
+    list_filter = ("status",)
+    search_fields = ("owner__first_name", "owner__last_name", "property__name")
+    ordering = ("-created_at",)
+    fieldsets = (
+        (_("Onboarding Info"), {"fields": ("owner", "property", "status")}),
+        (_("Offer Acceptance"), {"fields": ("offer_version", "offer_terms_snapshot", "offer_accepted_at")}),
+        (_("Review"), {"fields": ("reviewed_by", "review_notes", "generated_agreement")}),
     )

@@ -1,7 +1,9 @@
 from datetime import date, timedelta
 from decimal import Decimal
+from http import HTTPStatus
 
 from django.db.models import Count, F, Q, Sum
+from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 
 from api.v1.management.schemas import (
@@ -17,7 +19,12 @@ from api.v1.management.schemas import (
     KpiVacant,
     MaintenanceRequestRow,
     ManagementAgreementOutput,
+    ManagementBookingConvertInput,
+    ManagementBookingOutput,
     ManagementLeaseOutput,
+    ManagementOnboardingApproveInput,
+    ManagementOnboardingOutput,
+    ManagementOnboardingRejectInput,
     ManagementPaymentOutput,
     ManagementPayoutOutput,
     ManagementPropertyOutput,
@@ -29,6 +36,7 @@ from api.v1.management.schemas import (
     PnLSummaryOutput,
     RecentPaymentRow,
 )
+from api.v1.vas.schemas import ServiceOrderStatusInput
 from core.api.permissions import RoleAuth
 from core.api.views import BaseController, DetailPath, GenericController, ListAPIView, ListQuery
 from core.constants import UserRole
@@ -78,18 +86,12 @@ class DashboardView(ManagementView):
         last_month_start = last_month_end.replace(day=1)
 
         def _month_net(year, month):
-            inc = (
-                Payment.objects.filter(status="paid", payment_date__year=year, payment_date__month=month).aggregate(
-                    total=Sum("amount")
-                )["total"]
-                or Decimal("0.00")
-            )
-            out = (
-                PayoutSchedule.objects.filter(status="paid", paid_date__year=year, paid_date__month=month).aggregate(
-                    total=Sum("amount")
-                )["total"]
-                or Decimal("0.00")
-            )
+            inc = Payment.objects.filter(status="paid", payment_date__year=year, payment_date__month=month).aggregate(
+                total=Sum("amount")
+            )["total"] or Decimal("0.00")
+            out = PayoutSchedule.objects.filter(status="paid", paid_date__year=year, paid_date__month=month).aggregate(
+                total=Sum("amount")
+            )["total"] or Decimal("0.00")
             return inc - out
 
         net_profit_this = _month_net(today.year, today.month)
@@ -107,15 +109,10 @@ class DashboardView(ManagementView):
         # ---- KPI: Vacant units ----
         vacant_count = Property.objects.filter(status="vacant").count()
         vacant_props = list(Property.objects.filter(status="vacant").values_list("tenant_charge_price", flat=True))
-        loss_per_day = (
-            sum((p / Decimal("30")) for p in vacant_props if p) if vacant_props else Decimal("0.00")
-        )
+        loss_per_day = sum((p / Decimal("30")) for p in vacant_props if p) if vacant_props else Decimal("0.00")
 
         # ---- Recent Payments ----
-        recent_payments_qs = (
-            Payment.objects.select_related("tenant", "lease__property")
-            .order_by("-payment_date")[:5]
-        )
+        recent_payments_qs = Payment.objects.select_related("tenant", "lease__property").order_by("-payment_date")[:5]
         recent_payments = [
             RecentPaymentRow(
                 id=p.id,
@@ -130,8 +127,7 @@ class DashboardView(ManagementView):
 
         # ---- Occupancy ----
         props_by_status = {
-            entry["status"]: entry["count"]
-            for entry in Property.objects.values("status").annotate(count=Count("id"))
+            entry["status"]: entry["count"] for entry in Property.objects.values("status").annotate(count=Count("id"))
         }
         rented = props_by_status.get("rented", 0)
         vacant = props_by_status.get("vacant", 0)
@@ -165,9 +161,7 @@ class DashboardView(ManagementView):
             kpi=DashboardKPIs(
                 occupied=KpiOccupied(value=rented_count, total=total_properties, change=leases_this_month),
                 net_profit=KpiNetProfit(value=_d(net_profit_this), change=_d(net_profit_change)),
-                payments_received=KpiPaymentsReceived(
-                    amount=_d(payments_amount), days=25, on_time_pct=on_time_pct
-                ),
+                payments_received=KpiPaymentsReceived(amount=_d(payments_amount), days=25, on_time_pct=on_time_pct),
                 vacant=KpiVacant(value=vacant_count, loss_per_day=_d(loss_per_day)),
             ),
             recent_payments=recent_payments,
@@ -206,12 +200,8 @@ class PnLSummaryView(ManagementView):
         current_tax = Decimal("0.00")
 
         for m in range(1, current_month + 1):
-            payments = Payment.objects.filter(
-                status="paid", payment_date__year=current_year, payment_date__month=m
-            )
-            payouts = PayoutSchedule.objects.filter(
-                status="paid", paid_date__year=current_year, paid_date__month=m
-            )
+            payments = Payment.objects.filter(status="paid", payment_date__year=current_year, payment_date__month=m)
+            payouts = PayoutSchedule.objects.filter(status="paid", paid_date__year=current_year, paid_date__month=m)
 
             revenue_uzs = Decimal("0.00")
             for p in payments:
@@ -237,9 +227,7 @@ class PnLSummaryView(ManagementView):
                     tax=_d(tax_uzs),
                 )
             )
-            growth_actual.append(
-                GrowthPoint(month=month_names[m - 1], revenue=_d(revenue_usd))
-            )
+            growth_actual.append(GrowthPoint(month=month_names[m - 1], revenue=_d(revenue_usd)))
 
             if m == current_month:
                 current_revenue = revenue_usd
@@ -268,14 +256,10 @@ class PnLSummaryView(ManagementView):
                     if proj_month > 12:
                         break
                     last_rev = last_rev * (Decimal("1") + avg_growth)
-                    growth_projected.append(
-                        GrowthPoint(month=month_names[proj_month - 1], revenue=_d(last_rev))
-                    )
+                    growth_projected.append(GrowthPoint(month=month_names[proj_month - 1], revenue=_d(last_rev)))
 
         total_properties = Property.objects.count()
-        per_property_net = (
-            current_net / total_properties if total_properties > 0 else Decimal("0.00")
-        )
+        per_property_net = current_net / total_properties if total_properties > 0 else Decimal("0.00")
         investor = InvestorTakeHome(
             monthly=_d(current_net),
             annual=_d(current_net * Decimal("12")),
@@ -487,3 +471,271 @@ class ManagementServiceRequestListView(ManagementView, ListAPIView):
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         return super().get(parsed_query)
+
+
+class ManagementOnboardingListView(ManagementView, ListAPIView):
+    output_schema = ManagementOnboardingOutput
+
+    def get_queryset(self):
+        from contract.models import OwnerOnboarding
+
+        qs = OwnerOnboarding.objects.select_related("owner", "property").order_by("-created_at")
+        status = self.request.GET.get("status")
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return super().get(parsed_query)
+
+
+class ManagementOnboardingApproveView(ManagementView, GenericController):
+    output_schema = ManagementOnboardingOutput
+
+    def get_queryset(self):
+        from contract.models import OwnerOnboarding
+
+        return OwnerOnboarding.objects.select_related("owner", "property").all()
+
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementOnboardingApproveInput]) -> dict:
+        from core.constants import OnboardingStatus
+
+        onboarding = self.get_object(pk=parsed_path.pk)
+        if onboarding.status == OnboardingStatus.APPROVED:
+            return self.fail(
+                error=str(_("This onboarding has already been approved")),
+                message=str(_("Invalid status transition")),
+            )
+
+        prop = onboarding.property
+        if parsed_body.owner_guaranteed_price is not None:
+            prop.owner_guaranteed_price = parsed_body.owner_guaranteed_price
+        if parsed_body.tenant_charge_price is not None:
+            prop.tenant_charge_price = parsed_body.tenant_charge_price
+        if parsed_body.owner_guaranteed_price is not None or parsed_body.tenant_charge_price is not None:
+            prop.save(update_fields=["owner_guaranteed_price", "tenant_charge_price", "updated_at"])
+
+        onboarding.approve(
+            reviewed_by=self.request.user,
+            commission_rate=parsed_body.commission_rate,
+            start_date=parsed_body.start_date,
+            end_date=parsed_body.end_date,
+            agreement_number=parsed_body.agreement_number,
+            terms=parsed_body.terms,
+        )
+        return self.ok(self.to_output(onboarding), status_code=HTTPStatus.OK)
+
+
+class ManagementOnboardingRejectView(ManagementView, GenericController):
+    output_schema = ManagementOnboardingOutput
+
+    def get_queryset(self):
+        from contract.models import OwnerOnboarding
+
+        return OwnerOnboarding.objects.select_related("owner", "property").all()
+
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementOnboardingRejectInput]) -> dict:
+        from core.constants import OnboardingStatus
+
+        onboarding = self.get_object(pk=parsed_path.pk)
+        if onboarding.status == OnboardingStatus.APPROVED:
+            return self.fail(
+                error=str(_("Cannot reject an onboarding that has already been approved")),
+                message=str(_("Invalid status transition")),
+            )
+        onboarding.reject(reviewed_by=self.request.user, review_notes=parsed_body.review_notes)
+        return self.ok(self.to_output(onboarding), status_code=HTTPStatus.OK)
+
+
+class ManagementBookingListView(ManagementView, ListAPIView):
+    output_schema = ManagementBookingOutput
+
+    def get_queryset(self):
+        from marketplace.models import Booking
+
+        qs = Booking.objects.select_related("property", "tenant", "listing").order_by("-created_at")
+        status = self.request.GET.get("status")
+        listing_id = self.request.GET.get("listing_id")
+        if status:
+            qs = qs.filter(status=status)
+        if listing_id:
+            qs = qs.filter(listing_id=listing_id)
+        return qs
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return super().get(parsed_query)
+
+
+class ManagementBookingView(ManagementView, GenericController):
+    output_schema = ManagementBookingOutput
+
+    def get_queryset(self):
+        from marketplace.models import Booking
+
+        return Booking.objects.select_related("property", "tenant", "listing").all()
+
+
+class ManagementBookingApproveView(ManagementBookingView):
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        from notification.services import notify
+
+        from core.constants import BookingStatus, NotificationType
+
+        booking = self.get_object(pk=parsed_path.pk)
+        if booking.status != BookingStatus.REQUESTED:
+            return self.fail(
+                error=str(_("Only requested bookings can be approved")),
+                message=str(_("Invalid status transition")),
+            )
+        booking.status = BookingStatus.APPROVED
+        booking.reviewed_by = self.request.user
+        booking.save(update_fields=["status", "reviewed_by", "updated_at"])
+        notify(
+            recipient=booking.tenant,
+            type=NotificationType.BOOKING_STATUS,
+            title=str(_("Booking approved")),
+            body=str(_("Your booking for %(name)s was approved.")) % {"name": booking.property.name},
+            related_object_type="booking",
+            related_object_id=booking.id,
+        )
+        return self.ok(self.to_output(booking), status_code=HTTPStatus.OK)
+
+
+class ManagementBookingRejectView(ManagementBookingView):
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        from notification.services import notify
+
+        from core.constants import BookingStatus, NotificationType
+
+        booking = self.get_object(pk=parsed_path.pk)
+        if booking.status in (BookingStatus.CONVERTED, BookingStatus.CANCELLED):
+            return self.fail(
+                error=str(_("This booking can no longer be rejected")),
+                message=str(_("Invalid status transition")),
+            )
+        booking.status = BookingStatus.REJECTED
+        booking.reviewed_by = self.request.user
+        booking.save(update_fields=["status", "reviewed_by", "updated_at"])
+        notify(
+            recipient=booking.tenant,
+            type=NotificationType.BOOKING_STATUS,
+            title=str(_("Booking rejected")),
+            body=str(_("Your booking for %(name)s was not approved.")) % {"name": booking.property.name},
+            related_object_type="booking",
+            related_object_id=booking.id,
+        )
+        return self.ok(self.to_output(booking), status_code=HTTPStatus.OK)
+
+
+class ManagementBookingConvertView(ManagementBookingView):
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementBookingConvertInput]) -> dict:
+        booking = self.get_object(pk=parsed_path.pk)
+        try:
+            booking.convert_to_lease(
+                reviewed_by=self.request.user,
+                owner_agreement_id=parsed_body.owner_agreement_id,
+                monthly_rent=parsed_body.monthly_rent,
+                deposit=parsed_body.deposit,
+            )
+        except ValueError as err:
+            return self.fail(error=str(err), message=str(_("Cannot convert booking")))
+        return self.ok(self.to_output(booking), status_code=HTTPStatus.OK)
+
+
+class ManagementVacancyView(ManagementView):
+    """Vacancy-cost report: per-property revenue loss from vacant units."""
+
+    def get(self) -> dict:
+        from property.models import Property
+
+        from core.constants import PropertyStatus
+
+        vacant = Property.objects.filter(status=PropertyStatus.VACANT).select_related("district")
+        rows = []
+        total_daily_loss = Decimal("0.00")
+        total_accrued_loss = Decimal("0.00")
+        for prop in vacant:
+            daily = (prop.tenant_charge_price / Decimal("30")).quantize(Decimal("0.01"))
+            accrued = (daily * Decimal(prop.vacant_days or 0)).quantize(Decimal("0.01"))
+            total_daily_loss += daily
+            total_accrued_loss += accrued
+            rows.append(
+                {
+                    "property_id": prop.id,
+                    "property_name": prop.name,
+                    "district_name": prop.district.name,
+                    "tenant_charge_price": str(prop.tenant_charge_price),
+                    "currency": prop.tenant_charge_currency,
+                    "vacant_since": prop.vacant_since.isoformat() if prop.vacant_since else None,
+                    "vacant_days": prop.vacant_days or 0,
+                    "daily_loss": str(daily),
+                    "accrued_loss": str(accrued),
+                }
+            )
+        return self.ok(
+            {
+                "vacant_count": len(rows),
+                "total_daily_loss": str(total_daily_loss),
+                "total_accrued_loss": str(total_accrued_loss),
+                "properties": rows,
+            }
+        )
+
+
+class ManagementVASOrderListView(ManagementView, ListAPIView):
+    def get_queryset(self):
+        from vas.models import ServiceOrder
+
+        qs = ServiceOrder.objects.select_related("catalog_item", "tenant", "property").order_by("-created_at")
+        status = self.request.GET.get("status")
+        tenant_id = self.request.GET.get("tenant_id")
+        property_id = self.request.GET.get("property_id")
+        if status:
+            qs = qs.filter(status=status)
+        if tenant_id:
+            qs = qs.filter(tenant_id=tenant_id)
+        if property_id:
+            qs = qs.filter(property_id=property_id)
+        return qs
+
+    def to_output(self, instance):
+        from api.v1.vas.schemas import ServiceOrderOutput
+
+        return ServiceOrderOutput.model_validate(instance).model_dump(mode="json")
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return self.list_response(self.get_queryset(), parsed_query)
+
+
+class ManagementVASOrderStatusView(ManagementView, GenericController):
+    def get_queryset(self):
+        from vas.models import ServiceOrder
+
+        return ServiceOrder.objects.select_related("catalog_item", "tenant", "property").all()
+
+    def to_output(self, instance):
+        from api.v1.vas.schemas import ServiceOrderOutput
+
+        return ServiceOrderOutput.model_validate(instance).model_dump(mode="json")
+
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ServiceOrderStatusInput]) -> dict:
+        from notification.services import notify
+
+        from core.constants import NotificationType, VASOrderStatus
+
+        if parsed_body.status not in VASOrderStatus.values():
+            return self.fail(error=str(_("Invalid status")))
+
+        order = self.get_object(pk=parsed_path.pk)
+        order.status = parsed_body.status
+        order.save(update_fields=["status", "updated_at"])
+        notify(
+            recipient=order.tenant,
+            type=NotificationType.SERVICE_ORDER_STATUS,
+            title=str(_("Service order updated")),
+            body=str(_("Your %(name)s order is now %(status)s."))
+            % {"name": order.catalog_item.name, "status": order.get_status_display()},
+            related_object_type="service_order",
+            related_object_id=order.id,
+        )
+        return self.ok(self.to_output(order), status_code=HTTPStatus.OK)

@@ -82,9 +82,7 @@ class ServiceRequestAssignView(GenericController):
     def get_queryset(self):
         return ServiceRequest.objects.select_related("property", "tenant", "assigned_to").all()
 
-    def post(
-        self, parsed_path: Path[DetailPath], parsed_body: Body[ServiceRequestAssignInput]
-    ) -> ServiceRequestOutput:
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ServiceRequestAssignInput]) -> ServiceRequestOutput:
         instance = self.get_object(pk=parsed_path.pk)
         instance.assigned_to_id = parsed_body.assigned_to_id
         instance.status = ServiceRequestStatus.IN_PROGRESS

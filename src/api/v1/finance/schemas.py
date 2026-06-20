@@ -69,6 +69,7 @@ class PayoutScheduleOutput(pydantic.BaseModel):
     id: int
     owner_agreement_id: int
     owner_id: int
+    source_payment_id: int | None
     amount: Decimal
     currency: str
     scheduled_date: date

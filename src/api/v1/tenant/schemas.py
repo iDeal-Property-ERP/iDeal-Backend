@@ -36,7 +36,9 @@ class TenantPaymentOutput(pydantic.BaseModel):
 
 
 class TenantPaymentCreateInput(pydantic.BaseModel):
-    pass
+    amount: Decimal | None = None
+    method: str = "cash"
+    notes: str | None = None
 
 
 class TenantServiceRequestOutput(pydantic.BaseModel):
@@ -79,3 +81,48 @@ class TenantServiceRequestCreateInput(pydantic.BaseModel):
     title: str
     description: str
     priority: str = "medium"
+
+
+class TenantBookingCreateInput(pydantic.BaseModel):
+    listing_id: int
+    requested_start_date: date
+    requested_end_date: date
+    monthly_rent_offer: Decimal | None = None
+    message: str | None = None
+
+
+class TenantBookingOutput(pydantic.BaseModel):
+    id: int
+    listing_id: int
+    property_id: int
+    property_name: str
+    requested_start_date: date
+    requested_end_date: date
+    monthly_rent_offer: Decimal | None
+    status: str
+    message: str | None
+    converted_lease_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = pydantic.ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_related(cls, v):
+        if isinstance(v, dict):
+            return v
+        return {
+            "id": v.id,
+            "listing_id": v.listing_id,
+            "property_id": v.property_id,
+            "property_name": v.property.name,
+            "requested_start_date": v.requested_start_date,
+            "requested_end_date": v.requested_end_date,
+            "monthly_rent_offer": v.monthly_rent_offer,
+            "status": v.status,
+            "message": v.message,
+            "converted_lease_id": v.converted_lease_id,
+            "created_at": v.created_at,
+            "updated_at": v.updated_at,
+        }

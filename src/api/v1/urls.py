@@ -15,4 +15,7 @@ urlpatterns = [
     path("owner/", include("api.v1.owner.urls", namespace="owner")),
     path("tenant/", include("api.v1.tenant.urls", namespace="tenant")),
     path("management/", include("api.v1.management.urls", namespace="management")),
+    path("notifications/", include("api.v1.notification.urls", namespace="notification")),
+    path("inventory/", include("api.v1.inventory.urls", namespace="inventory")),
+    path("vas/", include("api.v1.vas.urls", namespace="vas")),
 ]

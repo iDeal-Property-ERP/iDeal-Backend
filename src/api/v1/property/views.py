@@ -57,9 +57,7 @@ class PropertyDetailView(RetrieveAPIView, PartialUpdateAPIView, DeleteAPIView):
         return super().get(parsed_path)
 
     @require_role(UserRole.MANAGEMENT)
-    def patch(
-        self, parsed_path: Path[DetailPath], parsed_body: Body[PropertyUpdateInput]
-    ) -> PropertyOutput:
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[PropertyUpdateInput]) -> PropertyOutput:
         return super().patch(parsed_path, parsed_body)
 
     @require_role(UserRole.MANAGEMENT)

@@ -1,6 +1,8 @@
 from contract.models import Lease, OwnerAgreement
+from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 from dmr.pagination import Paginated
+from notification.services import notify
 
 from api.v1.contract.schemas import (
     LeaseCreateInput,
@@ -18,7 +20,7 @@ from core.api.views import (
     ListQuery,
     RetrieveAPIView,
 )
-from core.constants import UserRole
+from core.constants import NotificationType, UserRole
 
 
 class OwnerAgreementListCreateView(CreateAPIView, ListAPIView):
@@ -33,9 +35,7 @@ class OwnerAgreementListCreateView(CreateAPIView, ListAPIView):
     def post(self, parsed_body: Body[OwnerAgreementCreateInput]) -> OwnerAgreementOutput:
         return super().post(parsed_body)
 
-    def get(
-        self, parsed_query: Query[ListQuery]
-    ) -> list[OwnerAgreementOutput] | Paginated[OwnerAgreementOutput]:
+    def get(self, parsed_query: Query[ListQuery]) -> list[OwnerAgreementOutput] | Paginated[OwnerAgreementOutput]:
         return super().get(parsed_query)
 
 
@@ -83,5 +83,13 @@ class LeaseRenewView(GenericController):
             new_end_date=parsed_body.new_end_date,
             new_monthly_rent=parsed_body.new_monthly_rent,
             deposit=parsed_body.deposit,
+        )
+        notify(
+            recipient=new_lease.tenant,
+            type=NotificationType.LEASE_RENEWAL,
+            title=str(_("Lease renewed")),
+            body=str(_("Your lease has been renewed through %(end_date)s.")) % {"end_date": new_lease.end_date},
+            related_object_type="lease",
+            related_object_id=new_lease.id,
         )
         return self.ok(self.to_output(new_lease))

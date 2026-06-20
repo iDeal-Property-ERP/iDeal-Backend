@@ -41,3 +41,60 @@ class OwnerWhyOutput(pydantic.BaseModel):
     title: str
     description: str
     benefits: list[str]
+
+
+class PublicOfferOutput(pydantic.BaseModel):
+    id: int
+    version: str
+    body: str
+
+    model_config = pydantic.ConfigDict(from_attributes=True)
+
+
+class OwnerOnboardingCreateInput(pydantic.BaseModel):
+    name: str
+    address: str
+    district_id: int
+    rooms: int
+    area_sqm: int
+    floor: int
+    total_floors: int | None = None
+    description: str | None = None
+    ask_price: Decimal
+    ask_currency: str = "USD"
+    accept_offer: bool
+
+
+class OwnerOnboardingOutput(pydantic.BaseModel):
+    id: int
+    owner_id: int
+    property_id: int
+    property_name: str
+    status: str
+    offer_version: str | None
+    offer_accepted_at: datetime | None
+    review_notes: str | None
+    generated_agreement_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = pydantic.ConfigDict(from_attributes=True)
+
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def extract_related(cls, v):
+        if isinstance(v, dict):
+            return v
+        return {
+            "id": v.id,
+            "owner_id": v.owner_id,
+            "property_id": v.property_id,
+            "property_name": v.property.name,
+            "status": v.status,
+            "offer_version": v.offer_version,
+            "offer_accepted_at": v.offer_accepted_at,
+            "review_notes": v.review_notes,
+            "generated_agreement_id": v.generated_agreement_id,
+            "created_at": v.created_at,
+            "updated_at": v.updated_at,
+        }

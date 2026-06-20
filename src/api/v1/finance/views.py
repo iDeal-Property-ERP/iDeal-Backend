@@ -8,6 +8,7 @@ from dmr import Body, Path, Query
 from dmr.pagination import Paginated
 from finance.models import ExchangeRate, Payment, PayoutSchedule
 from finance.utils import convert_amount
+from notification.services import notify
 
 from api.v1.finance.schemas import (
     DashboardMetrics,
@@ -28,7 +29,7 @@ from core.api.views import (
     ListAPIView,
     ListQuery,
 )
-from core.constants import Currency, PaymentStatus, PayoutStatus, UserRole
+from core.constants import Currency, NotificationType, PaymentStatus, PayoutStatus, UserRole
 
 
 class PaymentListCreateView(CreateAPIView, ListAPIView):
@@ -55,9 +56,7 @@ class PaymentPartialUpdateView(GenericController):
     def get_queryset(self):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
 
-    def patch(
-        self, parsed_path: Path[DetailPath], parsed_body: Body[PaymentPartialUpdateInput]
-    ) -> PaymentOutput:
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[PaymentPartialUpdateInput]) -> PaymentOutput:
         payment = self.get_object(pk=parsed_path.pk)
         data = parsed_body.model_dump(exclude_unset=True)
         for attr, value in data.items():
@@ -84,6 +83,15 @@ class PaymentMarkPaidView(GenericController):
         payment.status = PaymentStatus.PAID
         payment.payment_date = date_type.today()
         payment.save(update_fields=["status", "payment_date", "updated_at"])
+        notify(
+            recipient=payment.tenant,
+            type=NotificationType.PAYMENT_PAID,
+            title=str(_("Payment received")),
+            body=str(_("Your payment of %(amount)s %(currency)s has been recorded."))
+            % {"amount": payment.amount, "currency": payment.currency},
+            related_object_type="payment",
+            related_object_id=payment.id,
+        )
         return self.ok(self.to_output(payment), status_code=HTTPStatus.OK)
 
 
@@ -96,9 +104,7 @@ class ExchangeRateListCreateView(CreateAPIView, ListAPIView):
     def post(self, parsed_body: Body[ExchangeRateCreateInput]) -> ExchangeRateOutput:
         return super().post(parsed_body)
 
-    def get(
-        self, parsed_query: Query[ListQuery]
-    ) -> list[ExchangeRateOutput] | Paginated[ExchangeRateOutput]:
+    def get(self, parsed_query: Query[ListQuery]) -> list[ExchangeRateOutput] | Paginated[ExchangeRateOutput]:
         return super().get(parsed_query)
 
 
@@ -110,10 +116,58 @@ class PayoutScheduleListView(ListAPIView):
     def get_queryset(self):
         return PayoutSchedule.objects.select_related("owner_agreement", "owner").all()
 
-    def get(
-        self, parsed_query: Query[ListQuery]
-    ) -> list[PayoutScheduleOutput] | Paginated[PayoutScheduleOutput]:
+    def get(self, parsed_query: Query[ListQuery]) -> list[PayoutScheduleOutput] | Paginated[PayoutScheduleOutput]:
         return super().get(parsed_query)
+
+
+class PayoutScheduleMarkPaidView(GenericController):
+    model = PayoutSchedule
+    output_schema = PayoutScheduleOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return PayoutSchedule.objects.select_related("owner_agreement", "owner").all()
+
+    def post(self, parsed_path: Path[DetailPath]) -> PayoutScheduleOutput:
+        payout = self.get_object(pk=parsed_path.pk)
+        if payout.status == PayoutStatus.PAID:
+            return self.fail(
+                error=str(_("Payout is already marked as paid")),
+                message=str(_("Invalid status transition")),
+            )
+        payout.status = PayoutStatus.PAID
+        payout.paid_date = date_type.today()
+        payout.save(update_fields=["status", "paid_date", "updated_at"])
+        notify(
+            recipient=payout.owner,
+            type=NotificationType.PAYOUT_PAID,
+            title=str(_("Payout sent")),
+            body=str(_("Your payout of %(amount)s %(currency)s has been paid."))
+            % {"amount": payout.amount, "currency": payout.currency},
+            related_object_type="payout",
+            related_object_id=payout.id,
+        )
+        return self.ok(self.to_output(payout), status_code=HTTPStatus.OK)
+
+
+class PayoutScheduleCancelView(GenericController):
+    model = PayoutSchedule
+    output_schema = PayoutScheduleOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return PayoutSchedule.objects.select_related("owner_agreement", "owner").all()
+
+    def post(self, parsed_path: Path[DetailPath]) -> PayoutScheduleOutput:
+        payout = self.get_object(pk=parsed_path.pk)
+        if payout.status == PayoutStatus.PAID:
+            return self.fail(
+                error=str(_("Cannot cancel a payout that has already been paid")),
+                message=str(_("Invalid status transition")),
+            )
+        payout.status = PayoutStatus.CANCELLED
+        payout.save(update_fields=["status", "updated_at"])
+        return self.ok(self.to_output(payout), status_code=HTTPStatus.OK)
 
 
 def _safe_convert(amount, from_currency, to_currency):
