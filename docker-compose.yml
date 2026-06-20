@@ -3,7 +3,7 @@ services:
     container_name: "ideal-db-dev"
     image: postgres:18.4-alpine
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     ports:
       - "5400:5432"
     restart: unless-stopped
