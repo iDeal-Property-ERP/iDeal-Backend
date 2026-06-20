@@ -105,6 +105,25 @@ class TestPaymentAPI:
         response = api_client.get("/api/v1/finance/payments/")
         assert response.status_code in (401, 403)
 
+    def test_retrieve_payment(self, api_client, management):
+        payment = PaymentFactory(status=PaymentStatus.PENDING, notes="hello")
+        response = api_client.get(
+            f"/api/v1/finance/payments/{payment.id}/",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["id"] == payment.id
+        assert body["data"]["notes"] == "hello"
+
+    def test_retrieve_payment_404(self, api_client, management):
+        response = api_client.get(
+            "/api/v1/finance/payments/99999/",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 404
+
     def test_partial_update_payment(self, api_client, management):
         payment = PaymentFactory(status=PaymentStatus.PENDING, notes="original")
         payload = json.dumps({"notes": "updated notes"})
@@ -232,6 +251,24 @@ class TestPayoutAPI:
     def test_list_payouts_requires_auth(self, api_client):
         response = api_client.get("/api/v1/finance/payouts/")
         assert response.status_code in (401, 403)
+
+    def test_retrieve_payout(self, api_client, management):
+        payout = PayoutScheduleFactory()
+        response = api_client.get(
+            f"/api/v1/finance/payouts/{payout.id}/",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["id"] == payout.id
+
+    def test_retrieve_payout_404(self, api_client, management):
+        response = api_client.get(
+            "/api/v1/finance/payouts/99999/",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 404
 
 
 @pytest.mark.django_db

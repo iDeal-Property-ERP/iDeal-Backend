@@ -8,6 +8,7 @@ from api.v1.contract.schemas import (
     LeaseCreateInput,
     LeaseOutput,
     LeaseRenewInput,
+    LeaseUpdateInput,
     OwnerAgreementCreateInput,
     OwnerAgreementOutput,
 )
@@ -39,6 +40,18 @@ class OwnerAgreementListCreateView(CreateAPIView, ListAPIView):
         return super().get(parsed_query)
 
 
+class OwnerAgreementDetailView(RetrieveAPIView):
+    model = OwnerAgreement
+    output_schema = OwnerAgreementOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return OwnerAgreement.objects.select_related("owner", "property").all()
+
+    def get(self, parsed_path: Path[DetailPath]) -> OwnerAgreementOutput:
+        return super().get(parsed_path)
+
+
 class LeaseListCreateView(CreateAPIView, ListAPIView):
     model = Lease
     output_schema = LeaseOutput
@@ -58,6 +71,7 @@ class LeaseListCreateView(CreateAPIView, ListAPIView):
 class LeaseDetailView(RetrieveAPIView):
     model = Lease
     output_schema = LeaseOutput
+    update_schema = LeaseUpdateInput
     auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
@@ -65,6 +79,12 @@ class LeaseDetailView(RetrieveAPIView):
 
     def get(self, parsed_path: Path[DetailPath]) -> LeaseOutput:
         return super().get(parsed_path)
+
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[LeaseUpdateInput]) -> LeaseOutput:
+        lease = self.get_object(pk=parsed_path.pk)
+        data = parsed_body.model_dump(exclude_unset=True)
+        lease = self.perform_update(lease, data)
+        return self.ok(self.to_output(lease))
 
 
 class LeaseRenewView(GenericController):

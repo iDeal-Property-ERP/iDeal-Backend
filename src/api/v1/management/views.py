@@ -318,6 +318,10 @@ class ManagementUserDetailUpdateView(ManagementView, GenericController):
 
         return User.objects.all()
 
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        instance = self.get_object(pk=parsed_path.pk)
+        return self.ok(self.to_output(instance))
+
     def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementUserUpdateInput]) -> dict:
         instance = self.get_object(pk=parsed_path.pk)
         instance = self.perform_update(instance, parsed_body.model_dump(exclude_unset=True))

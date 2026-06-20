@@ -28,6 +28,7 @@ from core.api.views import (
     GenericController,
     ListAPIView,
     ListQuery,
+    RetrieveAPIView,
 )
 from core.constants import Currency, NotificationType, PaymentStatus, PayoutStatus, UserRole
 
@@ -55,6 +56,10 @@ class PaymentPartialUpdateView(GenericController):
 
     def get_queryset(self):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
+
+    def get(self, parsed_path: Path[DetailPath]) -> PaymentOutput:
+        payment = self.get_object(pk=parsed_path.pk)
+        return self.ok(self.to_output(payment))
 
     def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[PaymentPartialUpdateInput]) -> PaymentOutput:
         payment = self.get_object(pk=parsed_path.pk)
@@ -118,6 +123,18 @@ class PayoutScheduleListView(ListAPIView):
 
     def get(self, parsed_query: Query[ListQuery]) -> list[PayoutScheduleOutput] | Paginated[PayoutScheduleOutput]:
         return super().get(parsed_query)
+
+
+class PayoutScheduleDetailView(RetrieveAPIView):
+    model = PayoutSchedule
+    output_schema = PayoutScheduleOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return PayoutSchedule.objects.select_related("owner_agreement", "owner").all()
+
+    def get(self, parsed_path: Path[DetailPath]) -> PayoutScheduleOutput:
+        return super().get(parsed_path)
 
 
 class PayoutScheduleMarkPaidView(GenericController):

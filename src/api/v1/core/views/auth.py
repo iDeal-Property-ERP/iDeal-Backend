@@ -49,7 +49,7 @@ class RefreshAPIView(JWTMixin, RefreshTokenSyncController[PydanticFastSerializer
 
     def make_api_response(self) -> ObtainTokensResponse:
         return {
-            "access_token": self.create_jwt_token(token_type="access"),
+            "access_token": self.create_jwt_token(token_type="access", expiration=timezone.now() + self.jwt_expiration),
             "refresh_token": self.create_jwt_token(
                 token_type="refresh",
                 expiration=timezone.now() + self.jwt_refresh_expiration,

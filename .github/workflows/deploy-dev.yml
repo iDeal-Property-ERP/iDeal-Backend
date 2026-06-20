@@ -27,12 +27,14 @@ jobs:
           username: ${{ env.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            set -e
+            set -euxo pipefail
 
-            cd LOCATION
-            git fetch origin
-            git checkout $DEPLOY_BRANCH
-            git pull origin $DEPLOY_BRANCH
+            cd "$LOCATION"
 
-            docker compose down --volumes=false
+            git fetch origin --prune
+
+            git checkout "$DEPLOY_BRANCH"
+            git reset --hard "origin/$DEPLOY_BRANCH"
+            git clean -fd
+
             docker compose up -d --build

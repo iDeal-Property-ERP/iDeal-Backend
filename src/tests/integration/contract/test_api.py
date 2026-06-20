@@ -78,6 +78,25 @@ class TestOwnerAgreementAPI:
         assert body["success"] is True
         assert len(body["data"]) == 2
 
+    def test_retrieve_owner_agreement(self, api_client, management, owner):
+        agreement = OwnerAgreementFactory(owner=owner)
+        response = api_client.get(
+            f"/api/v1/contracts/owner-agreements/{agreement.id}/",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["id"] == agreement.id
+        assert body["data"]["agreement_number"] == agreement.agreement_number
+
+    def test_retrieve_owner_agreement_404(self, api_client, management):
+        response = api_client.get(
+            "/api/v1/contracts/owner-agreements/99999/",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 404
+
 
 @pytest.mark.django_db
 class TestLeaseAPI:
@@ -161,6 +180,34 @@ class TestLeaseAPI:
             **_make_jwt(management),
         )
         assert response.status_code == 404
+
+    def test_partial_update_lease(self, api_client, management):
+        lease = LeaseFactory(monthly_rent="600.00", status="active")
+        payload = json.dumps({"monthly_rent": "750.00", "status": "renewed"})
+        response = api_client.patch(
+            f"/api/v1/contracts/leases/{lease.id}/",
+            payload,
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["monthly_rent"] == "750.00"
+        assert body["data"]["status"] == "renewed"
+
+        lease.refresh_from_db()
+        assert str(lease.monthly_rent) == "750.00"
+
+    def test_partial_update_lease_requires_auth(self, api_client):
+        lease = LeaseFactory()
+        payload = json.dumps({"monthly_rent": "750.00"})
+        response = api_client.patch(
+            f"/api/v1/contracts/leases/{lease.id}/",
+            payload,
+            content_type="application/json",
+        )
+        assert response.status_code in (401, 403)
 
     def test_invalid_lease_data(self, api_client, management):
         payload = json.dumps({"property_id": 1})

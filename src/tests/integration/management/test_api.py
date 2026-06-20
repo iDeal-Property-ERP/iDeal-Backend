@@ -353,6 +353,34 @@ class TestManagementUserListAPI:
 
 
 @pytest.mark.django_db
+class TestManagementUserDetailAPI:
+    def test_retrieve_user(self, api_client):
+        mgmt = _mgmt_user()
+        target = UserFactory(role=UserRole.TENANT, is_active=True)
+        response = api_client.get(
+            f"/api/v1/management/users/{target.id}/",
+            **_make_jwt(mgmt),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["id"] == target.id
+        assert body["data"]["role"] == UserRole.TENANT
+
+    def test_retrieve_user_not_found(self, api_client):
+        mgmt = _mgmt_user()
+        response = api_client.get(
+            "/api/v1/management/users/99999/",
+            **_make_jwt(mgmt),
+        )
+        assert response.status_code == 404
+
+    def test_retrieve_user_requires_auth(self, api_client):
+        response = api_client.get("/api/v1/management/users/1/")
+        assert response.status_code in (401, 403)
+
+
+@pytest.mark.django_db
 class TestManagementUserUpdateAPI:
     def test_patch_user(self, api_client):
         mgmt = _mgmt_user()

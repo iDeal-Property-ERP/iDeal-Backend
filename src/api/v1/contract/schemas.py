@@ -62,6 +62,14 @@ class LeaseCreateInput(pydantic.BaseModel):
     status: str = "active"
 
 
+class LeaseUpdateInput(pydantic.BaseModel):
+    start_date: date | None = None
+    end_date: date | None = None
+    monthly_rent: Decimal | None = None
+    deposit: Decimal | None = None
+    status: str | None = None
+
+
 class LeaseRenewInput(pydantic.BaseModel):
     new_start_date: date
     new_end_date: date
