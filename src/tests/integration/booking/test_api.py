@@ -5,7 +5,7 @@ from contract.models import Lease
 from marketplace.models import Booking
 from notification.models import Notification
 
-from core.constants import BookingStatus, NotificationType, PropertyStatus
+from core.constants import BookingStatus, NotificationType, PropertyStatus, ViewingRequestStatus
 from tests.factories import (
     BookingFactory,
     ListingFactory,
@@ -14,6 +14,7 @@ from tests.factories import (
     PropertyFactory,
     TenantFactory,
     UserFactory,
+    ViewingRequestFactory,
 )
 from tests.integration.property.test_api import _make_jwt
 
@@ -137,3 +138,42 @@ class TestManagementBookings:
         BookingFactory()
         response = api_client.get("/api/v1/management/bookings/", data={"page": 1}, **_make_jwt(mgmt))
         assert response.status_code == 200
+        assert response.json()["data"]["page"]["object_list"][0]["id"] is not None
+
+
+@pytest.mark.django_db
+class TestManagementViewingRequests:
+    def test_public_viewing_request_appears_in_management(self, api_client):
+        mgmt = UserFactory()
+        vr = ViewingRequestFactory(full_name="Jane Doe")
+
+        response = api_client.get("/api/v1/management/viewing-requests/", data={"page": 1}, **_make_jwt(mgmt))
+        assert response.status_code == 200
+        rows = response.json()["data"]["page"]["object_list"]
+        assert any(row["id"] == vr.id and row["full_name"] == "Jane Doe" for row in rows)
+
+    def test_management_confirms_viewing_request(self, api_client):
+        mgmt = UserFactory()
+        vr = ViewingRequestFactory(status=ViewingRequestStatus.PENDING)
+
+        response = api_client.post(f"/api/v1/management/viewing-requests/{vr.id}/confirm/", **_make_jwt(mgmt))
+        assert response.status_code == 200
+        vr.refresh_from_db()
+        assert vr.status == ViewingRequestStatus.CONFIRMED
+
+    def test_management_cancels_viewing_request(self, api_client):
+        mgmt = UserFactory()
+        vr = ViewingRequestFactory(status=ViewingRequestStatus.PENDING)
+
+        response = api_client.post(f"/api/v1/management/viewing-requests/{vr.id}/cancel/", **_make_jwt(mgmt))
+        assert response.status_code == 200
+        vr.refresh_from_db()
+        assert vr.status == ViewingRequestStatus.CANCELLED
+
+    def test_confirm_cancelled_viewing_request_fails(self, api_client):
+        mgmt = UserFactory()
+        vr = ViewingRequestFactory(status=ViewingRequestStatus.CANCELLED)
+
+        response = api_client.post(f"/api/v1/management/viewing-requests/{vr.id}/confirm/", **_make_jwt(mgmt))
+        assert response.status_code == 400
+        assert response.json()["success"] is False

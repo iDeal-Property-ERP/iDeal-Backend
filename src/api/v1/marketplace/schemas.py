@@ -22,6 +22,8 @@ class PropertyBrief(pydantic.BaseModel):
     tariff: str
     ask_price: Decimal
     ask_currency: str
+    image_url: str | None = None
+    image_urls: list[str] = []
 
     model_config = pydantic.ConfigDict(from_attributes=True)
 

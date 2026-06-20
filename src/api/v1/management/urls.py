@@ -22,6 +22,17 @@ urlpatterns = [
     path("bookings/<int:pk>/approve/", views.ManagementBookingApproveView.as_view(), name="booking-approve"),
     path("bookings/<int:pk>/reject/", views.ManagementBookingRejectView.as_view(), name="booking-reject"),
     path("bookings/<int:pk>/convert/", views.ManagementBookingConvertView.as_view(), name="booking-convert"),
+    path("viewing-requests/", views.ManagementViewingRequestListView.as_view(), name="viewing-request-list"),
+    path(
+        "viewing-requests/<int:pk>/confirm/",
+        views.ManagementViewingRequestConfirmView.as_view(),
+        name="viewing-request-confirm",
+    ),
+    path(
+        "viewing-requests/<int:pk>/cancel/",
+        views.ManagementViewingRequestCancelView.as_view(),
+        name="viewing-request-cancel",
+    ),
     path("vas-orders/", views.ManagementVASOrderListView.as_view(), name="vas-order-list"),
     path("vas-orders/<int:pk>/status/", views.ManagementVASOrderStatusView.as_view(), name="vas-order-status"),
     path("vacancy/", views.ManagementVacancyView.as_view(), name="vacancy"),

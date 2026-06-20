@@ -31,6 +31,7 @@ from api.v1.management.schemas import (
     ManagementServiceRequestOutput,
     ManagementUserOutput,
     ManagementUserUpdateInput,
+    ManagementViewingRequestOutput,
     MonthlyPnlRow,
     PnLSummaryCard,
     PnLSummaryOutput,
@@ -640,6 +641,59 @@ class ManagementBookingConvertView(ManagementBookingView):
         except ValueError as err:
             return self.fail(error=str(err), message=str(_("Cannot convert booking")))
         return self.ok(self.to_output(booking), status_code=HTTPStatus.OK)
+
+
+class ManagementViewingRequestListView(ManagementView, ListAPIView):
+    output_schema = ManagementViewingRequestOutput
+
+    def get_queryset(self):
+        from marketplace.models import ViewingRequest
+
+        qs = ViewingRequest.objects.select_related("listing__property").order_by("-created_at")
+        status = self.request.GET.get("status")
+        listing_id = self.request.GET.get("listing_id")
+        if status:
+            qs = qs.filter(status=status)
+        if listing_id:
+            qs = qs.filter(listing_id=listing_id)
+        return qs
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return super().get(parsed_query)
+
+
+class ManagementViewingRequestView(ManagementView, GenericController):
+    output_schema = ManagementViewingRequestOutput
+
+    def get_queryset(self):
+        from marketplace.models import ViewingRequest
+
+        return ViewingRequest.objects.select_related("listing__property").all()
+
+
+class ManagementViewingRequestConfirmView(ManagementViewingRequestView):
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        from core.constants import ViewingRequestStatus
+
+        vr = self.get_object(pk=parsed_path.pk)
+        if vr.status == ViewingRequestStatus.CANCELLED:
+            return self.fail(
+                error=str(_("A cancelled viewing request cannot be confirmed")),
+                message=str(_("Invalid status transition")),
+            )
+        vr.status = ViewingRequestStatus.CONFIRMED
+        vr.save(update_fields=["status", "updated_at"])
+        return self.ok(self.to_output(vr), status_code=HTTPStatus.OK)
+
+
+class ManagementViewingRequestCancelView(ManagementViewingRequestView):
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        from core.constants import ViewingRequestStatus
+
+        vr = self.get_object(pk=parsed_path.pk)
+        vr.status = ViewingRequestStatus.CANCELLED
+        vr.save(update_fields=["status", "updated_at"])
+        return self.ok(self.to_output(vr), status_code=HTTPStatus.OK)
 
 
 class ManagementVacancyView(ManagementView):

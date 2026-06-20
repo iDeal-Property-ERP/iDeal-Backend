@@ -474,3 +474,37 @@ class ManagementBookingConvertInput(pydantic.BaseModel):
     owner_agreement_id: int | None = None
     monthly_rent: Decimal | None = None
     deposit: Decimal | None = None
+
+
+class ManagementViewingRequestOutput(pydantic.BaseModel):
+    id: int
+    listing_id: int
+    property_name: str
+    full_name: str
+    phone: str
+    email: str
+    preferred_date: date
+    message: str | None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_related(cls, v):
+        if isinstance(v, dict):
+            return v
+        listing = v.listing
+        return {
+            "id": v.id,
+            "listing_id": v.listing_id,
+            "property_name": listing.property.name if listing else "",
+            "full_name": v.full_name,
+            "phone": v.phone,
+            "email": v.email,
+            "preferred_date": v.preferred_date,
+            "message": v.message,
+            "status": v.status,
+            "created_at": v.created_at,
+            "updated_at": v.updated_at,
+        }
