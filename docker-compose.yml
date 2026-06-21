@@ -51,3 +51,8 @@ volumes:
   postgres_data:
   app_data:
   redis_data:
+
+networks:
+  default:
+    name: ideal-dev-net
+    driver: bridge

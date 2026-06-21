@@ -72,4 +72,5 @@ volumes:
 
 networks:
   network-default:
+    name: ideal-prod-net
     driver: bridge
