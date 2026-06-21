@@ -24,7 +24,7 @@ services:
     container_name: "ideal-qcluster-dev"
     command: python manage.py qcluster
     volumes:
-      - app_data:/app/cdn
+      - ./cdn:/cdn
     depends_on:
       - db
       - redis
@@ -38,7 +38,7 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.dev
     volumes:
-     - app_data:/app/cdn
+      - ./cdn:/cdn
     ports:
       - "8005:8000"
     depends_on:
@@ -49,7 +49,6 @@ services:
 
 volumes:
   postgres_data:
-  app_data:
   redis_data:
 
 networks:
