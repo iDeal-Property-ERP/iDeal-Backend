@@ -148,3 +148,31 @@ class TestListingSignals:
         listing = prop.listing
         assert listing is not None
         assert listing.is_active is True
+
+    def test_draft_listing_not_published_on_vacant(self):
+        """A wizard DRAFT listing must NOT be auto-published when the property goes vacant."""
+        from core.constants import ListingStatus
+
+        owner = OwnerFactory()
+        prop = PropertyFactory(owner=owner, status=PropertyStatus.PENDING_REVIEW)
+        listing = Listing.objects.create(property=prop, status=ListingStatus.DRAFT, is_active=False)
+        prop.status = PropertyStatus.VACANT
+        prop.save(update_fields=["status", "updated_at"])
+        listing.refresh_from_db()
+        assert listing.status == ListingStatus.DRAFT
+        assert listing.is_active is False
+
+    def test_pending_review_listing_published_on_vacant(self):
+        """An approved (PENDING_REVIEW) listing publishes exactly once — no double-create."""
+        from core.constants import ListingStatus
+
+        owner = OwnerFactory()
+        prop = PropertyFactory(owner=owner, status=PropertyStatus.PENDING_REVIEW)
+        listing = Listing.objects.create(property=prop, status=ListingStatus.PENDING_REVIEW, is_active=False)
+        prop.status = PropertyStatus.VACANT
+        prop.save(update_fields=["status", "updated_at"])
+        listing.refresh_from_db()
+        assert listing.status == ListingStatus.PUBLISHED
+        assert listing.is_active is True
+        assert listing.published_at is not None
+        assert Listing.objects.filter(property=prop).count() == 1

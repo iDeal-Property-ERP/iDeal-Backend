@@ -65,6 +65,61 @@ class OwnerOnboardingCreateInput(pydantic.BaseModel):
     accept_offer: bool
 
 
+class OwnerListingCreateInput(pydantic.BaseModel):
+    """Step 1 (Details) of the List-Your-Property wizard. Creates a draft."""
+
+    property_type: str = "apartment"
+    name: str
+    address: str | None = None
+    district_id: int
+    rooms: int
+    bathrooms: int = 1
+    area_sqm: int
+    floor: int = 1
+    total_floors: int | None = None
+    furnishing: str = "unfurnished"
+    description: str | None = None
+    amenities: list[str] = []  # amenity slugs
+
+
+class OwnerListingUpdateInput(pydantic.BaseModel):
+    """Partial per-step update. Pricing fields land on the listing; the rest on the property."""
+
+    property_type: str | None = None
+    name: str | None = None
+    address: str | None = None
+    district_id: int | None = None
+    rooms: int | None = None
+    bathrooms: int | None = None
+    area_sqm: int | None = None
+    floor: int | None = None
+    total_floors: int | None = None
+    furnishing: str | None = None
+    tariff: str | None = None
+    description: str | None = None
+    amenities: list[str] | None = None
+    monthly_price: Decimal | None = None
+    deposit_amount: Decimal | None = None
+    currency: str | None = None
+    minimum_stay: int | None = None
+    price_includes: list[str] | None = None
+
+
+class OwnerListingPhotoReorderItem(pydantic.BaseModel):
+    id: int
+    sort_order: int = 0
+    is_primary: bool = False
+    caption: str | None = None
+
+
+class OwnerListingPhotoReorderInput(pydantic.BaseModel):
+    items: list[OwnerListingPhotoReorderItem]
+
+
+class OwnerListingSubmitInput(pydantic.BaseModel):
+    accept_offer: bool
+
+
 class OwnerOnboardingOutput(pydantic.BaseModel):
     id: int
     owner_id: int

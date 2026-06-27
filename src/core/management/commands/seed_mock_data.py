@@ -77,6 +77,7 @@ from core.constants import (
     VASServiceType,
     ViewingRequestStatus,
 )
+from core.mock_images import real_estate_photo_set
 
 # Real Tashkent districts — get_or_create'd so append runs reuse them.
 TASHKENT_DISTRICTS = [
@@ -341,7 +342,7 @@ class Command(BaseCommand):
             k=total,
         )
         properties = []
-        for i, track in enumerate(tracks):
+        for track in tracks:
             owner = self.rng.choice(owners)
             district = self.rng.choice(districts)
             ask = self._money(300, 1500)
@@ -360,7 +361,8 @@ class Command(BaseCommand):
                 total_floors=self.rng.randint(4, 22),
                 owner=owner,
                 status=initial_status,
-                score=Decimal(f"{self.rng.uniform(3.0, 5.0):.1f}"),
+                score=Decimal(f"{self.rng.uniform(8.0, 9.9):.1f}"),
+                review_count=self.rng.randint(12, 180),
                 map_lat=Decimal(f"{self.rng.uniform(*TASHKENT_LAT):.7f}"),
                 map_lon=Decimal(f"{self.rng.uniform(*TASHKENT_LON):.7f}"),
                 description=self.faker.paragraph(nb_sentences=4),
@@ -369,7 +371,7 @@ class Command(BaseCommand):
                 owner_guaranteed_price=(ask * Decimal("0.9")).quantize(Decimal("0.01")),
                 tenant_charge_price=(ask * Decimal("1.1")).quantize(Decimal("0.01")),
             )
-            self._seed_property_photos(prop, i)
+            self._seed_property_photos(prop)
 
             agreement = None
             if track == "onboarding_approved":
@@ -391,13 +393,15 @@ class Command(BaseCommand):
             self._enrich_listing(prop, agreement)
         return properties
 
-    def _seed_property_photos(self, prop, index):
+    def _seed_property_photos(self, prop):
         if not self.with_images:
             return
-        for n in range(self.rng.randint(3, 5)):
+        count = self.rng.randint(5, 15)
+        for n, (image, caption) in enumerate(real_estate_photo_set(count, rng=self.rng)):
             PropertyPhoto.objects.create(
                 property=prop,
-                image=self.fetch_image(f"{self.token}-prop{index}-{n}"),
+                image=image,
+                caption=caption,
                 is_primary=(n == 0),
                 sort_order=n,
             )

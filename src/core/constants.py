@@ -64,6 +64,60 @@ class TariffChoices(ConstantChoices):
     ]
 
 
+class PropertyType(ConstantChoices):
+    APARTMENT = "apartment"
+    HOUSE = "house"
+    STUDIO = "studio"
+    ROOM = "room"
+    CHOICES = [
+        (APARTMENT, _("Apartment")),
+        (HOUSE, _("House")),
+        (STUDIO, _("Studio")),
+        (ROOM, _("Room")),
+    ]
+
+
+class FurnishingType(ConstantChoices):
+    FURNISHED = "furnished"
+    SEMI_FURNISHED = "semi_furnished"
+    UNFURNISHED = "unfurnished"
+    CHOICES = [
+        (FURNISHED, _("Furnished")),
+        (SEMI_FURNISHED, _("Semi-furnished")),
+        (UNFURNISHED, _("Unfurnished")),
+    ]
+
+
+class MinimumStay(ConstantChoices):
+    ONE = 1
+    THREE = 3
+    SIX = 6
+    TWELVE = 12
+    CHOICES = [
+        (ONE, _("1 month")),
+        (THREE, _("3 months")),
+        (SIX, _("6 months")),
+        (TWELVE, _("12 months")),
+    ]
+
+
+class PriceIncluded(ConstantChoices):
+    UTILITIES = "utilities"
+    WATER = "water"
+    INTERNET = "internet"
+    GAS = "gas"
+    CLEANING = "cleaning"
+    PARKING = "parking"
+    CHOICES = [
+        (UTILITIES, _("Utilities")),
+        (WATER, _("Water")),
+        (INTERNET, _("Internet")),
+        (GAS, _("Gas")),
+        (CLEANING, _("Cleaning")),
+        (PARKING, _("Parking")),
+    ]
+
+
 class OwnerAgreementStatus(ConstantChoices):
     ACTIVE = "active"
     EXPIRED = "expired"
@@ -177,6 +231,45 @@ class ViewingRequestStatus(ConstantChoices):
         (PENDING, _("Pending")),
         (CONFIRMED, _("Confirmed")),
         (CANCELLED, _("Cancelled")),
+    ]
+
+
+class ViewingTimeSlot(ConstantChoices):
+    T_10 = "10:00"
+    T_13 = "13:00"
+    T_15 = "15:00"
+    T_18 = "18:00"
+    CHOICES = [
+        (T_10, _("10:00")),
+        (T_13, _("13:00")),
+        (T_15, _("15:00")),
+        (T_18, _("18:00")),
+    ]
+
+
+class ListingStatus(ConstantChoices):
+    DRAFT = "draft"
+    PENDING_REVIEW = "pending_review"
+    PUBLISHED = "published"
+    REJECTED = "rejected"
+    ARCHIVED = "archived"
+    CHOICES = [
+        (DRAFT, _("Draft")),
+        (PENDING_REVIEW, _("Pending Review")),
+        (PUBLISHED, _("Published")),
+        (REJECTED, _("Rejected")),
+        (ARCHIVED, _("Archived")),
+    ]
+
+
+class ContactInquiryStatus(ConstantChoices):
+    NEW = "new"
+    HANDLED = "handled"
+    CLOSED = "closed"
+    CHOICES = [
+        (NEW, _("New")),
+        (HANDLED, _("Handled")),
+        (CLOSED, _("Closed")),
     ]
 
 

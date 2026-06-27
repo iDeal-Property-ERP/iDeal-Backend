@@ -1,7 +1,14 @@
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 
-from core.constants import BookingStatus, ViewingRequestStatus
+from core.constants import (
+    BookingStatus,
+    ContactInquiryStatus,
+    ListingStatus,
+    MinimumStay,
+    ViewingRequestStatus,
+    ViewingTimeSlot,
+)
 from core.models import SoftDeleteModel, TimestampedModel
 
 
@@ -10,10 +17,23 @@ class Listing(TimestampedModel, SoftDeleteModel):
     owner_agreement = models.ForeignKey(
         "contract.OwnerAgreement", on_delete=models.SET_NULL, null=True, blank=True, related_name="listings"
     )
+    status = models.CharField(max_length=20, choices=ListingStatus.choices, default=ListingStatus.PUBLISHED)
+    # Kept mirrored from ``status`` (is_active == status == PUBLISHED) for back-compat with the
+    # public query and the auto-listing signal.
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
     description = models.TextField(null=True, blank=True)
+    # ``listed_price`` is kept as a compat alias of ``monthly_price``.
     listed_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    monthly_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=3, default="USD")
+    # Pricing extras surfaced on the List-Your-Property wizard (step 3).
+    minimum_stay = models.PositiveSmallIntegerField(choices=MinimumStay.choices(), null=True, blank=True)
+    price_includes = models.JSONField(default=list, blank=True)
+    rejection_reason = models.TextField(null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    published_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = _("Listing")
@@ -23,6 +43,7 @@ class Listing(TimestampedModel, SoftDeleteModel):
         indexes = [
             models.Index(fields=["is_active"]),
             models.Index(fields=["is_featured"]),
+            models.Index(fields=["status"]),
         ]
 
     def __str__(self):
@@ -33,8 +54,9 @@ class ViewingRequest(TimestampedModel, SoftDeleteModel):
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="viewing_requests")
     full_name = models.CharField(max_length=150)
     phone = models.CharField(max_length=30)
-    email = models.EmailField()
+    email = models.EmailField(null=True, blank=True)
     preferred_date = models.DateField()
+    preferred_time = models.CharField(max_length=10, choices=ViewingTimeSlot.choices, null=True, blank=True)
     message = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=ViewingRequestStatus.choices, default=ViewingRequestStatus.PENDING)
 
@@ -50,6 +72,48 @@ class ViewingRequest(TimestampedModel, SoftDeleteModel):
 
     def __str__(self):
         return f"Viewing #{self.id} — {self.full_name} ({self.get_status_display()})"
+
+
+class ContactInquiry(TimestampedModel, SoftDeleteModel):
+    """A general "Message iDeal" inquiry from the public marketplace, kept separate from
+    ViewingRequest so management's viewing queue stays clean."""
+
+    listing = models.ForeignKey(Listing, on_delete=models.SET_NULL, null=True, blank=True, related_name="inquiries")
+    full_name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=30)
+    email = models.EmailField(null=True, blank=True)
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=ContactInquiryStatus.choices, default=ContactInquiryStatus.NEW)
+
+    class Meta:
+        verbose_name = _("Contact Inquiry")
+        verbose_name_plural = _("Contact Inquiries")
+        ordering = ["-created_at"]
+        db_table = "contact_inquiries"
+        indexes = [
+            models.Index(fields=["status"]),
+        ]
+
+    def __str__(self):
+        return f"Inquiry #{self.id} — {self.full_name} ({self.get_status_display()})"
+
+
+class FaqItem(TimestampedModel):
+    """Editable FAQ entry shown on the public "How it works" page."""
+
+    question = models.CharField(max_length=255)
+    answer = models.TextField()
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = _("FAQ Item")
+        verbose_name_plural = _("FAQ Items")
+        ordering = ["sort_order", "id"]
+        db_table = "faq_items"
+
+    def __str__(self):
+        return self.question
 
 
 class Booking(TimestampedModel, SoftDeleteModel):

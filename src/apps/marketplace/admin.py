@@ -1,17 +1,49 @@
 from django.contrib import admin
-from marketplace.models import Booking, Listing, ViewingRequest
+from marketplace.models import Booking, ContactInquiry, FaqItem, Listing, ViewingRequest
 
-from core.admin import BaseSoftDeleteModelAdmin
+from core.admin import BaseModelAdmin, BaseSoftDeleteModelAdmin
 
 
 @admin.register(Listing)
 class ListingAdmin(BaseSoftDeleteModelAdmin):
-    pass
+    list_display = (
+        "id",
+        "property",
+        "status",
+        "is_active",
+        "is_featured",
+        "monthly_price",
+        "minimum_stay",
+        "created_at",
+        "is_deleted",
+    )
+    list_filter = ("status", "is_active", "is_featured")
+    search_fields = ("property__name",)
+    ordering = ("-created_at",)
 
 
 @admin.register(ViewingRequest)
 class ViewingRequestAdmin(BaseSoftDeleteModelAdmin):
-    pass
+    list_display = ("id", "listing", "full_name", "phone", "preferred_date", "preferred_time", "status", "is_deleted")
+    list_filter = ("status",)
+    search_fields = ("full_name", "phone", "email")
+    ordering = ("-created_at",)
+
+
+@admin.register(ContactInquiry)
+class ContactInquiryAdmin(BaseSoftDeleteModelAdmin):
+    list_display = ("id", "listing", "full_name", "phone", "status", "created_at", "is_deleted")
+    list_filter = ("status",)
+    search_fields = ("full_name", "phone", "email")
+    ordering = ("-created_at",)
+
+
+@admin.register(FaqItem)
+class FaqItemAdmin(BaseModelAdmin):
+    list_display = ("id", "question", "sort_order", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("question", "answer")
+    ordering = ("sort_order", "id")
 
 
 @admin.register(Booking)

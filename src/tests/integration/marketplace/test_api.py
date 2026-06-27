@@ -16,6 +16,11 @@ def _make_vacant_listing(**listing_kwargs):
     return listing
 
 
+def _items(body):
+    """Extract the listing rows from the always-paginated discovery envelope."""
+    return body["data"]["page"]["object_list"]
+
+
 @pytest.mark.django_db
 class TestPublicListingAPI:
     def test_list_listings_public_no_auth(self, api_client):
@@ -25,8 +30,8 @@ class TestPublicListingAPI:
         assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
-        assert isinstance(body["data"], list)
-        assert len(body["data"]) >= 2
+        assert body["data"]["count"] >= 2
+        assert len(_items(body)) >= 2
 
     def test_list_listings_only_active_vacant(self, api_client, owner):
         district = DistrictFactory()
@@ -38,7 +43,7 @@ class TestPublicListingAPI:
         response = api_client.get("/api/v1/marketplace/listings/")
         assert response.status_code == 200
         body = response.json()
-        listing_ids = [item["id"] for item in body["data"]]
+        listing_ids = [item["id"] for item in _items(body)]
         assert active_listing.id in listing_ids
 
     def test_list_listings_paginated(self, api_client):
@@ -63,7 +68,7 @@ class TestPublicListingAPI:
         assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
-        for item in body["data"]:
+        for item in _items(body):
             assert item["property"]["district_id"] == district_a.id
 
     def test_list_listings_filter_by_rooms(self, api_client, owner):
@@ -74,8 +79,44 @@ class TestPublicListingAPI:
         assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
-        for item in body["data"]:
+        for item in _items(body):
             assert item["property"]["rooms"] == 2
+
+    def test_list_listings_filter_verified_only(self, api_client, owner):
+        verified = PropertyFactory(owner=owner, status=PropertyStatus.VACANT, is_verified=True)
+        PropertyFactory(owner=owner, status=PropertyStatus.VACANT, is_verified=False)
+
+        response = api_client.get("/api/v1/marketplace/listings/?verified=true")
+        assert response.status_code == 200
+        body = response.json()
+        ids = [item["property"]["id"] for item in _items(body)]
+        assert verified.id in ids
+        assert all(item["property"]["is_verified"] for item in _items(body))
+
+    def test_list_listings_filter_by_amenities(self, api_client, owner):
+        from property.models import Amenity
+
+        wifi = Amenity.objects.get(slug="wifi")
+        parking = Amenity.objects.get(slug="parking")
+        match = PropertyFactory(owner=owner, status=PropertyStatus.VACANT)
+        match.amenities.set([wifi, parking])
+        partial = PropertyFactory(owner=owner, status=PropertyStatus.VACANT)
+        partial.amenities.set([wifi])
+
+        response = api_client.get("/api/v1/marketplace/listings/?amenities=wifi,parking")
+        assert response.status_code == 200
+        ids = [item["property"]["id"] for item in _items(response.json())]
+        assert match.id in ids
+        assert partial.id not in ids
+
+    def test_list_listings_sort_price_asc(self, api_client, owner):
+        cheap = _make_vacant_listing(monthly_price=300)
+        pricey = _make_vacant_listing(monthly_price=900)
+
+        response = api_client.get("/api/v1/marketplace/listings/?sort=price_asc")
+        assert response.status_code == 200
+        ids = [item["id"] for item in _items(response.json())]
+        assert ids.index(cheap.id) < ids.index(pricey.id)
 
     def test_retrieve_listing_public(self, api_client):
         listing = _make_vacant_listing()
@@ -83,9 +124,34 @@ class TestPublicListingAPI:
         assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
-        assert body["data"]["id"] == listing.id
-        assert body["data"]["property"] is not None
-        assert body["data"]["property"]["name"] == listing.property.name
+        data = body["data"]
+        assert data["id"] == listing.id
+        assert data["property"] is not None
+        assert data["property"]["name"] == listing.property.name
+        assert "score" in data["property"]
+        assert data["property"]["review_count"] == listing.property.review_count
+        # Enriched detail blocks.
+        assert "photos" in data
+        assert data["specs"]["rooms"] == listing.property.rooms
+        assert "price_card" in data
+        assert data["verification"]["is_verified"] == listing.property.is_verified
+        assert len(data["verification"]["checklist"]) == 4
+
+    def test_retrieve_listing_photo_caption(self, api_client):
+        from property.models import PropertyPhoto
+
+        listing = _make_vacant_listing()
+        PropertyPhoto.objects.create(
+            property=listing.property,
+            image="properties/photos/test.jpg",
+            caption="Front exterior",
+            is_primary=True,
+            sort_order=0,
+        )
+        response = api_client.get(f"/api/v1/marketplace/listings/{listing.id}/")
+        assert response.status_code == 200
+        photos = response.json()["data"]["photos"]
+        assert photos[0]["caption"] == "Front exterior"
 
     def test_retrieve_listing_404(self, api_client):
         response = api_client.get("/api/v1/marketplace/listings/99999/")
@@ -184,3 +250,75 @@ class TestPublicListingAPI:
         assert vr is not None
         assert vr.full_name == "Jane Doe"
         assert vr.listing == listing
+
+    def test_book_viewing_with_time_slot_no_email(self, api_client):
+        """Phone-first booking: email omitted, time slot provided."""
+        listing = _make_vacant_listing()
+        payload = json.dumps(
+            {
+                "full_name": "Phone Only",
+                "phone": "+998900000000",
+                "preferred_date": "2025-08-01",
+                "preferred_time": "13:00",
+            }
+        )
+        response = api_client.post(
+            f"/api/v1/marketplace/listings/{listing.id}/book-viewing/",
+            payload,
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        body = response.json()
+        assert body["data"]["preferred_time"] == "13:00"
+        assert body["data"]["email"] is None
+
+
+@pytest.mark.django_db
+class TestMarketplaceLookups:
+    def test_districts_endpoint(self, api_client):
+        DistrictFactory(name="Yunusobod")
+        response = api_client.get("/api/v1/marketplace/districts/")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert any(d["name"] == "Yunusobod" for d in body["data"])
+
+    def test_amenities_endpoint_seeded(self, api_client):
+        response = api_client.get("/api/v1/marketplace/amenities/")
+        assert response.status_code == 200
+        body = response.json()
+        slugs = {a["slug"] for a in body["data"]}
+        assert {"wifi", "parking", "elevator"} <= slugs
+
+    def test_faqs_endpoint_seeded(self, api_client):
+        response = api_client.get("/api/v1/marketplace/faqs/")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert len(body["data"]) >= 1
+        assert "question" in body["data"][0]
+
+    def test_create_inquiry(self, api_client):
+        listing = _make_vacant_listing()
+        payload = json.dumps(
+            {
+                "listing_id": listing.id,
+                "full_name": "Curious Renter",
+                "phone": "+998901112233",
+                "message": "Is this still available?",
+            }
+        )
+        response = api_client.post(
+            "/api/v1/marketplace/inquiries/",
+            payload,
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["status"] == "new"
+        assert body["data"]["listing_id"] == listing.id
+
+        from marketplace.models import ContactInquiry
+
+        assert ContactInquiry.objects.filter(full_name="Curious Renter").exists()
