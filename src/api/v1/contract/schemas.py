@@ -35,6 +35,26 @@ class OwnerAgreementCreateInput(pydantic.BaseModel):
     commission_rate: Decimal
 
 
+class OwnerAgreementUpdateInput(pydantic.BaseModel):
+    start_date: date | None = None
+    end_date: date | None = None
+    commission_rate: Decimal | None = None
+    terms: str | None = None
+    status: str | None = None
+
+
+class OwnerAgreementRenewInput(pydantic.BaseModel):
+    new_start_date: date
+    new_end_date: date
+    commission_rate: Decimal | None = None
+    agreement_number: str | None = None
+    terms: str | None = None
+
+
+class OwnerAgreementTerminateInput(pydantic.BaseModel):
+    reason: str | None = None
+
+
 class LeaseOutput(pydantic.BaseModel):
     id: int
     property_id: int
@@ -75,6 +95,11 @@ class LeaseRenewInput(pydantic.BaseModel):
     new_end_date: date
     new_monthly_rent: Decimal
     deposit: Decimal | None = None
+
+
+class LeaseTerminateInput(pydantic.BaseModel):
+    end_date: date | None = None
+    reason: str | None = None
 
 
 class LeaseRenewalOutput(pydantic.BaseModel):

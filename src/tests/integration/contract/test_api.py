@@ -289,3 +289,152 @@ class TestLeaseRenewAPI:
             **_make_jwt(management),
         )
         assert response.status_code == 404
+
+
+@pytest.mark.django_db
+class TestLeaseTerminateAPI:
+    def test_terminate_lease(self, api_client, management, property_obj, tenant):
+        agreement = OwnerAgreementFactory(property=property_obj)
+        lease = LeaseFactory(
+            property=property_obj,
+            owner_agreement=agreement,
+            tenant=tenant,
+            status="active",
+        )
+        payload = json.dumps({"end_date": "2026-09-01", "reason": "Tenant relocating"})
+        response = api_client.post(
+            f"/api/v1/contracts/leases/{lease.id}/terminate/",
+            payload,
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 201
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["status"] == "terminated"
+        assert body["data"]["end_date"] == "2026-09-01"
+
+        property_obj.refresh_from_db()
+        assert property_obj.status == "vacant"
+
+    def test_terminate_lease_invalid_status(self, api_client, management):
+        lease = LeaseFactory(status="terminated")
+        response = api_client.post(
+            f"/api/v1/contracts/leases/{lease.id}/terminate/",
+            json.dumps({}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+
+    def test_terminate_lease_requires_auth(self, api_client):
+        lease = LeaseFactory(status="active")
+        response = api_client.post(
+            f"/api/v1/contracts/leases/{lease.id}/terminate/",
+            json.dumps({}),
+            content_type="application/json",
+        )
+        assert response.status_code in (401, 403)
+
+
+@pytest.mark.django_db
+class TestOwnerAgreementUpdateAPI:
+    def test_patch_owner_agreement(self, api_client, management, owner):
+        agreement = OwnerAgreementFactory(owner=owner, commission_rate="10.00")
+        payload = json.dumps({"commission_rate": "18.00", "status": "expired"})
+        response = api_client.patch(
+            f"/api/v1/contracts/owner-agreements/{agreement.id}/",
+            payload,
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["commission_rate"] == "18.00"
+        assert body["data"]["status"] == "expired"
+
+    def test_patch_owner_agreement_requires_auth(self, api_client):
+        agreement = OwnerAgreementFactory()
+        response = api_client.patch(
+            f"/api/v1/contracts/owner-agreements/{agreement.id}/",
+            json.dumps({"commission_rate": "18.00"}),
+            content_type="application/json",
+        )
+        assert response.status_code in (401, 403)
+
+
+@pytest.mark.django_db
+class TestOwnerAgreementRenewAPI:
+    def test_renew_owner_agreement(self, api_client, management, owner, property_obj):
+        agreement = OwnerAgreementFactory(owner=owner, property=property_obj, agreement_number="AG-API-REN-1")
+        payload = json.dumps(
+            {
+                "new_start_date": "2027-01-01",
+                "new_end_date": "2028-01-01",
+            }
+        )
+        response = api_client.post(
+            f"/api/v1/contracts/owner-agreements/{agreement.id}/renew/",
+            payload,
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 201
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["id"] != agreement.id
+        assert body["data"]["status"] == "active"
+        assert body["data"]["agreement_number"] == "AG-API-REN-1-R1"
+
+        agreement.refresh_from_db()
+        assert agreement.status == "expired"
+
+    def test_renew_owner_agreement_404(self, api_client, management):
+        payload = json.dumps({"new_start_date": "2027-01-01", "new_end_date": "2028-01-01"})
+        response = api_client.post(
+            "/api/v1/contracts/owner-agreements/99999/renew/",
+            payload,
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 404
+
+
+@pytest.mark.django_db
+class TestOwnerAgreementTerminateAPI:
+    def test_terminate_owner_agreement(self, api_client, management, owner):
+        agreement = OwnerAgreementFactory(owner=owner, status="active")
+        response = api_client.post(
+            f"/api/v1/contracts/owner-agreements/{agreement.id}/terminate/",
+            json.dumps({}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 201
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["status"] == "terminated"
+
+    def test_terminate_owner_agreement_already_terminated(self, api_client, management):
+        agreement = OwnerAgreementFactory(status="terminated")
+        response = api_client.post(
+            f"/api/v1/contracts/owner-agreements/{agreement.id}/terminate/",
+            json.dumps({}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+
+    def test_terminate_owner_agreement_requires_auth(self, api_client):
+        agreement = OwnerAgreementFactory(status="active")
+        response = api_client.post(
+            f"/api/v1/contracts/owner-agreements/{agreement.id}/terminate/",
+            json.dumps({}),
+            content_type="application/json",
+        )
+        assert response.status_code in (401, 403)

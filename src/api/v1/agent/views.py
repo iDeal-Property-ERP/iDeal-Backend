@@ -3,7 +3,13 @@ from agent.models import Agent, AgentDeal
 from django.shortcuts import get_object_or_404
 from dmr import Body, Path, Query
 
-from api.v1.agent.schemas import AgentDealCreateInput, AgentDealOutput, AgentOutput
+from api.v1.agent.schemas import (
+    AgentCreateInput,
+    AgentDealCreateInput,
+    AgentDealOutput,
+    AgentOutput,
+    AgentUpdateInput,
+)
 from core.api.permissions import RoleAuth
 from core.api.views import DetailPath, GenericController, ListAPIView, RetrieveAPIView
 from core.constants import UserRole
@@ -29,10 +35,19 @@ class AgentListView(ListAPIView):
             qs = qs.filter(is_active=parsed_query.is_active)
         return self.list_response(qs, parsed_query)
 
+    def post(self, parsed_body: Body[AgentCreateInput]) -> dict:
+        agent = Agent.objects.create(
+            user_id=parsed_body.user_id,
+            commission_rate=parsed_body.commission_rate,
+            is_active=parsed_body.is_active,
+        )
+        return self.ok(self.to_output(agent))
+
 
 class AgentDetailView(RetrieveAPIView):
     model = Agent
     output_schema = AgentOutput
+    update_schema = AgentUpdateInput
     auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
@@ -40,6 +55,11 @@ class AgentDetailView(RetrieveAPIView):
 
     def get(self, parsed_path: Path[DetailPath]) -> dict:
         instance = self.get_object(pk=parsed_path.pk)
+        return self.ok(self.to_output(instance))
+
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[AgentUpdateInput]) -> dict:
+        instance = self.get_object(pk=parsed_path.pk)
+        instance = self.perform_update(instance, parsed_body.model_dump(exclude_unset=True))
         return self.ok(self.to_output(instance))
 
 

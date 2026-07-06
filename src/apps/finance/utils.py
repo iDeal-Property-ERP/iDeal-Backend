@@ -1,6 +1,22 @@
+from datetime import date
 from decimal import Decimal
 
+from django.db.models import Q
 from finance.models import ExchangeRate
+
+from core.constants import PaymentStatus
+
+
+def overdue_q(today: date) -> Q:
+    """Predicate for payments that are effectively overdue.
+
+    No background job flips ``PENDING`` payments to ``OVERDUE`` when their due
+    date passes, so "overdue" must be derived: anything explicitly marked
+    OVERDUE, plus any still-PENDING payment whose ``due_date`` is in the past.
+    This is the single source of truth used by list filters, KPI stats, and the
+    sidebar badge.
+    """
+    return Q(status=PaymentStatus.OVERDUE) | Q(status=PaymentStatus.PENDING, due_date__lt=today)
 
 
 def convert_amount(amount: Decimal, from_currency: str, to_currency: str) -> Decimal:

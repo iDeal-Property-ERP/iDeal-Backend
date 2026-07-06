@@ -40,6 +40,15 @@ def _next_payout_date(from_date: date) -> date:
     return date(year, month, day)
 
 
+def next_payout_run_date(from_date: date | None = None) -> date:
+    """Public wrapper: the next scheduled owner-payout run date.
+
+    Used by the management payouts stats endpoint (the "next run" KPI). Defaults
+    to computing from today when no ``from_date`` is given.
+    """
+    return _next_payout_date(from_date or date.today())
+
+
 def accrue_owner_payout_for_payment(payment):
     """Accrue an owner payout for a PAID ``payment``.
 

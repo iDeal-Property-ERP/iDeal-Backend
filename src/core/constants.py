@@ -159,21 +159,40 @@ class PaymentMethod(ConstantChoices):
     CASH = "cash"
     BANK_TRANSFER = "bank_transfer"
     ONLINE = "online"
+    CLICK = "click"
+    PAYME = "payme"
+    UZUM = "uzum"
     CHOICES = [
         (CASH, _("Cash")),
         (BANK_TRANSFER, _("Bank Transfer")),
         (ONLINE, _("Online")),
+        (CLICK, _("Click")),
+        (PAYME, _("Payme")),
+        (UZUM, _("Uzum")),
     ]
 
 
 class PayoutStatus(ConstantChoices):
     SCHEDULED = "scheduled"
+    HELD = "held"
     PAID = "paid"
     CANCELLED = "cancelled"
     CHOICES = [
         (SCHEDULED, _("Scheduled")),
+        (HELD, _("Held")),
         (PAID, _("Paid")),
         (CANCELLED, _("Cancelled")),
+    ]
+
+
+class PayoutMethod(ConstantChoices):
+    BANK_TRANSFER = "bank_transfer"
+    CARD = "card"
+    CASH = "cash"
+    CHOICES = [
+        (BANK_TRANSFER, _("Bank Transfer")),
+        (CARD, _("Card")),
+        (CASH, _("Cash")),
     ]
 
 

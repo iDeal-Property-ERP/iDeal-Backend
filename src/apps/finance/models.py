@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from core.constants import Currency, PaymentMethod, PaymentStatus, PayoutStatus
+from core.constants import Currency, PaymentMethod, PaymentStatus, PayoutMethod, PayoutStatus
 from core.models import SoftDeleteModel, TimestampedModel
 
 
@@ -103,6 +103,15 @@ class PayoutSchedule(TimestampedModel, SoftDeleteModel):
         default=PayoutStatus.SCHEDULED,
         verbose_name=_("Status"),
     )
+    method = models.CharField(
+        max_length=20,
+        choices=PayoutMethod.choices,
+        default=PayoutMethod.BANK_TRANSFER,
+        verbose_name=_("Method"),
+    )
+    # Shared reason line for the HELD and CANCELLED transitions (e.g. "bank
+    # details invalid" while held, or the cancellation note).
+    status_reason = models.TextField(null=True, blank=True, verbose_name=_("Status Reason"))
 
     class Meta:
         verbose_name = _("Payout Schedule")

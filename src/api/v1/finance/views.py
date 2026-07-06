@@ -3,6 +3,7 @@ from decimal import Decimal
 from http import HTTPStatus
 
 from django.db.models import Sum
+from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 from dmr.pagination import Paginated
@@ -14,9 +15,16 @@ from api.v1.finance.schemas import (
     DashboardMetrics,
     ExchangeRateCreateInput,
     ExchangeRateOutput,
+    PaymentBulkActionOutput,
+    PaymentBulkMarkPaidInput,
     PaymentCreateInput,
     PaymentOutput,
     PaymentPartialUpdateInput,
+    PaymentRemindInput,
+    PaymentRemindOutput,
+    PayoutBulkActionOutput,
+    PayoutBulkMarkPaidInput,
+    PayoutScheduleCreateInput,
     PayoutScheduleOutput,
     PnLBreakdown,
     PnLFilter,
@@ -30,7 +38,40 @@ from core.api.views import (
     ListQuery,
     RetrieveAPIView,
 )
-from core.constants import Currency, NotificationType, PaymentStatus, PayoutStatus, UserRole
+from core.constants import (
+    Currency,
+    NotificationType,
+    PaymentMethod,
+    PaymentStatus,
+    PayoutStatus,
+    UserRole,
+)
+
+
+def _optional_json(request) -> dict:
+    """Best-effort parse of a JSON request body; ``{}`` when absent or invalid.
+
+    Lets detail-action endpoints (mark-paid / hold / cancel) accept an optional
+    body without the framework rejecting a body-less request.
+    """
+    import json
+
+    raw = getattr(request, "body", b"") or b""
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _remind_body(payment) -> str:
+    return str(_("Reminder: your payment of %(amount)s %(currency)s is due on %(due)s.")) % {
+        "amount": payment.amount,
+        "currency": payment.currency,
+        "due": payment.due_date,
+    }
 
 
 class PaymentListCreateView(CreateAPIView, ListAPIView):
@@ -43,6 +84,12 @@ class PaymentListCreateView(CreateAPIView, ListAPIView):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
 
     def post(self, parsed_body: Body[PaymentCreateInput]) -> PaymentOutput:
+        # Bank transfers must carry a reference (mirrors the Record-payment dialog).
+        if parsed_body.method == PaymentMethod.BANK_TRANSFER and not (parsed_body.gateway_ref or "").strip():
+            return self.fail(
+                error=str(_("A reference number is required for bank transfers")),
+                message=str(_("Validation error")),
+            )
         return super().post(parsed_body)
 
     def get(self, parsed_query: Query[ListQuery]) -> list[PaymentOutput] | Paginated[PaymentOutput]:
@@ -80,14 +127,24 @@ class PaymentMarkPaidView(GenericController):
 
     def post(self, parsed_path: Path[DetailPath]) -> PaymentOutput:
         payment = self.get_object(pk=parsed_path.pk)
-        if payment.status == PaymentStatus.PAID:
+        if payment.status not in (PaymentStatus.PENDING, PaymentStatus.OVERDUE):
             return self.fail(
-                error=str(_("Payment is already marked as paid")),
+                error=str(_("Only pending or overdue payments can be marked as paid")),
                 message=str(_("Invalid status transition")),
             )
+        # Optional overrides (method / gateway_ref / payment_date) come from the
+        # Mark-paid sheet. Parsed leniently so a body-less request still works.
+        body = _optional_json(self.request)
+        update_fields = ["status", "payment_date", "updated_at"]
         payment.status = PaymentStatus.PAID
-        payment.payment_date = date_type.today()
-        payment.save(update_fields=["status", "payment_date", "updated_at"])
+        payment.payment_date = body.get("payment_date") or date_type.today()
+        if body.get("method"):
+            payment.method = body["method"]
+            update_fields.append("method")
+        if body.get("gateway_ref") is not None:
+            payment.gateway_ref = body["gateway_ref"]
+            update_fields.append("gateway_ref")
+        payment.save(update_fields=update_fields)
         notify(
             recipient=payment.tenant,
             type=NotificationType.PAYMENT_PAID,
@@ -98,6 +155,79 @@ class PaymentMarkPaidView(GenericController):
             related_object_id=payment.id,
         )
         return self.ok(self.to_output(payment), status_code=HTTPStatus.OK)
+
+
+class PaymentBulkMarkPaidView(GenericController):
+    model = Payment
+    output_schema = PaymentOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def post(self, parsed_body: Body[PaymentBulkMarkPaidInput]) -> PaymentBulkActionOutput:
+        payments = Payment.objects.select_related("tenant").filter(id__in=parsed_body.ids)
+        updated = 0
+        skipped = 0
+        today = date_type.today()
+        for payment in payments:
+            if payment.status not in (PaymentStatus.PENDING, PaymentStatus.OVERDUE):
+                skipped += 1
+                continue
+            payment.status = PaymentStatus.PAID
+            payment.payment_date = today
+            fields = ["status", "payment_date", "updated_at"]
+            if parsed_body.method:
+                payment.method = parsed_body.method
+                fields.append("method")
+            payment.save(update_fields=fields)  # post_save signal accrues the owner payout
+            notify(
+                recipient=payment.tenant,
+                type=NotificationType.PAYMENT_PAID,
+                title=str(_("Payment received")),
+                body=str(_("Your payment of %(amount)s %(currency)s has been recorded."))
+                % {"amount": payment.amount, "currency": payment.currency},
+                related_object_type="payment",
+                related_object_id=payment.id,
+            )
+            updated += 1
+        # ids that matched no row are counted as skipped too.
+        skipped += len(set(parsed_body.ids)) - payments.count()
+        return self.ok({"updated": updated, "skipped": skipped}, status_code=HTTPStatus.OK)
+
+
+class PaymentRemindView(GenericController):
+    model = Payment
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def post(self, parsed_path: Path[DetailPath]) -> PaymentRemindOutput:
+        payment = get_object_or_404(Payment.objects.select_related("tenant"), pk=parsed_path.pk)
+        sent = _send_reminders([payment])
+        return self.ok({"sent": sent}, status_code=HTTPStatus.OK)
+
+
+class PaymentBulkRemindView(GenericController):
+    model = Payment
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def post(self, parsed_body: Body[PaymentRemindInput]) -> PaymentRemindOutput:
+        payments = Payment.objects.select_related("tenant").filter(id__in=parsed_body.ids)
+        sent = _send_reminders(payments)
+        return self.ok({"sent": sent}, status_code=HTTPStatus.OK)
+
+
+def _send_reminders(payments) -> int:
+    sent = 0
+    for payment in payments:
+        if payment.status not in (PaymentStatus.PENDING, PaymentStatus.OVERDUE):
+            continue
+        notify(
+            recipient=payment.tenant,
+            type=NotificationType.PAYMENT_DUE,
+            title=str(_("Payment reminder")),
+            body=_remind_body(payment),
+            related_object_type="payment",
+            related_object_id=payment.id,
+        )
+        sent += 1
+    return sent
 
 
 class ExchangeRateListCreateView(CreateAPIView, ListAPIView):
@@ -113,9 +243,10 @@ class ExchangeRateListCreateView(CreateAPIView, ListAPIView):
         return super().get(parsed_query)
 
 
-class PayoutScheduleListView(ListAPIView):
+class PayoutScheduleListCreateView(CreateAPIView, ListAPIView):
     model = PayoutSchedule
     output_schema = PayoutScheduleOutput
+    create_schema = PayoutScheduleCreateInput
     auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
@@ -123,6 +254,100 @@ class PayoutScheduleListView(ListAPIView):
 
     def get(self, parsed_query: Query[ListQuery]) -> list[PayoutScheduleOutput] | Paginated[PayoutScheduleOutput]:
         return super().get(parsed_query)
+
+    def post(self, parsed_body: Body[PayoutScheduleCreateInput]) -> PayoutScheduleOutput:
+        from contract.models import OwnerAgreement
+
+        agreement = get_object_or_404(OwnerAgreement, pk=parsed_body.owner_agreement_id)
+        payout = PayoutSchedule.objects.create(
+            owner_agreement=agreement,
+            owner=agreement.owner,
+            amount=parsed_body.amount,
+            currency=parsed_body.currency,
+            scheduled_date=parsed_body.scheduled_date,
+            method=parsed_body.method,
+            status=PayoutStatus.SCHEDULED,
+        )
+        return self.ok(self.to_output(payout), status_code=HTTPStatus.CREATED)
+
+
+class PayoutScheduleBulkMarkPaidView(GenericController):
+    model = PayoutSchedule
+    output_schema = PayoutScheduleOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def post(self, parsed_body: Body[PayoutBulkMarkPaidInput]) -> PayoutBulkActionOutput:
+        payouts = PayoutSchedule.objects.select_related("owner").filter(id__in=parsed_body.ids)
+        updated = 0
+        skipped = 0
+        today = date_type.today()
+        for payout in payouts:
+            if payout.status not in (PayoutStatus.SCHEDULED, PayoutStatus.HELD):
+                skipped += 1
+                continue
+            payout.status = PayoutStatus.PAID
+            payout.paid_date = today
+            payout.save(update_fields=["status", "paid_date", "updated_at"])
+            notify(
+                recipient=payout.owner,
+                type=NotificationType.PAYOUT_PAID,
+                title=str(_("Payout sent")),
+                body=str(_("Your payout of %(amount)s %(currency)s has been paid."))
+                % {"amount": payout.amount, "currency": payout.currency},
+                related_object_type="payout",
+                related_object_id=payout.id,
+            )
+            updated += 1
+        skipped += len(set(parsed_body.ids)) - payouts.count()
+        return self.ok({"updated": updated, "skipped": skipped}, status_code=HTTPStatus.OK)
+
+
+class PayoutScheduleHoldView(GenericController):
+    model = PayoutSchedule
+    output_schema = PayoutScheduleOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return PayoutSchedule.objects.select_related("owner_agreement", "owner").all()
+
+    def post(self, parsed_path: Path[DetailPath]) -> PayoutScheduleOutput:
+        payout = self.get_object(pk=parsed_path.pk)
+        if payout.status != PayoutStatus.SCHEDULED:
+            return self.fail(
+                error=str(_("Only scheduled payouts can be held")),
+                message=str(_("Invalid status transition")),
+            )
+        reason = (_optional_json(self.request).get("reason") or "").strip()
+        if not reason:
+            return self.fail(
+                error=str(_("A reason is required to hold a payout")),
+                message=str(_("Validation error")),
+            )
+        payout.status = PayoutStatus.HELD
+        payout.status_reason = reason
+        payout.save(update_fields=["status", "status_reason", "updated_at"])
+        return self.ok(self.to_output(payout), status_code=HTTPStatus.OK)
+
+
+class PayoutScheduleReleaseView(GenericController):
+    model = PayoutSchedule
+    output_schema = PayoutScheduleOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return PayoutSchedule.objects.select_related("owner_agreement", "owner").all()
+
+    def post(self, parsed_path: Path[DetailPath]) -> PayoutScheduleOutput:
+        payout = self.get_object(pk=parsed_path.pk)
+        if payout.status != PayoutStatus.HELD:
+            return self.fail(
+                error=str(_("Only held payouts can be released")),
+                message=str(_("Invalid status transition")),
+            )
+        payout.status = PayoutStatus.SCHEDULED
+        payout.status_reason = None
+        payout.save(update_fields=["status", "status_reason", "updated_at"])
+        return self.ok(self.to_output(payout), status_code=HTTPStatus.OK)
 
 
 class PayoutScheduleDetailView(RetrieveAPIView):
@@ -182,8 +407,13 @@ class PayoutScheduleCancelView(GenericController):
                 error=str(_("Cannot cancel a payout that has already been paid")),
                 message=str(_("Invalid status transition")),
             )
+        reason = _optional_json(self.request).get("reason")
         payout.status = PayoutStatus.CANCELLED
-        payout.save(update_fields=["status", "updated_at"])
+        fields = ["status", "updated_at"]
+        if reason is not None:
+            payout.status_reason = reason
+            fields.append("status_reason")
+        payout.save(update_fields=fields)
         return self.ok(self.to_output(payout), status_code=HTTPStatus.OK)
 
 

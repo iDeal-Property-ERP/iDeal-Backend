@@ -29,6 +29,7 @@ from api.v1.management.schemas import (
     ManagementPayoutOutput,
     ManagementPropertyOutput,
     ManagementServiceRequestOutput,
+    ManagementUserCreateInput,
     ManagementUserOutput,
     ManagementUserUpdateInput,
     ManagementViewingRequestOutput,
@@ -40,11 +41,50 @@ from api.v1.management.schemas import (
 from api.v1.vas.schemas import ServiceOrderStatusInput
 from core.api.permissions import RoleAuth
 from core.api.views import BaseController, DetailPath, GenericController, ListAPIView, ListQuery
-from core.constants import UserRole
+from core.constants import PaymentStatus, PayoutStatus, UserRole
 
 
 def _d(value):
     return str(value.quantize(Decimal("0.01")))
+
+
+def _month_end(today: date) -> date:
+    import calendar
+
+    return today.replace(day=calendar.monthrange(today.year, today.month)[1])
+
+
+def _sum_usd(qs) -> str:
+    """Sum ``amount`` across a queryset, converting each currency bucket to USD.
+
+    Best-effort like the finance dashboard: an empty exchange-rate table makes a
+    UZS→USD conversion fall back to that bucket contributing 0 rather than
+    raising, so the KPI degrades gracefully instead of 500-ing.
+    """
+    from finance.utils import convert_amount
+
+    total = Decimal("0.00")
+    for row in qs.values("currency").annotate(bucket=Sum("amount")):
+        amount = row["bucket"] or Decimal("0.00")
+        currency = row["currency"]
+        if currency == "USD":
+            total += amount
+        else:
+            try:
+                total += convert_amount(amount, currency, "USD")
+            except ValueError:
+                continue
+    return str(total.quantize(Decimal("0.01")))
+
+
+def _payouts_due_usd() -> str:
+    """Total scheduled owner payouts on/before the next run — the 'payouts due' KPI."""
+    from finance.models import PayoutSchedule
+    from finance.services import next_payout_run_date
+
+    next_run = next_payout_run_date(date.today())
+    qs = PayoutSchedule.objects.filter(status=PayoutStatus.SCHEDULED, scheduled_date__lte=next_run)
+    return _sum_usd(qs)
 
 
 class ManagementView(BaseController):
@@ -310,6 +350,41 @@ class ManagementUserListView(ManagementView, ListAPIView):
         return super().get(parsed_query)
 
 
+class ManagementUserInviteView(ManagementView, GenericController):
+    output_schema = ManagementUserOutput
+
+    def post(self, parsed_body: Body[ManagementUserCreateInput]) -> dict:
+        from account.models import User
+        from django.contrib.auth.hashers import make_password
+
+        if parsed_body.role not in UserRole.values():
+            return self.fail(error=str(_("Invalid role")))
+
+        base_username = parsed_body.email.split("@")[0]
+        username = base_username
+        suffix = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{base_username}{suffix}"
+            suffix += 1
+
+        user = User.objects.create_user(
+            username=username,
+            password=None,
+            first_name=parsed_body.first_name,
+            last_name=parsed_body.last_name,
+            email=parsed_body.email,
+            phone=parsed_body.phone,
+            role=parsed_body.role,
+            is_active=parsed_body.is_active,
+            is_verified=parsed_body.is_verified,
+        )
+        # User.save() re-hashes any non-pbkdf2 password, so persist an unusable
+        # password directly to bypass that hook until the user sets one.
+        User.objects.filter(pk=user.pk).update(password=make_password(None))
+        user.refresh_from_db()
+        return self.ok(self.to_output(user), status_code=HTTPStatus.CREATED)
+
+
 class ManagementUserDetailUpdateView(ManagementView, GenericController):
     output_schema = ManagementUserOutput
 
@@ -364,6 +439,8 @@ class LeaseListView(ManagementView, ListAPIView):
         status = self.request.GET.get("status")
         property_id = self.request.GET.get("property_id")
         tenant_id = self.request.GET.get("tenant_id")
+        search = self.request.GET.get("search")
+        ends_within = self.request.GET.get("ends_within")
 
         if status:
             qs = qs.filter(status=status)
@@ -371,6 +448,18 @@ class LeaseListView(ManagementView, ListAPIView):
             qs = qs.filter(property_id=property_id)
         if tenant_id:
             qs = qs.filter(tenant_id=tenant_id)
+        if search:
+            cond = (
+                Q(tenant__first_name__icontains=search)
+                | Q(tenant__last_name__icontains=search)
+                | Q(property__name__icontains=search)
+            )
+            if search.isdigit():
+                cond |= Q(id=int(search))
+            qs = qs.filter(cond)
+        if ends_within and ends_within.isdigit():
+            today = date.today()
+            qs = qs.filter(end_date__gte=today, end_date__lte=today + timedelta(days=int(ends_within)))
         return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
@@ -387,6 +476,8 @@ class OwnerAgreementListView(ManagementView, ListAPIView):
         status = self.request.GET.get("status")
         owner_id = self.request.GET.get("owner_id")
         property_id = self.request.GET.get("property_id")
+        search = self.request.GET.get("search")
+        ends_within = self.request.GET.get("ends_within")
 
         if status:
             qs = qs.filter(status=status)
@@ -394,10 +485,37 @@ class OwnerAgreementListView(ManagementView, ListAPIView):
             qs = qs.filter(owner_id=owner_id)
         if property_id:
             qs = qs.filter(property_id=property_id)
+        if search:
+            qs = qs.filter(
+                Q(owner__first_name__icontains=search)
+                | Q(owner__last_name__icontains=search)
+                | Q(agreement_number__icontains=search)
+            )
+        if ends_within and ends_within.isdigit():
+            today = date.today()
+            qs = qs.filter(end_date__gte=today, end_date__lte=today + timedelta(days=int(ends_within)))
         return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         return super().get(parsed_query)
+
+
+# "Most overdue" first = earliest due date; the frontend sort values map here.
+_PAYMENT_ORDERINGS = {
+    "due_date": ["due_date", "-id"],
+    "-due_date": ["-due_date", "-id"],
+    "payment_date": ["payment_date", "-id"],
+    "-payment_date": ["-payment_date", "-id"],
+    "amount": ["amount", "-id"],
+    "-amount": ["-amount", "-id"],
+}
+_PAYOUT_ORDERINGS = {
+    "scheduled_date": ["scheduled_date", "-id"],
+    "-scheduled_date": ["-scheduled_date", "-id"],
+    "amount": ["amount", "-id"],
+    "-amount": ["-amount", "-id"],
+    "-created_at": ["-created_at"],
+}
 
 
 class PaymentListView(ManagementView, ListAPIView):
@@ -405,14 +523,21 @@ class PaymentListView(ManagementView, ListAPIView):
 
     def get_queryset(self):
         from finance.models import Payment
+        from finance.utils import overdue_q
 
-        qs = Payment.objects.select_related("tenant").order_by("-payment_date")
+        qs = Payment.objects.select_related("tenant", "lease__property").order_by("-payment_date")
         status = self.request.GET.get("status")
         method = self.request.GET.get("method")
         lease_id = self.request.GET.get("lease_id")
         tenant_id = self.request.GET.get("tenant_id")
+        property_id = self.request.GET.get("property_id")
+        search = self.request.GET.get("search")
+        overdue = self.request.GET.get("overdue")
         date_from = self.request.GET.get("date_from")
         date_to = self.request.GET.get("date_to")
+        due_from = self.request.GET.get("due_from")
+        due_to = self.request.GET.get("due_to")
+        order = self.request.GET.get("order")
 
         if status:
             qs = qs.filter(status=status)
@@ -422,10 +547,29 @@ class PaymentListView(ManagementView, ListAPIView):
             qs = qs.filter(lease_id=lease_id)
         if tenant_id:
             qs = qs.filter(tenant_id=tenant_id)
+        if property_id:
+            qs = qs.filter(lease__property_id=property_id)
+        if search:
+            cond = (
+                Q(tenant__first_name__icontains=search)
+                | Q(tenant__last_name__icontains=search)
+                | Q(lease__property__name__icontains=search)
+            )
+            if search.isdigit():
+                cond |= Q(id=int(search)) | Q(lease_id=int(search))
+            qs = qs.filter(cond)
+        if overdue in ("true", "1"):
+            qs = qs.filter(overdue_q(date.today()))
         if date_from:
             qs = qs.filter(payment_date__gte=date_from)
         if date_to:
             qs = qs.filter(payment_date__lte=date_to)
+        if due_from:
+            qs = qs.filter(due_date__gte=due_from)
+        if due_to:
+            qs = qs.filter(due_date__lte=due_to)
+        if order in _PAYMENT_ORDERINGS:
+            qs = qs.order_by(*_PAYMENT_ORDERINGS[order])
         return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
@@ -438,18 +582,130 @@ class PayoutListView(ManagementView, ListAPIView):
     def get_queryset(self):
         from finance.models import PayoutSchedule
 
-        qs = PayoutSchedule.objects.select_related("owner").order_by("-scheduled_date")
+        qs = PayoutSchedule.objects.select_related("owner", "owner_agreement__property", "source_payment").order_by(
+            "-scheduled_date"
+        )
         status = self.request.GET.get("status")
         owner_id = self.request.GET.get("owner_id")
+        search = self.request.GET.get("search")
+        scheduled_from = self.request.GET.get("scheduled_from")
+        scheduled_to = self.request.GET.get("scheduled_to")
+        order = self.request.GET.get("order")
 
         if status:
             qs = qs.filter(status=status)
         if owner_id:
             qs = qs.filter(owner_id=owner_id)
+        if search:
+            cond = (
+                Q(owner__first_name__icontains=search)
+                | Q(owner__last_name__icontains=search)
+                | Q(owner_agreement__property__name__icontains=search)
+            )
+            if search.isdigit():
+                cond |= Q(id=int(search))
+            qs = qs.filter(cond)
+        if scheduled_from:
+            qs = qs.filter(scheduled_date__gte=scheduled_from)
+        if scheduled_to:
+            qs = qs.filter(scheduled_date__lte=scheduled_to)
+        if order in _PAYOUT_ORDERINGS:
+            qs = qs.order_by(*_PAYOUT_ORDERINGS[order])
         return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         return super().get(parsed_query)
+
+
+class PaymentStatsView(ManagementView):
+    """Aggregate money totals for the Payments workbench KPI strip.
+
+    All sums are converted to USD (mixed-currency safe) using the same
+    best-effort conversion the finance dashboard uses; an empty exchange-rate
+    table degrades to raw same-currency sums rather than erroring.
+    """
+
+    def get(self) -> dict:
+        from finance.models import Payment
+        from finance.utils import overdue_q
+
+        today = date.today()
+        month_start = today.replace(day=1)
+        search = self.request.GET.get("search")
+
+        base = Payment.objects.all()
+        if search:
+            cond = (
+                Q(tenant__first_name__icontains=search)
+                | Q(tenant__last_name__icontains=search)
+                | Q(lease__property__name__icontains=search)
+            )
+            if search.isdigit():
+                cond |= Q(id=int(search)) | Q(lease_id=int(search))
+            base = base.filter(cond)
+
+        overdue = overdue_q(today)
+        collected_month = base.filter(status=PaymentStatus.PAID, payment_date__gte=month_start, payment_date__lte=today)
+        outstanding = base.filter(Q(status=PaymentStatus.PENDING) | Q(status=PaymentStatus.OVERDUE))
+        overdue_qs = base.filter(overdue)
+        due_month = base.filter(
+            status=PaymentStatus.PENDING, due_date__gte=month_start, due_date__lte=_month_end(today)
+        )
+
+        return self.ok(
+            {
+                "month": today.strftime("%Y-%m"),
+                "collected_month": _sum_usd(collected_month),
+                "outstanding": _sum_usd(outstanding),
+                "overdue_total": _sum_usd(overdue_qs),
+                "payouts_due": _payouts_due_usd(),
+                "counts": {
+                    "overdue": overdue_qs.count(),
+                    "due_month": due_month.count(),
+                    "paid_month": collected_month.count(),
+                    "all": base.count(),
+                },
+            }
+        )
+
+
+class PayoutStatsView(ManagementView):
+    """Aggregate money totals for the Payouts workbench KPI strip."""
+
+    def get(self) -> dict:
+        from finance.models import PayoutSchedule
+        from finance.services import next_payout_run_date
+
+        today = date.today()
+        month_start = today.replace(day=1)
+        next_run = next_payout_run_date(today)
+
+        base = PayoutSchedule.objects.all()
+        due = base.filter(status=PayoutStatus.SCHEDULED)
+        held = base.filter(status=PayoutStatus.HELD)
+        paid = base.filter(status=PayoutStatus.PAID)
+        cancelled = base.filter(status=PayoutStatus.CANCELLED)
+
+        return self.ok(
+            {
+                "next_run_date": next_run.isoformat(),
+                "due_next_run": _sum_usd(due.filter(scheduled_date__lte=next_run)),
+                "this_month": _sum_usd(
+                    base.filter(scheduled_date__gte=month_start, scheduled_date__lte=_month_end(today))
+                ),
+                "held_total": _sum_usd(held),
+                "next_30_days": _sum_usd(
+                    due.filter(scheduled_date__gte=today, scheduled_date__lte=today + timedelta(days=30))
+                ),
+                "counts": {
+                    "due": due.count(),
+                    "held": held.count(),
+                    "paid": paid.count(),
+                    "cancelled": cancelled.count(),
+                    "all": base.count(),
+                },
+            }
+        )
 
 
 class ManagementServiceRequestListView(ManagementView, ListAPIView):

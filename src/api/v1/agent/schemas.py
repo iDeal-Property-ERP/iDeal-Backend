@@ -78,3 +78,14 @@ class AgentDealCreateInput(pydantic.BaseModel):
     deal_date: date
     rent_amount: Decimal
     status: str = AgentDealStatus.CLOSED
+
+
+class AgentCreateInput(pydantic.BaseModel):
+    user_id: int
+    commission_rate: Decimal
+    is_active: bool = True
+
+
+class AgentUpdateInput(pydantic.BaseModel):
+    commission_rate: Decimal | None = None
+    is_active: bool | None = None

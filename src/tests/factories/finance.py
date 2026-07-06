@@ -1,7 +1,7 @@
 import factory
 from finance.models import ExchangeRate, Payment, PayoutSchedule
 
-from core.constants import Currency, PaymentMethod, PaymentStatus, PayoutStatus
+from core.constants import Currency, PaymentMethod, PaymentStatus, PayoutMethod, PayoutStatus
 
 from .account import OwnerFactory, TenantFactory, UserFactory
 from .contract import LeaseFactory, OwnerAgreementFactory
@@ -43,3 +43,4 @@ class PayoutScheduleFactory(factory.django.DjangoModelFactory):
     scheduled_date = factory.Faker("date_this_year")
     paid_date = None
     status = PayoutStatus.SCHEDULED
+    method = PayoutMethod.BANK_TRANSFER

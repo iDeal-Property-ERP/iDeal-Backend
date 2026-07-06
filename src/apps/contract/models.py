@@ -33,6 +33,31 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
     def __str__(self):
         return f"{self.agreement_number} — {self.property.name}"
 
+    def renew(self, new_start_date, new_end_date, commission_rate=None, agreement_number=None, terms=None):
+        with transaction.atomic():
+            if agreement_number is None:
+                n = OwnerAgreement.objects.filter(agreement_number__startswith=f"{self.agreement_number}-R").count() + 1
+                agreement_number = f"{self.agreement_number}-R{n}"
+            new_agreement = OwnerAgreement.objects.create(
+                owner=self.owner,
+                property=self.property,
+                agreement_number=agreement_number,
+                signed_date=date.today(),
+                start_date=new_start_date,
+                end_date=new_end_date,
+                status=OwnerAgreementStatus.ACTIVE,
+                terms=terms if terms is not None else self.terms,
+                commission_rate=commission_rate if commission_rate is not None else self.commission_rate,
+            )
+            self.status = OwnerAgreementStatus.EXPIRED
+            self.save(update_fields=["status", "updated_at"])
+            return new_agreement
+
+    def terminate(self):
+        self.status = OwnerAgreementStatus.TERMINATED
+        self.save(update_fields=["status", "updated_at"])
+        return self
+
 
 class Lease(TimestampedModel, SoftDeleteModel):
     property = models.ForeignKey("property.Property", on_delete=models.PROTECT, related_name="leases")
@@ -80,6 +105,13 @@ class Lease(TimestampedModel, SoftDeleteModel):
                 self.property.vacant_since = date.today()
                 self.property.vacant_days = 0
                 self.property.save(update_fields=["status", "vacant_since", "vacant_days"])
+
+    def terminate(self, end_date=None, reason=None):
+        with transaction.atomic():
+            self.end_date = end_date or self.end_date
+            self.status = LeaseStatus.TERMINATED
+            self.save()
+            return self
 
     def renew(self, new_start_date, new_end_date, new_monthly_rent, deposit=None):
         with transaction.atomic():

@@ -164,13 +164,18 @@ class ManagementPaymentOutput(pydantic.BaseModel):
     tenant_id: int
     tenant_name: str
     paid_by_id: int | None
+    paid_by_name: str | None
+    property_id: int | None
+    property_name: str | None
     amount: Decimal
     currency: str
     payment_date: date
     due_date: date
     status: str
     method: str
+    gateway_ref: str | None
     notes: str | None
+    linked_payout_id: int | None
     created_at: datetime
 
     @model_validator(mode="before")
@@ -178,19 +183,31 @@ class ManagementPaymentOutput(pydantic.BaseModel):
     def extract_related(cls, v):
         if isinstance(v, dict):
             return v
+        prop = getattr(v.lease, "property", None)
+        paid_by = v.paid_by
+        # Reverse OneToOne (owner_payout) may not exist for unpaid payments.
+        try:
+            linked_payout_id = v.owner_payout.id
+        except Exception:
+            linked_payout_id = None
         return {
             "id": v.id,
             "lease_id": v.lease_id,
             "tenant_id": v.tenant_id,
             "tenant_name": f"{v.tenant.first_name} {v.tenant.last_name or ''}".strip(),
             "paid_by_id": v.paid_by_id,
+            "paid_by_name": (f"{paid_by.first_name} {paid_by.last_name or ''}".strip() if paid_by else None),
+            "property_id": (prop.id if prop else None),
+            "property_name": (prop.name if prop else None),
             "amount": v.amount,
             "currency": v.currency,
             "payment_date": v.payment_date,
             "due_date": v.due_date,
             "status": v.status,
             "method": v.method,
+            "gateway_ref": v.gateway_ref,
             "notes": v.notes,
+            "linked_payout_id": linked_payout_id,
             "created_at": v.created_at,
         }
 
@@ -200,11 +217,17 @@ class ManagementPayoutOutput(pydantic.BaseModel):
     owner_agreement_id: int
     owner_id: int
     owner_name: str
+    property_id: int | None
+    property_name: str | None
+    property_address: str | None
+    source_payment_id: int | None
     amount: Decimal
     currency: str
     scheduled_date: date
     paid_date: date | None
     status: str
+    status_reason: str | None
+    method: str
     created_at: datetime
 
     @model_validator(mode="before")
@@ -212,16 +235,23 @@ class ManagementPayoutOutput(pydantic.BaseModel):
     def extract_related(cls, v):
         if isinstance(v, dict):
             return v
+        prop = getattr(v.owner_agreement, "property", None)
         return {
             "id": v.id,
             "owner_agreement_id": v.owner_agreement_id,
             "owner_id": v.owner_id,
             "owner_name": f"{v.owner.first_name} {v.owner.last_name or ''}".strip(),
+            "property_id": (prop.id if prop else None),
+            "property_name": (prop.name if prop else None),
+            "property_address": (getattr(prop, "address", None) if prop else None),
+            "source_payment_id": v.source_payment_id,
             "amount": v.amount,
             "currency": v.currency,
             "scheduled_date": v.scheduled_date,
             "paid_date": v.paid_date,
             "status": v.status,
+            "status_reason": v.status_reason,
+            "method": v.method,
             "created_at": v.created_at,
         }
 
@@ -273,6 +303,16 @@ class ManagementUserUpdateInput(pydantic.BaseModel):
     is_active: bool | None = None
     is_verified: bool | None = None
     role: str | None = None
+
+
+class ManagementUserCreateInput(pydantic.BaseModel):
+    first_name: str
+    last_name: str | None = None
+    email: str
+    phone: str | None = None
+    role: str
+    is_active: bool = True
+    is_verified: bool = False
 
 
 class RecentPaymentRow(pydantic.BaseModel):

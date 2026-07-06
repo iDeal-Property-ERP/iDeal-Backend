@@ -8,9 +8,13 @@ from api.v1.contract.schemas import (
     LeaseCreateInput,
     LeaseOutput,
     LeaseRenewInput,
+    LeaseTerminateInput,
     LeaseUpdateInput,
     OwnerAgreementCreateInput,
     OwnerAgreementOutput,
+    OwnerAgreementRenewInput,
+    OwnerAgreementTerminateInput,
+    OwnerAgreementUpdateInput,
 )
 from core.api.permissions import RoleAuth
 from core.api.views import (
@@ -21,7 +25,7 @@ from core.api.views import (
     ListQuery,
     RetrieveAPIView,
 )
-from core.constants import NotificationType, UserRole
+from core.constants import LeaseStatus, NotificationType, OwnerAgreementStatus, UserRole
 
 
 class OwnerAgreementListCreateView(CreateAPIView, ListAPIView):
@@ -43,6 +47,7 @@ class OwnerAgreementListCreateView(CreateAPIView, ListAPIView):
 class OwnerAgreementDetailView(RetrieveAPIView):
     model = OwnerAgreement
     output_schema = OwnerAgreementOutput
+    update_schema = OwnerAgreementUpdateInput
     auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get_queryset(self):
@@ -50,6 +55,57 @@ class OwnerAgreementDetailView(RetrieveAPIView):
 
     def get(self, parsed_path: Path[DetailPath]) -> OwnerAgreementOutput:
         return super().get(parsed_path)
+
+    def patch(
+        self, parsed_path: Path[DetailPath], parsed_body: Body[OwnerAgreementUpdateInput]
+    ) -> OwnerAgreementOutput:
+        agreement = self.get_object(pk=parsed_path.pk)
+        data = parsed_body.model_dump(exclude_unset=True)
+        agreement = self.perform_update(agreement, data)
+        return self.ok(self.to_output(agreement))
+
+
+class OwnerAgreementRenewView(GenericController):
+    model = OwnerAgreement
+    create_schema = OwnerAgreementRenewInput
+    output_schema = OwnerAgreementOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return OwnerAgreement.objects.select_related("owner", "property").all()
+
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[OwnerAgreementRenewInput]) -> OwnerAgreementOutput:
+        agreement = self.get_object(pk=parsed_path.pk)
+        new_agreement = agreement.renew(
+            new_start_date=parsed_body.new_start_date,
+            new_end_date=parsed_body.new_end_date,
+            commission_rate=parsed_body.commission_rate,
+            agreement_number=parsed_body.agreement_number,
+            terms=parsed_body.terms,
+        )
+        return self.ok(self.to_output(new_agreement))
+
+
+class OwnerAgreementTerminateView(GenericController):
+    model = OwnerAgreement
+    create_schema = OwnerAgreementTerminateInput
+    output_schema = OwnerAgreementOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return OwnerAgreement.objects.select_related("owner", "property").all()
+
+    def post(
+        self, parsed_path: Path[DetailPath], parsed_body: Body[OwnerAgreementTerminateInput]
+    ) -> OwnerAgreementOutput:
+        agreement = self.get_object(pk=parsed_path.pk)
+        if agreement.status == OwnerAgreementStatus.TERMINATED:
+            return self.fail(
+                error=str(_("This agreement has already been terminated")),
+                message=str(_("Invalid status transition")),
+            )
+        agreement.terminate()
+        return self.ok(self.to_output(agreement))
 
 
 class LeaseListCreateView(CreateAPIView, ListAPIView):
@@ -113,3 +169,23 @@ class LeaseRenewView(GenericController):
             related_object_id=new_lease.id,
         )
         return self.ok(self.to_output(new_lease))
+
+
+class LeaseTerminateView(GenericController):
+    model = Lease
+    create_schema = LeaseTerminateInput
+    output_schema = LeaseOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return Lease.objects.select_related("property", "owner_agreement", "tenant").all()
+
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[LeaseTerminateInput]) -> LeaseOutput:
+        lease = self.get_object(pk=parsed_path.pk)
+        if lease.status not in (LeaseStatus.ACTIVE, LeaseStatus.RENEWED):
+            return self.fail(
+                error=str(_("Only active or renewed leases can be terminated")),
+                message=str(_("Invalid status transition")),
+            )
+        lease = lease.terminate(end_date=parsed_body.end_date, reason=parsed_body.reason)
+        return self.ok(self.to_output(lease))

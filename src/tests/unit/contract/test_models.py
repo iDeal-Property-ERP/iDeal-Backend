@@ -27,6 +27,47 @@ class TestOwnerAgreementModel:
         with pytest.raises(IntegrityError):
             OwnerAgreementFactory(agreement_number="UNIQUE-001")
 
+    def test_owner_agreement_renew(self, owner, property_obj):
+        from datetime import date
+
+        old = OwnerAgreementFactory(
+            owner=owner,
+            property=property_obj,
+            agreement_number="AG-REN-001",
+            commission_rate=12.00,
+        )
+        new = old.renew(new_start_date=date(2027, 1, 1), new_end_date=date(2028, 1, 1))
+
+        old.refresh_from_db()
+        assert old.status == OwnerAgreementStatus.EXPIRED
+        assert new.id != old.id
+        assert new.status == OwnerAgreementStatus.ACTIVE
+        assert new.owner == owner
+        assert new.property == property_obj
+        assert new.commission_rate == old.commission_rate
+        assert new.agreement_number == "AG-REN-001-R1"
+
+    def test_owner_agreement_renew_with_overrides(self, owner, property_obj):
+        from datetime import date
+        from decimal import Decimal
+
+        old = OwnerAgreementFactory(owner=owner, property=property_obj)
+        new = old.renew(
+            new_start_date=date(2027, 1, 1),
+            new_end_date=date(2028, 1, 1),
+            commission_rate=Decimal("20.00"),
+            agreement_number="AG-CUSTOM-9",
+        )
+        assert new.agreement_number == "AG-CUSTOM-9"
+        assert new.commission_rate == Decimal("20.00")
+
+    def test_owner_agreement_terminate(self):
+        ag = OwnerAgreementFactory()
+        result = ag.terminate()
+        ag.refresh_from_db()
+        assert ag.status == OwnerAgreementStatus.TERMINATED
+        assert result == ag
+
 
 @pytest.mark.django_db
 class TestLeaseModel:
@@ -68,6 +109,29 @@ class TestLeaseModel:
 
         lease.status = LeaseStatus.EXPIRED
         lease.save()
+        property_obj.refresh_from_db()
+        assert property_obj.status == "vacant"
+        assert property_obj.vacant_since is not None
+
+    def test_lease_terminate_updates_property(self, property_obj, tenant):
+        from datetime import date
+
+        agreement = OwnerAgreementFactory(property=property_obj)
+        lease = LeaseFactory(
+            property=property_obj,
+            owner_agreement=agreement,
+            tenant=tenant,
+            status=LeaseStatus.ACTIVE,
+        )
+        property_obj.refresh_from_db()
+        assert property_obj.status == "rented"
+
+        result = lease.terminate(end_date=date(2026, 8, 1))
+        lease.refresh_from_db()
+        assert lease.status == LeaseStatus.TERMINATED
+        assert lease.end_date == date(2026, 8, 1)
+        assert result == lease
+
         property_obj.refresh_from_db()
         assert property_obj.status == "vacant"
         assert property_obj.vacant_since is not None

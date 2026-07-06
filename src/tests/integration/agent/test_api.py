@@ -86,6 +86,81 @@ class TestAgentDetailAPI:
 
 
 @pytest.mark.django_db
+class TestAgentCreateAPI:
+    def test_create_agent(self, api_client, jwt_header):
+        agent_user = AgentFactory()
+        payload = {
+            "user_id": agent_user.id,
+            "commission_rate": "12.50",
+            "is_active": True,
+        }
+        response = api_client.post(
+            "/api/v1/agents/",
+            data=json.dumps(payload),
+            content_type="application/json",
+            **jwt_header,
+        )
+        assert response.status_code == 201
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["user_id"] == agent_user.id
+        assert Decimal(body["data"]["commission_rate"]) == Decimal("12.50")
+        assert body["data"]["is_active"] is True
+
+    def test_create_agent_requires_auth(self, api_client):
+        agent_user = AgentFactory()
+        payload = {"user_id": agent_user.id, "commission_rate": "12.50"}
+        response = api_client.post(
+            "/api/v1/agents/",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestAgentUpdateAPI:
+    def test_update_agent(self, api_client, jwt_header):
+        agent_user = AgentFactory()
+        agent_profile = AgentProfileFactory(user=agent_user, commission_rate="10.00", is_active=True)
+        payload = {"commission_rate": "22.00", "is_active": False}
+        response = api_client.patch(
+            f"/api/v1/agents/{agent_profile.id}/",
+            data=json.dumps(payload),
+            content_type="application/json",
+            **jwt_header,
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert Decimal(body["data"]["commission_rate"]) == Decimal("22.00")
+        assert body["data"]["is_active"] is False
+
+        agent_profile.refresh_from_db()
+        assert agent_profile.commission_rate == Decimal("22.00")
+        assert agent_profile.is_active is False
+
+    def test_update_agent_requires_auth(self, api_client):
+        agent_user = AgentFactory()
+        agent_profile = AgentProfileFactory(user=agent_user)
+        response = api_client.patch(
+            f"/api/v1/agents/{agent_profile.id}/",
+            data=json.dumps({"is_active": False}),
+            content_type="application/json",
+        )
+        assert response.status_code == 401
+
+    def test_update_agent_not_found(self, api_client, jwt_header):
+        response = api_client.patch(
+            "/api/v1/agents/99999/",
+            data=json.dumps({"is_active": False}),
+            content_type="application/json",
+            **jwt_header,
+        )
+        assert response.status_code == 404
+
+
+@pytest.mark.django_db
 class TestAgentDealListAPI:
     def test_list_agent_deals(self, api_client, jwt_header):
         agent_user = AgentFactory()
