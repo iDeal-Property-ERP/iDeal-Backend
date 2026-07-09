@@ -18,6 +18,7 @@ class CatalogFilterQuery(pydantic.BaseModel):
     per_page: int = 20
     service_type: str | None = None
     is_active: bool | None = None
+    search: str | None = None
 
 
 class ServiceCatalogListCreateView(CreateAPIView, ListAPIView):
@@ -36,6 +37,14 @@ class ServiceCatalogListCreateView(CreateAPIView, ListAPIView):
             qs = qs.filter(service_type=parsed_query.service_type)
         if parsed_query.is_active is not None:
             qs = qs.filter(is_active=parsed_query.is_active)
+        if parsed_query.search:
+            from django.db.models import Q
+
+            qs = qs.filter(
+                Q(name__icontains=parsed_query.search)
+                | Q(partner_name__icontains=parsed_query.search)
+                | Q(description__icontains=parsed_query.search)
+            )
         items = [self.to_output(obj) for obj in qs]
         if parsed_query.page is not None:
             from core.utils.pagination import build_paginated_response

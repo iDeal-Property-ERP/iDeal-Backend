@@ -53,8 +53,12 @@ class ServiceOrderOutput(pydantic.BaseModel):
     id: int
     catalog_item_id: int
     catalog_item_name: str
+    service_type: str
+    partner_name: str | None
     tenant_id: int
+    tenant_name: str
     property_id: int
+    property_name: str
     lease_id: int | None
     status: str
     cost: Decimal
@@ -63,6 +67,8 @@ class ServiceOrderOutput(pydantic.BaseModel):
     cashback_amount: Decimal
     scheduled_for: date | None
     notes: str | None
+    cancellation_reason: str | None
+    completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -75,8 +81,12 @@ class ServiceOrderOutput(pydantic.BaseModel):
             "id": v.id,
             "catalog_item_id": v.catalog_item_id,
             "catalog_item_name": v.catalog_item.name,
+            "service_type": v.catalog_item.service_type,
+            "partner_name": v.catalog_item.partner_name,
             "tenant_id": v.tenant_id,
+            "tenant_name": f"{v.tenant.first_name} {v.tenant.last_name or ''}".strip(),
             "property_id": v.property_id,
+            "property_name": v.property.name,
             "lease_id": v.lease_id,
             "status": v.status,
             "cost": v.cost,
@@ -85,6 +95,8 @@ class ServiceOrderOutput(pydantic.BaseModel):
             "cashback_amount": v.cashback_amount,
             "scheduled_for": v.scheduled_for,
             "notes": v.notes,
+            "cancellation_reason": v.cancellation_reason,
+            "completed_at": v.completed_at,
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }
@@ -96,5 +108,19 @@ class TenantServiceOrderCreateInput(pydantic.BaseModel):
     notes: str | None = None
 
 
+class ManagementServiceOrderCreateInput(pydantic.BaseModel):
+    """Management-initiated order on behalf of a tenant; cost defaults to the catalog base price."""
+
+    catalog_item_id: int
+    tenant_id: int
+    property_id: int
+    lease_id: int | None = None
+    cost: Decimal | None = None
+    scheduled_for: date | None = None
+    notes: str | None = None
+
+
 class ServiceOrderStatusInput(pydantic.BaseModel):
     status: str
+    # Required by the UI when cancelling; stored as ServiceOrder.cancellation_reason.
+    reason: str | None = None

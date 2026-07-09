@@ -83,6 +83,10 @@ class ServiceOrder(TimestampedModel, SoftDeleteModel):
     )
     scheduled_for = models.DateField(null=True, blank=True, verbose_name=_("Scheduled For"))
     notes = models.TextField(null=True, blank=True, verbose_name=_("Notes"))
+    cancellation_reason = models.TextField(null=True, blank=True, verbose_name=_("Cancellation Reason"))
+    # Stamped on the transition to COMPLETED; legacy completed rows have NULL —
+    # P&L month-attribution falls back to updated_at for those.
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Completed At"))
 
     class Meta:
         verbose_name = _("Service Order")

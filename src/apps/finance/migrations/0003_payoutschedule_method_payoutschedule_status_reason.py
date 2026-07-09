@@ -6,7 +6,6 @@ import core.constants
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("finance", "0002_payment_gateway_ref_payoutschedule_source_payment"),
     ]

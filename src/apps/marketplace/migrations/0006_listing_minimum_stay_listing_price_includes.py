@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("marketplace", "0005_backfill_listing_status_seed_faq"),
     ]

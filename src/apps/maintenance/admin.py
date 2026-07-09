@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
-from maintenance.models import ServiceRequest, ServiceRequestPhoto
+from maintenance.models import ServiceRequest, ServiceRequestComment, ServiceRequestPhoto
 
 from core.admin import BaseSoftDeleteModelAdmin
 
@@ -25,7 +25,7 @@ class ServiceRequestAdmin(BaseSoftDeleteModelAdmin):
     fieldsets = (
         (_("Request Info"), {"fields": ("property", "tenant", "assigned_to", "title", "description")}),
         (_("Status"), {"fields": ("status", "priority")}),
-        (_("Resolution"), {"fields": ("cost", "resolution_notes")}),
+        (_("Resolution"), {"fields": ("cost", "cost_bearer", "resolution_notes", "resolved_at")}),
     )
 
 
@@ -36,3 +36,12 @@ class ServiceRequestPhotoAdmin(BaseSoftDeleteModelAdmin):
     search_fields = ("service_request__title",)
     ordering = ("-created_at",)
     fieldsets = ((_("Photo Info"), {"fields": ("service_request", "image")}),)
+
+
+@admin.register(ServiceRequestComment)
+class ServiceRequestCommentAdmin(BaseSoftDeleteModelAdmin):
+    list_display = ("id", "service_request", "author", "created_at", "is_deleted")
+    list_filter = ("service_request__property",)
+    search_fields = ("service_request__title", "body")
+    ordering = ("-created_at",)
+    fieldsets = ((_("Comment Info"), {"fields": ("service_request", "author", "body")}),)

@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("property", "0003_seed_amenities_backfill_verified"),
     ]

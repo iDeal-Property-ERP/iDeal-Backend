@@ -46,3 +46,4 @@ class ServiceRequestAssignInput(pydantic.BaseModel):
 class ServiceRequestResolveInput(pydantic.BaseModel):
     cost: Decimal
     resolution_notes: str
+    cost_bearer: str | None = None

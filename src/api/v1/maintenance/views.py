@@ -101,9 +101,13 @@ class ServiceRequestResolveView(GenericController):
     def post(
         self, parsed_path: Path[DetailPath], parsed_body: Body[ServiceRequestResolveInput]
     ) -> ServiceRequestOutput:
+        from django.utils import timezone
+
         instance = self.get_object(pk=parsed_path.pk)
         instance.status = ServiceRequestStatus.RESOLVED
         instance.cost = parsed_body.cost
+        instance.cost_bearer = parsed_body.cost_bearer
         instance.resolution_notes = parsed_body.resolution_notes
-        instance.save(update_fields=["status", "cost", "resolution_notes", "updated_at"])
+        instance.resolved_at = timezone.now()
+        instance.save(update_fields=["status", "cost", "cost_bearer", "resolution_notes", "resolved_at", "updated_at"])
         return self.ok(self.to_output(instance), status_code=HTTPStatus.OK)

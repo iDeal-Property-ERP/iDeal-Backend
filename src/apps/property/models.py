@@ -1,7 +1,13 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from core.constants import FurnishingType, PropertyStatus, PropertyType, TariffChoices
+from core.constants import (
+    FurnishingType,
+    PropertyStatus,
+    PropertyType,
+    TariffChoices,
+    VerificationVisitStatus,
+)
 from core.models import SoftDeleteModel, TimestampedModel
 
 
@@ -41,17 +47,21 @@ class Amenity(TimestampedModel):
 
 class Property(TimestampedModel, SoftDeleteModel):
     name = models.CharField(max_length=200)
-    address = models.CharField(max_length=255)
-    district = models.ForeignKey(District, on_delete=models.PROTECT, related_name="properties")
+    address = models.CharField(max_length=255, blank=True, default="")
+    # Publish-required fields are nullable so a DRAFT can be saved partially;
+    # the publish transition enforces completeness before going VACANT.
+    district = models.ForeignKey(District, on_delete=models.PROTECT, related_name="properties", null=True, blank=True)
     property_type = models.CharField(max_length=20, choices=PropertyType.choices, default=PropertyType.APARTMENT)
-    rooms = models.PositiveSmallIntegerField()
+    rooms = models.PositiveSmallIntegerField(null=True, blank=True)
     bathrooms = models.PositiveSmallIntegerField(default=1)
-    area_sqm = models.PositiveSmallIntegerField()
-    floor = models.PositiveSmallIntegerField()
+    area_sqm = models.PositiveSmallIntegerField(null=True, blank=True)
+    floor = models.PositiveSmallIntegerField(null=True, blank=True)
     total_floors = models.PositiveSmallIntegerField(null=True, blank=True)
     furnishing = models.CharField(max_length=20, choices=FurnishingType.choices, default=FurnishingType.UNFURNISHED)
     amenities = models.ManyToManyField(Amenity, blank=True, related_name="properties")
-    owner = models.ForeignKey("account.User", on_delete=models.PROTECT, related_name="owned_properties")
+    owner = models.ForeignKey(
+        "account.User", on_delete=models.PROTECT, related_name="owned_properties", null=True, blank=True
+    )
     status = models.CharField(max_length=20, choices=PropertyStatus.choices, default=PropertyStatus.VACANT)
     is_verified = models.BooleanField(default=False)
     verified_at = models.DateTimeField(null=True, blank=True)
@@ -69,11 +79,11 @@ class Property(TimestampedModel, SoftDeleteModel):
     description = models.TextField(null=True, blank=True)
     tariff = models.CharField(max_length=20, choices=TariffChoices.choices, default=TariffChoices.STANDARD)
 
-    ask_price = models.DecimalField(max_digits=12, decimal_places=2)
+    ask_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     ask_currency = models.CharField(max_length=3, default="USD")
-    owner_guaranteed_price = models.DecimalField(max_digits=12, decimal_places=2)
+    owner_guaranteed_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     owner_guaranteed_currency = models.CharField(max_length=3, default="USD")
-    tenant_charge_price = models.DecimalField(max_digits=12, decimal_places=2)
+    tenant_charge_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     tenant_charge_currency = models.CharField(max_length=3, default="USD")
 
     deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
@@ -113,3 +123,35 @@ class PropertyPhoto(TimestampedModel):
 
     def __str__(self):
         return f"Photo {self.id} for {self.property.name}"
+
+
+class VerificationVisit(TimestampedModel):
+    """A management on-site verification visit scheduled when a property is
+    published. Backs the "Save & schedule verification" action and the publish
+    checklist's verification row."""
+
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="verification_visits")
+    scheduled_for = models.DateTimeField(_("Scheduled for"))
+    status = models.CharField(
+        max_length=20,
+        choices=VerificationVisitStatus.choices,
+        default=VerificationVisitStatus.SCHEDULED,
+    )
+    scheduled_by = models.ForeignKey(
+        "account.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scheduled_verification_visits",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        verbose_name = _("Verification Visit")
+        verbose_name_plural = _("Verification Visits")
+        ordering = ["-scheduled_for"]
+        db_table = "verification_visits"
+
+    def __str__(self):
+        return f"Verification visit for {self.property.name} ({self.get_status_display()})"

@@ -12,6 +12,10 @@ from core.constants import (
 from core.models import SoftDeleteModel, TimestampedModel
 
 
+class LeaseConflictError(Exception):
+    """Raised when converting a booking whose property already has an active lease."""
+
+
 class Listing(TimestampedModel, SoftDeleteModel):
     property = models.OneToOneField("property.Property", on_delete=models.CASCADE, related_name="listing")
     owner_agreement = models.ForeignKey(
@@ -173,15 +177,33 @@ class Booking(TimestampedModel, SoftDeleteModel):
     def __str__(self):
         return f"Booking #{self.id} — {self.tenant} ({self.get_status_display()})"
 
-    def convert_to_lease(self, reviewed_by, *, owner_agreement_id=None, monthly_rent=None, deposit=None):
-        """Convert an APPROVED booking into a Lease, reusing Lease creation."""
+    def convert_to_lease(
+        self,
+        reviewed_by,
+        *,
+        owner_agreement_id=None,
+        monthly_rent=None,
+        deposit=None,
+        start_date=None,
+        end_date=None,
+    ):
+        """Convert an APPROVED booking into a Lease, reusing Lease creation.
+
+        Also raises a pending deposit invoice and notifies the tenant to sign
+        and pay (Booking → Lease → Payment flow). Raises ``LeaseConflictError``
+        if the property already carries an active lease.
+        """
         from contract.models import Lease
+        from finance.models import Payment
         from notification.services import notify
 
-        from core.constants import NotificationType
+        from core.constants import LeaseStatus, NotificationType, PaymentStatus
 
         if self.status != BookingStatus.APPROVED:
             raise ValueError("Only approved bookings can be converted")
+
+        if self.property.leases.filter(status=LeaseStatus.ACTIVE).exists():
+            raise LeaseConflictError("This property already has an active lease")
 
         from core.constants import OwnerAgreementStatus
 
@@ -198,16 +220,33 @@ class Booking(TimestampedModel, SoftDeleteModel):
             raise ValueError("An owner agreement is required to create a lease")
 
         rent = monthly_rent or self.monthly_rent_offer or self.listing.listed_price or self.property.tenant_charge_price
+        deposit_amount = deposit if deposit is not None else rent
+        lease_start = start_date or self.requested_start_date
+        lease_end = end_date or self.requested_end_date
 
         with transaction.atomic():
             lease = Lease.objects.create(
                 property=self.property,
                 owner_agreement_id=agreement_id,
                 tenant=self.tenant,
-                start_date=self.requested_start_date,
-                end_date=self.requested_end_date,
+                start_date=lease_start,
+                end_date=lease_end,
                 monthly_rent=rent,
-                deposit=deposit if deposit is not None else rent,
+                deposit=deposit_amount,
+            )
+            # Raise the first (deposit) invoice as PENDING — the tenant is
+            # invited to sign and pay it. Stays PENDING until management/gateway
+            # confirms, matching the tenant pay-now flow.
+            Payment.objects.create(
+                lease=lease,
+                tenant=self.tenant,
+                paid_by=self.tenant,
+                amount=deposit_amount,
+                currency=self.property.tenant_charge_currency,
+                payment_date=lease_start,
+                due_date=lease_start,
+                status=PaymentStatus.PENDING,
+                notes=str(_("Deposit")),
             )
             self.status = BookingStatus.CONVERTED
             self.reviewed_by = reviewed_by
@@ -218,7 +257,8 @@ class Booking(TimestampedModel, SoftDeleteModel):
             recipient=self.tenant,
             type=NotificationType.BOOKING_STATUS,
             title=str(_("Booking confirmed")),
-            body=str(_("Your booking for %(name)s has been confirmed.")) % {"name": self.property.name},
+            body=str(_("Your booking for %(name)s is confirmed — please sign and pay the deposit."))
+            % {"name": self.property.name},
             related_object_type="booking",
             related_object_id=self.id,
         )

@@ -1,9 +1,9 @@
 import factory
-from maintenance.models import ServiceRequest, ServiceRequestPhoto
+from maintenance.models import ServiceRequest, ServiceRequestComment, ServiceRequestPhoto
 
 from core.constants import ServiceRequestPriority, ServiceRequestStatus
 
-from .account import TenantFactory
+from .account import TenantFactory, UserFactory
 from .property import PropertyFactory
 
 
@@ -28,3 +28,12 @@ class ServiceRequestPhotoFactory(factory.django.DjangoModelFactory):
 
     service_request = factory.SubFactory(ServiceRequestFactory)
     image = factory.django.ImageField(color="blue")
+
+
+class ServiceRequestCommentFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = ServiceRequestComment
+
+    service_request = factory.SubFactory(ServiceRequestFactory)
+    author = factory.SubFactory(UserFactory)
+    body = factory.Faker("sentence", nb_words=8)

@@ -41,15 +41,28 @@ class UserRole(ConstantChoices):
 
 
 class PropertyStatus(ConstantChoices):
+    DRAFT = "draft"
     RENTED = "rented"
     VACANT = "vacant"
     MAINTENANCE = "maintenance"
     PENDING_REVIEW = "pending_review"
     CHOICES = [
+        (DRAFT, _("Draft")),
         (RENTED, _("Rented")),
         (VACANT, _("Vacant")),
         (MAINTENANCE, _("Maintenance")),
         (PENDING_REVIEW, _("Pending Review")),
+    ]
+
+
+class VerificationVisitStatus(ConstantChoices):
+    SCHEDULED = "scheduled"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    CHOICES = [
+        (SCHEDULED, _("Scheduled")),
+        (COMPLETED, _("Completed")),
+        (CANCELLED, _("Cancelled")),
     ]
 
 
@@ -228,6 +241,15 @@ class ServiceRequestPriority(ConstantChoices):
         (MEDIUM, _("Medium")),
         (HIGH, _("High")),
         (CRITICAL, _("Critical")),
+    ]
+
+
+class CostBearer(ConstantChoices):
+    OWNER = "owner"
+    PLATFORM = "platform"
+    CHOICES = [
+        (OWNER, _("Owner")),
+        (PLATFORM, _("Platform")),
     ]
 
 

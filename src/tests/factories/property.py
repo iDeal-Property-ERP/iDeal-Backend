@@ -1,5 +1,5 @@
 import factory
-from property.models import District, Property, PropertyPhoto
+from property.models import District, Property, PropertyPhoto, VerificationVisit
 
 from .account import OwnerFactory
 
@@ -39,3 +39,11 @@ class PropertyPhotoFactory(factory.django.DjangoModelFactory):
     property = factory.SubFactory(PropertyFactory)
     is_primary = False
     sort_order = 0
+
+
+class VerificationVisitFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = VerificationVisit
+
+    property = factory.SubFactory(PropertyFactory)
+    scheduled_for = factory.Faker("future_datetime", tzinfo=None)
