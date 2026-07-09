@@ -2,10 +2,22 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Annotated
 
 import pydantic
 
-from core.constants import PaymentMethod, PaymentStatus, PayoutMethod
+from core.constants import Currency, PaymentMethod, PaymentStatus, PayoutMethod
+
+PositiveAmount = Annotated[Decimal, pydantic.Field(gt=0)]
+
+
+def _validate_currency(value: str) -> str:
+    if value not in Currency.values():
+        raise ValueError(f"Unsupported currency '{value}'. Allowed: {', '.join(Currency.values())}.")
+    return value
+
+
+CurrencyStr = Annotated[str, pydantic.AfterValidator(_validate_currency)]
 
 
 class PaymentOutput(pydantic.BaseModel):
@@ -30,8 +42,8 @@ class PaymentCreateInput(pydantic.BaseModel):
     lease_id: int
     tenant_id: int
     paid_by_id: int
-    amount: Decimal
-    currency: str = "USD"
+    amount: PositiveAmount
+    currency: CurrencyStr = "USD"
     payment_date: date
     due_date: date
     status: str = PaymentStatus.PENDING
@@ -86,8 +98,8 @@ class ExchangeRateOutput(pydantic.BaseModel):
 
 
 class ExchangeRateCreateInput(pydantic.BaseModel):
-    currency: str
-    rate: Decimal
+    currency: CurrencyStr
+    rate: PositiveAmount
     effective_date: date
 
 
@@ -111,8 +123,8 @@ class PayoutScheduleOutput(pydantic.BaseModel):
 
 class PayoutScheduleCreateInput(pydantic.BaseModel):
     owner_agreement_id: int
-    amount: Decimal
-    currency: str = "USD"
+    amount: PositiveAmount
+    currency: CurrencyStr = "USD"
     scheduled_date: date
     method: str = PayoutMethod.BANK_TRANSFER
 
@@ -162,3 +174,5 @@ class PnLBreakdown(pydantic.BaseModel):
 class PnLFilter(pydantic.BaseModel):
     year: int | None = None
     month: int | None = None
+    start_date: date | None = None
+    end_date: date | None = None

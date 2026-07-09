@@ -24,6 +24,10 @@ class User(AbstractBaseUser, TimestampedModel, SoftDeleteModel):
     is_superuser = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
+    # Set for invited users given a temporary password: they must set their own
+    # password on first login before they can use the app.
+    must_change_password = models.BooleanField(default=False)
+
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["first_name", "email"]
 
@@ -45,9 +49,35 @@ class User(AbstractBaseUser, TimestampedModel, SoftDeleteModel):
         return self.is_superuser
 
     def save(self, *args, **kwargs):
-        from django.contrib.auth.hashers import make_password
+        from django.contrib.auth.hashers import identify_hasher, is_password_usable, make_password
 
-        if self.password and not self.password.startswith("pbkdf2_sha256$"):
-            self.password = make_password(self.password)  # Hash the password
+        # Hash a directly-assigned plaintext password, but never re-hash a value
+        # that is already a valid Django hash (any hasher — pbkdf2, argon2, md5 in
+        # tests, …) or an unusable "!" password. Detecting the hasher generically
+        # avoids corrupting non-pbkdf2 hashes (the previous prefix check did).
+        if self.password and is_password_usable(self.password):
+            try:
+                identify_hasher(self.password)
+            except ValueError:
+                self.password = make_password(self.password)
 
         return super().save(*args, **kwargs)
+
+
+class TokenBlacklist(TimestampedModel):
+    """Revoked JWT ids (jti). A token whose jti is listed here is rejected by the
+    auth layer even if its signature and expiry are still valid. Populated on
+    logout and on refresh-token rotation (the consumed refresh token is revoked)."""
+
+    jti = models.CharField(max_length=255, unique=True, db_index=True)
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the underlying token expires; rows past this are safe to prune.",
+    )
+
+    class Meta:
+        db_table = "token_blacklist"
+
+    def __str__(self):
+        return self.jti

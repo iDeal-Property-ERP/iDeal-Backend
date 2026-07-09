@@ -1,6 +1,8 @@
 from http import HTTPStatus
 
 from django.conf import settings
+from django.db import IntegrityError
+from django.db.models.deletion import ProtectedError
 from django.http import Http404, JsonResponse
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
@@ -53,6 +55,27 @@ def global_error_handler(endpoint, controller, exc):
         return JsonResponse(
             {"success": False, "message": str(_("Not found")), "error": str(exc)},
             status=HTTPStatus.NOT_FOUND,
+        )
+
+    # Database-level guards. These must NEVER echo the raw exception (it leaks the
+    # failing row / SQL / constraint internals), regardless of DEBUG.
+    if isinstance(exc, ProtectedError):
+        return JsonResponse(
+            {
+                "success": False,
+                "message": str(_("Cannot delete")),
+                "error": str(_("This record is referenced by other records and cannot be deleted.")),
+            },
+            status=HTTPStatus.CONFLICT,
+        )
+    if isinstance(exc, IntegrityError):
+        return JsonResponse(
+            {
+                "success": False,
+                "message": str(_("Data conflict")),
+                "error": str(_("The request conflicts with existing data or references a missing record.")),
+            },
+            status=HTTPStatus.CONFLICT,
         )
 
     status_code = getattr(exc, "status_code", HTTPStatus.INTERNAL_SERVER_ERROR)

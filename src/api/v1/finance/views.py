@@ -1,3 +1,4 @@
+import logging
 from datetime import date as date_type
 from decimal import Decimal
 from http import HTTPStatus
@@ -46,6 +47,8 @@ from core.constants import (
     PayoutStatus,
     UserRole,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _optional_json(request) -> dict:
@@ -137,7 +140,9 @@ class PaymentMarkPaidView(GenericController):
         body = _optional_json(self.request)
         update_fields = ["status", "payment_date", "updated_at"]
         payment.status = PaymentStatus.PAID
-        payment.payment_date = body.get("payment_date") or date_type.today()
+        # Keep the recorded payment_date unless the mark-paid sheet overrides it;
+        # only fall back to today when the payment has no date at all.
+        payment.payment_date = body.get("payment_date") or payment.payment_date or date_type.today()
         if body.get("method"):
             payment.method = body["method"]
             update_fields.append("method")
@@ -237,7 +242,17 @@ class ExchangeRateListCreateView(CreateAPIView, ListAPIView):
     auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def post(self, parsed_body: Body[ExchangeRateCreateInput]) -> ExchangeRateOutput:
-        return super().post(parsed_body)
+        # Upsert on (currency, effective_date) so a given currency has exactly one
+        # rate per day — prevents ambiguous duplicates that make conversion
+        # nondeterministic. (A hard DB unique constraint is avoided because legacy
+        # seed data already contains same-day duplicates.)
+        rate, _created = ExchangeRate.objects.update_or_create(
+            currency=parsed_body.currency,
+            effective_date=parsed_body.effective_date,
+            defaults={"rate": parsed_body.rate},
+        )
+        status_code = HTTPStatus.CREATED if _created else HTTPStatus.OK
+        return self.ok(self.to_output(rate), status_code=status_code)
 
     def get(self, parsed_query: Query[ListQuery]) -> list[ExchangeRateOutput] | Paginated[ExchangeRateOutput]:
         return super().get(parsed_query)
@@ -423,6 +438,16 @@ def _safe_convert(amount, from_currency, to_currency):
     try:
         return convert_amount(amount, from_currency, to_currency)
     except ValueError:
+        # A non-zero amount could not be converted (missing exchange rate). Do not
+        # silently corrupt aggregated totals — surface it in the logs so it is
+        # investigable. Currencies are validated at write-time, so this indicates a
+        # genuinely missing rate for a supported currency.
+        logger.warning(
+            "Currency conversion failed: %s %s -> %s (missing rate); excluded from total.",
+            amount,
+            from_currency,
+            to_currency,
+        )
         return Decimal("0.00")
 
 
@@ -474,6 +499,8 @@ class PnLView(GenericController):
     def get(self, parsed_query: Query[PnLFilter]) -> PnLBreakdown:
         year = parsed_query.year
         month = parsed_query.month
+        start_date = parsed_query.start_date
+        end_date = parsed_query.end_date
 
         payment_qs = Payment.objects.filter(status=PaymentStatus.PAID)
         payout_qs = PayoutSchedule.objects.filter(status=PayoutStatus.PAID)
@@ -484,6 +511,12 @@ class PnLView(GenericController):
         if month:
             payment_qs = payment_qs.filter(payment_date__month=month)
             payout_qs = payout_qs.filter(paid_date__month=month)
+        if start_date:
+            payment_qs = payment_qs.filter(payment_date__gte=start_date)
+            payout_qs = payout_qs.filter(paid_date__gte=start_date)
+        if end_date:
+            payment_qs = payment_qs.filter(payment_date__lte=end_date)
+            payout_qs = payout_qs.filter(paid_date__lte=end_date)
 
         gross_revenue_uzs = Decimal("0.00")
         for p in payment_qs:

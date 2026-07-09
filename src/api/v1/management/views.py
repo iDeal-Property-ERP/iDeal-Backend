@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Case, Count, F, IntegerField, Max, Min, Q, Sum, Value, When
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 
@@ -21,10 +21,15 @@ from api.v1.management.schemas import (
     ManagementAgreementOutput,
     ManagementBookingConvertInput,
     ManagementBookingOutput,
+    ManagementInquiryOutput,
+    ManagementInquiryStatusInput,
+    ManagementLeadOutput,
     ManagementLeaseOutput,
     ManagementOnboardingApproveInput,
+    ManagementOnboardingDetailOutput,
     ManagementOnboardingOutput,
     ManagementOnboardingRejectInput,
+    ManagementOnboardingRequestInfoInput,
     ManagementPaymentOutput,
     ManagementPayoutOutput,
     ManagementPropertyOutput,
@@ -32,16 +37,23 @@ from api.v1.management.schemas import (
     ManagementUserCreateInput,
     ManagementUserOutput,
     ManagementUserUpdateInput,
+    ManagementViewingProposeTimeInput,
     ManagementViewingRequestOutput,
     MonthlyPnlRow,
+    PnlBreakdown,
+    PnlBreakdownRow,
+    PnlServiceTypeRow,
     PnLSummaryCard,
     PnLSummaryOutput,
     RecentPaymentRow,
+    ServiceRequestCommentCreateInput,
+    ServiceRequestCommentOutput,
 )
-from api.v1.vas.schemas import ServiceOrderStatusInput
+from api.v1.vas.schemas import ManagementServiceOrderCreateInput, ServiceOrderStatusInput
 from core.api.permissions import RoleAuth
 from core.api.views import BaseController, DetailPath, GenericController, ListAPIView, ListQuery
-from core.constants import PaymentStatus, PayoutStatus, UserRole
+from core.constants import BookingStatus, PaymentStatus, PayoutStatus, UserRole, ViewingRequestStatus
+from core.utils.pagination import build_paginated_response
 
 
 def _d(value):
@@ -54,8 +66,8 @@ def _month_end(today: date) -> date:
     return today.replace(day=calendar.monthrange(today.year, today.month)[1])
 
 
-def _sum_usd(qs) -> str:
-    """Sum ``amount`` across a queryset, converting each currency bucket to USD.
+def _sum_usd(qs, field: str = "amount") -> str:
+    """Sum ``field`` across a queryset, converting each currency bucket to USD.
 
     Best-effort like the finance dashboard: an empty exchange-rate table makes a
     UZS→USD conversion fall back to that bucket contributing 0 rather than
@@ -64,7 +76,7 @@ def _sum_usd(qs) -> str:
     from finance.utils import convert_amount
 
     total = Decimal("0.00")
-    for row in qs.values("currency").annotate(bucket=Sum("amount")):
+    for row in qs.values("currency").annotate(bucket=Sum(field)):
         amount = row["bucket"] or Decimal("0.00")
         currency = row["currency"]
         if currency == "USD":
@@ -85,6 +97,40 @@ def _payouts_due_usd() -> str:
     next_run = next_payout_run_date(date.today())
     qs = PayoutSchedule.objects.filter(status=PayoutStatus.SCHEDULED, scheduled_date__lte=next_run)
     return _sum_usd(qs)
+
+
+def _optional_json(request) -> dict:
+    """Best-effort parse of a JSON request body; ``{}`` when absent or invalid.
+
+    Mirrors the finance-views helper: lets detail-action endpoints accept an
+    optional body without the dmr framework rejecting a body-less request.
+    """
+    import json
+
+    raw = getattr(request, "body", b"") or b""
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+# Lead triage tabs → per-source status sets. A lead is a ViewingRequest or a
+# Booking; the queue merges both and buckets them into four workflow tabs.
+_LEAD_TAB_VIEWING = {
+    "new": [ViewingRequestStatus.PENDING],
+    "scheduled": [ViewingRequestStatus.CONFIRMED],
+    "awaiting": [],
+    "closed": [ViewingRequestStatus.CANCELLED],
+}
+_LEAD_TAB_BOOKING = {
+    "new": [BookingStatus.REQUESTED],
+    "scheduled": [],
+    "awaiting": [BookingStatus.APPROVED],
+    "closed": [BookingStatus.REJECTED, BookingStatus.CANCELLED, BookingStatus.CONVERTED],
+}
 
 
 class ManagementView(BaseController):
@@ -213,17 +259,150 @@ class DashboardView(ManagementView):
         return self.ok(output.model_dump(mode="json"))
 
 
-class PnLSummaryView(ManagementView):
-    def get(self) -> dict:
-        today = date.today()
-        current_year = today.year
-        current_month = today.month
+# P&L revenue streams (lease, vas) and expense streams (payouts, maintenance).
+# The ``sources`` query param picks which streams are included; the default
+# reproduces the pre-phase-6 math exactly (lease payments vs. owner payouts).
+_PNL_REVENUE_SOURCES = ("lease", "vas")
+_PNL_EXPENSE_SOURCES = ("payouts", "maintenance")
+_PNL_SOURCES = _PNL_REVENUE_SOURCES + _PNL_EXPENSE_SOURCES
+_PNL_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-        from finance.models import Payment, PayoutSchedule
+
+def _pnl_parse_sources(raw: str | None) -> list[str]:
+    if not raw:
+        return ["lease", "payouts"]
+    picked = [s for s in (part.strip() for part in raw.split(",")) if s in _PNL_SOURCES]
+    return picked or ["lease", "payouts"]
+
+
+def _pnl_month_buckets(year: int, month: int, convert) -> dict[str, Decimal]:
+    """UZS totals per source for one month.
+
+    VAS commission is attributed to the completion month (``completed_at``,
+    falling back to ``updated_at`` for legacy rows completed before the field
+    existed). Maintenance counts platform-borne resolved costs only; a null
+    bearer buckets as platform, mirroring the maintenance stats endpoint.
+    Maintenance costs carry no currency column and are assumed USD (phase-5 gap).
+    """
+    from finance.models import Payment, PayoutSchedule
+    from maintenance.models import ServiceRequest
+    from vas.models import ServiceOrder
+
+    from core.constants import CostBearer, ServiceRequestStatus, VASOrderStatus
+
+    lease = Decimal("0.00")
+    for p in Payment.objects.filter(status="paid", payment_date__year=year, payment_date__month=month):
+        lease += convert(p.amount, p.currency, "UZS")
+
+    vas = Decimal("0.00")
+    vas_orders = ServiceOrder.objects.filter(status=VASOrderStatus.COMPLETED).filter(
+        Q(completed_at__year=year, completed_at__month=month)
+        | Q(completed_at__isnull=True, updated_at__year=year, updated_at__month=month)
+    )
+    for o in vas_orders:
+        vas += convert(o.commission_earned, o.currency, "UZS")
+
+    payouts = Decimal("0.00")
+    for po in PayoutSchedule.objects.filter(status="paid", paid_date__year=year, paid_date__month=month):
+        payouts += convert(po.amount, po.currency, "UZS")
+
+    maintenance = Decimal("0.00")
+    maint_qs = ServiceRequest.objects.filter(
+        status=ServiceRequestStatus.RESOLVED,
+        resolved_at__year=year,
+        resolved_at__month=month,
+        cost__isnull=False,
+    ).exclude(cost_bearer=CostBearer.OWNER)
+    for sr in maint_qs:
+        maintenance += convert(sr.cost, "USD", "UZS")
+
+    return {"lease": lease, "vas": vas, "payouts": payouts, "maintenance": maintenance}
+
+
+def _pnl_projection(growth_actual, last_month):
+    projected = []
+    if len(growth_actual) < 2:
+        return projected
+    last3_revenues = [Decimal(r.revenue) for r in growth_actual[-3:]]
+    if last3_revenues[0] <= 0:
+        return projected
+    avg_growth = sum(
+        (last3_revenues[i + 1] - last3_revenues[i]) / last3_revenues[i] for i in range(len(last3_revenues) - 1)
+    ) / (len(last3_revenues) - 1)
+    last_rev = last3_revenues[-1]
+    for i in range(1, 4):
+        proj_month = last_month + i
+        if proj_month > 12:
+            break
+        last_rev = last_rev * (Decimal("1") + avg_growth)
+        projected.append(GrowthPoint(month=_PNL_MONTH_NAMES[proj_month - 1], revenue=_d(last_rev)))
+    return projected
+
+
+def _pnl_breakdown(totals: dict, sources: list[str], convert, currency: str, year: int):
+    """Whole-period revenue/expense composition + VAS commission by service type."""
+    from vas.models import ServiceOrder
+
+    from core.constants import VASOrderStatus
+
+    def rows(names):
+        picked = [s for s in names if s in sources]
+        total = sum((totals[s] for s in picked), Decimal("0.00"))
+        out = []
+        for s in picked:
+            share = (totals[s] / total * Decimal("100")).quantize(Decimal("0.1")) if total > 0 else Decimal("0.0")
+            out.append(PnlBreakdownRow(source=s, amount=_d(convert(totals[s], "UZS", currency)), share=str(share)))
+        return out
+
+    by_type = []
+    if "vas" in sources:
+        vas_orders = (
+            ServiceOrder.objects.filter(status=VASOrderStatus.COMPLETED)
+            .filter(Q(completed_at__year=year) | Q(completed_at__isnull=True, updated_at__year=year))
+            .select_related("catalog_item")
+        )
+        type_totals: dict[str, Decimal] = {}
+        for o in vas_orders:
+            uzs = convert(o.commission_earned, o.currency, "UZS")
+            type_totals[o.catalog_item.service_type] = (
+                type_totals.get(o.catalog_item.service_type, Decimal("0.00")) + uzs
+            )
+        by_type = [
+            PnlServiceTypeRow(service_type=k, amount=_d(convert(v, "UZS", currency)))
+            for k, v in sorted(type_totals.items())
+        ]
+
+    return PnlBreakdown(
+        revenue=rows(_PNL_REVENUE_SOURCES), expenses=rows(_PNL_EXPENSE_SOURCES), vas_by_service_type=by_type
+    )
+
+
+class PnLSummaryView(ManagementView):
+    """P&L report.
+
+    Query params (all optional; the param-less call is byte-compatible with the
+    pre-phase-6 response apart from additive keys):
+    - ``year``      report year, default current
+    - ``currency``  USD (default) or UZS consolidation; ``tax`` stays UZS as before
+    - ``sources``   csv of lease,vas,payouts,maintenance; default lease,payouts
+    """
+
+    def get(self) -> dict:
         from finance.utils import convert_amount
         from property.models import Property
 
+        today = date.today()
+        params = self.request.GET
+        year_raw = params.get("year") or ""
+        year = int(year_raw) if year_raw.isdigit() else today.year
+        currency = (params.get("currency") or "USD").upper()
+        if currency not in ("USD", "UZS"):
+            currency = "USD"
+        sources = _pnl_parse_sources(params.get("sources"))
+
         def _convert(amount, from_currency, to_currency):
+            if from_currency == to_currency:
+                return Decimal(str(amount))
             if float(amount) == 0:
                 return Decimal("0.00")
             try:
@@ -231,73 +410,48 @@ class PnLSummaryView(ManagementView):
             except ValueError:
                 return Decimal("0.00")
 
-        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
+        last_month = today.month if year == today.year else 12
+        totals = {s: Decimal("0.00") for s in _PNL_SOURCES}
         monthly_rows = []
         growth_actual = []
-        current_revenue = Decimal("0.00")
-        current_owner = Decimal("0.00")
-        current_net = Decimal("0.00")
-        current_tax = Decimal("0.00")
+        current_revenue = current_expenses = current_net = current_tax = Decimal("0.00")
 
-        for m in range(1, current_month + 1):
-            payments = Payment.objects.filter(status="paid", payment_date__year=current_year, payment_date__month=m)
-            payouts = PayoutSchedule.objects.filter(status="paid", paid_date__year=current_year, paid_date__month=m)
-
-            revenue_uzs = Decimal("0.00")
-            for p in payments:
-                revenue_uzs += _convert(p.amount, p.currency, "UZS")
-
-            owner_uzs = Decimal("0.00")
-            for po in payouts:
-                owner_uzs += _convert(po.amount, po.currency, "UZS")
-
-            net_uzs = revenue_uzs - owner_uzs
+        for m in range(1, last_month + 1):
+            buckets = _pnl_month_buckets(year, m, _convert)
+            for s in _PNL_SOURCES:
+                totals[s] += buckets[s]
+            revenue_uzs = sum((buckets[s] for s in _PNL_REVENUE_SOURCES if s in sources), Decimal("0.00"))
+            expenses_uzs = sum((buckets[s] for s in _PNL_EXPENSE_SOURCES if s in sources), Decimal("0.00"))
+            net_uzs = revenue_uzs - expenses_uzs
             tax_uzs = net_uzs * Decimal("0.04")
 
-            revenue_usd = _convert(revenue_uzs, "UZS", "USD")
-            owner_usd = _convert(owner_uzs, "UZS", "USD")
-            net_usd = _convert(net_uzs, "UZS", "USD")
+            revenue_out = _convert(revenue_uzs, "UZS", currency)
+            expenses_out = _convert(expenses_uzs, "UZS", currency)
+            net_out = _convert(net_uzs, "UZS", currency)
 
             monthly_rows.append(
                 MonthlyPnlRow(
-                    month=month_names[m - 1],
-                    revenue=_d(revenue_usd),
-                    owner_payouts=_d(owner_usd),
-                    profit=_d(net_usd),
+                    month=_PNL_MONTH_NAMES[m - 1],
+                    revenue=_d(revenue_out),
+                    owner_payouts=_d(expenses_out),
+                    profit=_d(net_out),
                     tax=_d(tax_uzs),
                 )
             )
-            growth_actual.append(GrowthPoint(month=month_names[m - 1], revenue=_d(revenue_usd)))
+            growth_actual.append(GrowthPoint(month=_PNL_MONTH_NAMES[m - 1], revenue=_d(revenue_out)))
 
-            if m == current_month:
-                current_revenue = revenue_usd
-                current_owner = owner_usd
-                current_net = net_usd
-                current_tax = tax_uzs
+            if m == last_month:
+                current_revenue, current_expenses = revenue_out, expenses_out
+                current_net, current_tax = net_out, tax_uzs
 
         summary = PnLSummaryCard(
             gross_revenue=_d(current_revenue),
-            owner_payouts=_d(current_owner),
+            owner_payouts=_d(current_expenses),
             net_profit=_d(current_net),
             tax=_d(current_tax),
         )
 
-        growth_projected = []
-        if len(growth_actual) >= 2:
-            last3_revenues = [Decimal(r.revenue) for r in growth_actual[-3:]]
-            if last3_revenues[0] > 0:
-                avg_growth = sum(
-                    (last3_revenues[i + 1] - last3_revenues[i]) / last3_revenues[i]
-                    for i in range(len(last3_revenues) - 1)
-                ) / (len(last3_revenues) - 1)
-                last_rev = last3_revenues[-1]
-                for i in range(1, 4):
-                    proj_month = current_month + i
-                    if proj_month > 12:
-                        break
-                    last_rev = last_rev * (Decimal("1") + avg_growth)
-                    growth_projected.append(GrowthPoint(month=month_names[proj_month - 1], revenue=_d(last_rev)))
+        growth_projected = _pnl_projection(growth_actual, last_month) if year == today.year else []
 
         total_properties = Property.objects.count()
         per_property_net = current_net / total_properties if total_properties > 0 else Decimal("0.00")
@@ -313,6 +467,10 @@ class PnLSummaryView(ManagementView):
             monthly=monthly_rows,
             growth=GrowthData(actual=growth_actual, projected=growth_projected),
             investor=investor,
+            year=year,
+            currency=currency,
+            sources=sources,
+            breakdown=_pnl_breakdown(totals, sources, _convert, currency, year),
         )
 
         return self.ok(output.model_dump(mode="json"))
@@ -354,8 +512,9 @@ class ManagementUserInviteView(ManagementView, GenericController):
     output_schema = ManagementUserOutput
 
     def post(self, parsed_body: Body[ManagementUserCreateInput]) -> dict:
+        import secrets
+
         from account.models import User
-        from django.contrib.auth.hashers import make_password
 
         if parsed_body.role not in UserRole.values():
             return self.fail(error=str(_("Invalid role")))
@@ -367,9 +526,13 @@ class ManagementUserInviteView(ManagementView, GenericController):
             username = f"{base_username}{suffix}"
             suffix += 1
 
+        # Give the invited user a usable temporary password so they can actually
+        # log in, and flag them to set their own on first login. The temp password
+        # is returned once for the manager to relay; it is never stored in clear.
+        temp_password = secrets.token_urlsafe(9)
         user = User.objects.create_user(
             username=username,
-            password=None,
+            password=temp_password,
             first_name=parsed_body.first_name,
             last_name=parsed_body.last_name,
             email=parsed_body.email,
@@ -377,12 +540,12 @@ class ManagementUserInviteView(ManagementView, GenericController):
             role=parsed_body.role,
             is_active=parsed_body.is_active,
             is_verified=parsed_body.is_verified,
+            is_staff=(parsed_body.role == UserRole.MANAGEMENT),
+            must_change_password=True,
         )
-        # User.save() re-hashes any non-pbkdf2 password, so persist an unusable
-        # password directly to bypass that hook until the user sets one.
-        User.objects.filter(pk=user.pk).update(password=make_password(None))
-        user.refresh_from_db()
-        return self.ok(self.to_output(user), status_code=HTTPStatus.CREATED)
+        data = self.to_output(user)
+        data["temporary_password"] = temp_password
+        return self.ok(data, status_code=HTTPStatus.CREATED)
 
 
 class ManagementUserDetailUpdateView(ManagementView, GenericController):
@@ -398,8 +561,21 @@ class ManagementUserDetailUpdateView(ManagementView, GenericController):
         return self.ok(self.to_output(instance))
 
     def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementUserUpdateInput]) -> dict:
+        from account.models import User
+
         instance = self.get_object(pk=parsed_path.pk)
-        instance = self.perform_update(instance, parsed_body.model_dump(exclude_unset=True))
+        data = parsed_body.model_dump(exclude_unset=True)
+        if data.get("role") and data["role"] not in UserRole.values():
+            return self.fail(error=str(_("Invalid role")))
+        for field in ("email", "phone"):
+            value = data.get(field)
+            if value and User.objects.filter(**{field: value}).exclude(pk=instance.pk).exists():
+                return self.fail(
+                    error=str(_("This %s is already in use") % field),
+                    message=str(_("Data conflict")),
+                    status_code=HTTPStatus.CONFLICT,
+                )
+        instance = self.perform_update(instance, data)
         return self.ok(self.to_output(instance))
 
 
@@ -409,14 +585,16 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
     def get_queryset(self):
         from property.models import Property
 
+        from core.constants import PropertyStatus
+
         qs = Property.objects.select_related("district", "owner").order_by("-created_at")
         status = self.request.GET.get("status")
         district_id = self.request.GET.get("district_id")
         tariff = self.request.GET.get("tariff")
         search = self.request.GET.get("search")
 
-        if status:
-            qs = qs.filter(status=status)
+        # Drafts live behind their own saved-view tab, not the default portfolio.
+        qs = qs.filter(status=status) if status else qs.exclude(status=PropertyStatus.DRAFT)
         if district_id:
             qs = qs.filter(district_id=district_id)
         if tariff:
@@ -427,6 +605,73 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         return super().get(parsed_query)
+
+
+class ManagementPropertyMapView(ManagementView):
+    """Geocoded portfolio for the map screen — all statuses, non-paginated.
+
+    Sized for portfolio scale (hundreds of rows); ``bbox`` (minLon,minLat,maxLon,maxLat)
+    is the escape hatch if the portfolio outgrows a single response. Rows are a
+    superset of ManagementPropertyOutput so the frontend can hand a marker's row
+    straight to the property record panel.
+    """
+
+    def get(self) -> dict:
+        from contract.models import Lease
+        from django.db.models import Prefetch
+        from property.models import Property
+
+        from core.constants import LeaseStatus, PropertyStatus
+
+        params = self.request.GET
+        qs = (
+            Property.objects.select_related("district", "owner")
+            .exclude(status=PropertyStatus.DRAFT)
+            .exclude(Q(map_lat__isnull=True) | Q(map_lon__isnull=True))
+            .prefetch_related(
+                Prefetch(
+                    "leases",
+                    queryset=Lease.objects.filter(status=LeaseStatus.ACTIVE).select_related("tenant"),
+                    to_attr="active_leases",
+                )
+            )
+            .order_by("-created_at")
+        )
+        for field, param in (
+            ("status", "status"),
+            ("district_id", "district_id"),
+            ("tariff", "tariff"),
+            ("rooms", "rooms"),
+            ("tenant_charge_price__gte", "price_min"),
+            ("tenant_charge_price__lte", "price_max"),
+        ):
+            value = params.get(param)
+            if value:
+                qs = qs.filter(**{field: value})
+        search = params.get("search")
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(address__icontains=search))
+        bbox = params.get("bbox")
+        if bbox:
+            parts = bbox.split(",")
+            if len(parts) == 4:
+                try:
+                    min_lon, min_lat, max_lon, max_lat = (Decimal(p) for p in parts)
+                except ArithmeticError:
+                    pass
+                else:
+                    qs = qs.filter(
+                        map_lon__gte=min_lon, map_lon__lte=max_lon, map_lat__gte=min_lat, map_lat__lte=max_lat
+                    )
+
+        rows = []
+        for prop in qs:
+            row = ManagementPropertyOutput.model_validate(prop).model_dump(mode="json")
+            lease = prop.active_leases[0] if prop.active_leases else None
+            row["tenant_name"] = f"{lease.tenant.first_name} {lease.tenant.last_name or ''}".strip() if lease else None
+            row["lease_end_date"] = lease.end_date.isoformat() if lease else None
+            rows.append(row)
+        return self.ok(rows)
 
 
 class LeaseListView(ManagementView, ListAPIView):
@@ -708,17 +953,46 @@ class PayoutStatsView(ManagementView):
         )
 
 
+_SERVICE_REQUEST_ORDERINGS = {
+    "recent": ("-created_at",),
+    "oldest": ("created_at",),
+    "cost": ("-cost", "-created_at"),
+}
+
+
+def _service_priority_rank():
+    """Order-by expression ranking Critical → High → Medium → Low (0..3)."""
+    from core.constants import ServiceRequestPriority as P
+
+    return Case(
+        When(priority=P.CRITICAL, then=Value(0)),
+        When(priority=P.HIGH, then=Value(1)),
+        When(priority=P.MEDIUM, then=Value(2)),
+        When(priority=P.LOW, then=Value(3)),
+        default=Value(4),
+        output_field=IntegerField(),
+    )
+
+
 class ManagementServiceRequestListView(ManagementView, ListAPIView):
     output_schema = ManagementServiceRequestOutput
 
     def get_queryset(self):
         from maintenance.models import ServiceRequest
 
-        qs = ServiceRequest.objects.select_related("property", "tenant", "assigned_to").order_by("-created_at")
+        qs = (
+            ServiceRequest.objects.select_related("property", "tenant", "assigned_to")
+            .prefetch_related("photos")
+            .order_by("-created_at")
+        )
         status = self.request.GET.get("status")
         priority = self.request.GET.get("priority")
         property_id = self.request.GET.get("property_id")
         tenant_id = self.request.GET.get("tenant_id")
+        assigned_to_id = self.request.GET.get("assigned_to_id")
+        unassigned = self.request.GET.get("unassigned")
+        search = self.request.GET.get("search")
+        order = self.request.GET.get("order")
 
         if status:
             qs = qs.filter(status=status)
@@ -728,10 +1002,169 @@ class ManagementServiceRequestListView(ManagementView, ListAPIView):
             qs = qs.filter(property_id=property_id)
         if tenant_id:
             qs = qs.filter(tenant_id=tenant_id)
+        if assigned_to_id:
+            qs = qs.filter(assigned_to_id=assigned_to_id)
+        if unassigned in ("true", "1"):
+            qs = qs.filter(assigned_to__isnull=True)
+        if search:
+            cond = (
+                Q(title__icontains=search)
+                | Q(property__name__icontains=search)
+                | Q(tenant__first_name__icontains=search)
+                | Q(tenant__last_name__icontains=search)
+            )
+            if search.isdigit():
+                cond |= Q(id=int(search))
+            qs = qs.filter(cond)
+        if order == "priority":
+            qs = qs.annotate(_prank=_service_priority_rank()).order_by("_prank", "-created_at")
+        elif order in _SERVICE_REQUEST_ORDERINGS:
+            qs = qs.order_by(*_SERVICE_REQUEST_ORDERINGS[order])
         return qs
+
+    def to_output(self, instance):
+        data = super().to_output(instance)
+        data["photo_urls"] = [self.request.build_absolute_uri(p.image.url) for p in instance.photos.all()]
+        return data
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         return super().get(parsed_query)
+
+
+class ManagementServiceRequestStatsView(ManagementView):
+    """KPI strip for the Maintenance workbench: open/in-progress/resolved + cost."""
+
+    def get(self) -> dict:
+        from django.db.models import Avg, DurationField, ExpressionWrapper
+        from django.db.models.functions import Coalesce, Now
+        from maintenance.models import ServiceRequest
+
+        from core.constants import CostBearer, ServiceRequestStatus
+
+        today = date.today()
+        window_start = today - timedelta(days=30)
+        base = ServiceRequest.objects.all()
+
+        open_qs = base.filter(status=ServiceRequestStatus.OPEN)
+        in_progress_qs = base.filter(status=ServiceRequestStatus.IN_PROGRESS)
+        resolved_30d = base.filter(
+            status=ServiceRequestStatus.RESOLVED,
+            resolved_at__date__gte=window_start,
+        )
+
+        age_expr = ExpressionWrapper(Now() - F("created_at"), output_field=DurationField())
+        in_progress_age = in_progress_qs.aggregate(v=Avg(age_expr))["v"]
+        resolution_expr = ExpressionWrapper(
+            Coalesce(F("resolved_at"), Now()) - F("created_at"), output_field=DurationField()
+        )
+        resolved_age = resolved_30d.aggregate(v=Avg(resolution_expr))["v"]
+
+        def _days(delta):
+            return round(delta.total_seconds() / 86400, 1) if delta else 0.0
+
+        cost_rows = base.filter(
+            status=ServiceRequestStatus.RESOLVED, resolved_at__date__gte=window_start, cost__isnull=False
+        )
+        total = cost_rows.aggregate(s=Sum("cost"))["s"] or Decimal("0.00")
+        owner = cost_rows.filter(cost_bearer=CostBearer.OWNER).aggregate(s=Sum("cost"))["s"] or Decimal("0.00")
+        # A null bearer buckets as platform-borne cost.
+        platform = total - owner
+
+        return self.ok(
+            {
+                "open": open_qs.count(),
+                "open_unassigned": open_qs.filter(assigned_to__isnull=True).count(),
+                "in_progress": in_progress_qs.count(),
+                "in_progress_avg_age_days": _days(in_progress_age),
+                "resolved_30d": resolved_30d.count(),
+                "resolved_30d_avg_days": _days(resolved_age),
+                "cost_30d_total": _d(total),
+                "cost_30d_owner": _d(owner),
+                "cost_30d_platform": _d(platform),
+                "counts": {
+                    "open": open_qs.count(),
+                    "in_progress": in_progress_qs.count(),
+                    "resolved": base.filter(status=ServiceRequestStatus.RESOLVED).count(),
+                    "all": base.count(),
+                },
+            }
+        )
+
+
+class _ServiceRequestActionView(ManagementView, GenericController):
+    output_schema = ManagementServiceRequestOutput
+
+    def get_queryset(self):
+        from maintenance.models import ServiceRequest
+
+        return ServiceRequest.objects.select_related("property", "tenant", "assigned_to").prefetch_related("photos")
+
+    def to_output(self, instance):
+        data = super().to_output(instance)
+        data["photo_urls"] = [self.request.build_absolute_uri(p.image.url) for p in instance.photos.all()]
+        return data
+
+
+class ManagementServiceRequestCancelView(_ServiceRequestActionView):
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        from core.constants import ServiceRequestStatus
+
+        sr = self.get_object(pk=parsed_path.pk)
+        if sr.status == ServiceRequestStatus.RESOLVED:
+            return self.fail(
+                error=str(_("A resolved request cannot be cancelled")),
+                message=str(_("Invalid status transition")),
+            )
+        reason = (_optional_json(self.request).get("reason") or "").strip()
+        sr.status = ServiceRequestStatus.CANCELLED
+        update_fields = ["status", "updated_at"]
+        if reason:
+            sr.resolution_notes = f"{sr.resolution_notes}\n{reason}" if sr.resolution_notes else reason
+            update_fields.append("resolution_notes")
+        sr.save(update_fields=update_fields)
+        return self.ok(self.to_output(sr), status_code=HTTPStatus.OK)
+
+
+class ManagementServiceRequestCommentsView(ManagementView, GenericController):
+    def get_queryset(self):
+        from maintenance.models import ServiceRequest
+
+        return ServiceRequest.objects.all()
+
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        sr = self.get_object(pk=parsed_path.pk)
+        comments = sr.comments.select_related("author").order_by("created_at")
+        return self.ok([ServiceRequestCommentOutput.model_validate(c).model_dump(mode="json") for c in comments])
+
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ServiceRequestCommentCreateInput]) -> dict:
+        from maintenance.models import ServiceRequestComment
+
+        sr = self.get_object(pk=parsed_path.pk)
+        comment = ServiceRequestComment.objects.create(
+            service_request=sr, author=self.request.user, body=parsed_body.body
+        )
+        return self.ok(
+            ServiceRequestCommentOutput.model_validate(comment).model_dump(mode="json"),
+            status_code=HTTPStatus.CREATED,
+        )
+
+
+class ManagementServiceRequestPhotosView(_ServiceRequestActionView):
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        from maintenance.models import ServiceRequestPhoto
+
+        from core.utils.uploads import UploadError, save_uploaded_images
+
+        sr = self.get_object(pk=parsed_path.pk)
+        files = self.request.FILES.getlist("images")
+        if not files:
+            return self.fail(error=str(_("No images provided")), message=str(_("Validation error")))
+        try:
+            save_uploaded_images(ServiceRequestPhoto, "service_request", sr, files)
+        except UploadError as err:
+            return self.fail(error=str(err), message=str(_("Upload failed")))
+        sr.refresh_from_db()
+        return self.ok(self.to_output(sr), status_code=HTTPStatus.CREATED)
 
 
 class ManagementOnboardingListView(ManagementView, ListAPIView):
@@ -742,12 +1175,146 @@ class ManagementOnboardingListView(ManagementView, ListAPIView):
 
         qs = OwnerOnboarding.objects.select_related("owner", "property").order_by("-created_at")
         status = self.request.GET.get("status")
+        search = self.request.GET.get("search")
         if status:
             qs = qs.filter(status=status)
+        if search:
+            cond = (
+                Q(owner__first_name__icontains=search)
+                | Q(owner__last_name__icontains=search)
+                | Q(property__name__icontains=search)
+            )
+            if search.isdigit():
+                cond |= Q(id=int(search))
+            qs = qs.filter(cond)
         return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         return super().get(parsed_query)
+
+
+class ManagementOnboardingDetailView(ManagementView, GenericController):
+    output_schema = ManagementOnboardingDetailOutput
+
+    def get_queryset(self):
+        from contract.models import OwnerOnboarding
+
+        return OwnerOnboarding.objects.select_related("owner", "property__district").prefetch_related(
+            "property__photos"
+        )
+
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        from property.models import Property
+
+        from core.constants import PropertyStatus
+
+        onboarding = self.get_object(pk=parsed_path.pk)
+        prop = onboarding.property
+        owner = onboarding.owner
+
+        owner_props = Property.objects.filter(owner_id=owner.id).count()
+
+        # District market comps: tenant-charge of active (non-pending) properties
+        # in the same district — the basis for the pricing grid.
+        comps = (
+            Property.objects.filter(district_id=prop.district_id)
+            .exclude(status=PropertyStatus.PENDING_REVIEW)
+            .exclude(id=prop.id)
+        )
+        agg = comps.aggregate(lo=Min("tenant_charge_price"), hi=Max("tenant_charge_price"))
+        prices = sorted(comps.values_list("tenant_charge_price", flat=True))
+        median = prices[len(prices) // 2] if prices else None
+        # "Suggested price" targets an iDeal margin ≥ 15% over the owner-guaranteed
+        # floor, benchmarked to the district median.
+        suggested = (median * Decimal("0.85")).quantize(Decimal("0.01")) if median is not None else None
+
+        photos = [
+            self.request.build_absolute_uri(p.image.url)
+            for p in prop.photos.all().order_by("-is_primary", "sort_order", "id")
+        ]
+
+        data = {
+            "id": onboarding.id,
+            "number": f"ONB-{onboarding.created_at.year}-{onboarding.id:03d}",
+            "owner_id": owner.id,
+            "owner_name": f"{owner.first_name} {owner.last_name or ''}".strip(),
+            "owner_phone": getattr(owner, "phone", None),
+            "owner_properties_count": owner_props,
+            "property_id": prop.id,
+            "property_name": prop.name,
+            "property_address": prop.address,
+            "district_name": prop.district.name,
+            "rooms": prop.rooms,
+            "area_sqm": prop.area_sqm,
+            "floor": prop.floor,
+            "total_floors": prop.total_floors,
+            "tariff": prop.tariff,
+            "status": onboarding.status,
+            "offer_version": onboarding.offer_version,
+            "offer_terms_snapshot": onboarding.offer_terms_snapshot,
+            "offer_accepted_at": onboarding.offer_accepted_at,
+            "review_notes": onboarding.review_notes,
+            "generated_agreement_id": onboarding.generated_agreement_id,
+            "ask_price": prop.ask_price,
+            "ask_currency": prop.ask_currency,
+            "market_min": agg["lo"],
+            "market_max": agg["hi"],
+            "market_median": median,
+            "suggested_price": suggested,
+            "photos": photos,
+            "created_at": onboarding.created_at,
+            "updated_at": onboarding.updated_at,
+        }
+        return self.ok(self.to_output(data), status_code=HTTPStatus.OK)
+
+
+class ManagementOnboardingStatsView(ManagementView):
+    """Tab counts + open total for the Onboardings queue."""
+
+    def get(self) -> dict:
+        from contract.models import OwnerOnboarding
+
+        from core.constants import OnboardingStatus
+
+        base = OwnerOnboarding.objects.all()
+        counts = {
+            "submitted": base.filter(status=OnboardingStatus.SUBMITTED).count(),
+            "offer_accepted": base.filter(status=OnboardingStatus.OFFER_ACCEPTED).count(),
+            "approved": base.filter(status=OnboardingStatus.APPROVED).count(),
+            "rejected": base.filter(status=OnboardingStatus.REJECTED).count(),
+            "all": base.count(),
+        }
+        return self.ok({"counts": counts, "open": counts["submitted"] + counts["offer_accepted"]})
+
+
+class ManagementOnboardingRequestInfoView(ManagementView, GenericController):
+    output_schema = ManagementOnboardingOutput
+
+    def get_queryset(self):
+        from contract.models import OwnerOnboarding
+
+        return OwnerOnboarding.objects.select_related("owner", "property").all()
+
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementOnboardingRequestInfoInput]) -> dict:
+        from django.utils import timezone
+        from notification.services import notify
+
+        from core.constants import NotificationType
+
+        onboarding = self.get_object(pk=parsed_path.pk)
+        stamp = timezone.now().strftime("%Y-%m-%d %H:%M")
+        line = f"[{stamp}] More info requested: {parsed_body.note}"
+        onboarding.review_notes = f"{onboarding.review_notes}\n{line}" if onboarding.review_notes else line
+        onboarding.save(update_fields=["review_notes", "updated_at"])
+        notify(
+            recipient=onboarding.owner,
+            type=NotificationType.OWNER_ONBOARDING,
+            title=str(_("More information requested")),
+            body=parsed_body.note,
+            related_object_type="owner_onboarding",
+            related_object_id=onboarding.id,
+        )
+        return self.ok(self.to_output(onboarding), status_code=HTTPStatus.OK)
 
 
 class ManagementOnboardingApproveView(ManagementView, GenericController):
@@ -890,6 +1457,8 @@ class ManagementBookingRejectView(ManagementBookingView):
 
 class ManagementBookingConvertView(ManagementBookingView):
     def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementBookingConvertInput]) -> dict:
+        from marketplace.models import LeaseConflictError
+
         booking = self.get_object(pk=parsed_path.pk)
         try:
             booking.convert_to_lease(
@@ -897,6 +1466,14 @@ class ManagementBookingConvertView(ManagementBookingView):
                 owner_agreement_id=parsed_body.owner_agreement_id,
                 monthly_rent=parsed_body.monthly_rent,
                 deposit=parsed_body.deposit,
+                start_date=parsed_body.start_date,
+                end_date=parsed_body.end_date,
+            )
+        except LeaseConflictError:
+            return self.fail(
+                error="lease_conflict",
+                message=str(_("This property already has an active lease")),
+                status_code=HTTPStatus.CONFLICT,
             )
         except ValueError as err:
             return self.fail(error=str(err), message=str(_("Cannot convert booking")))
@@ -920,6 +1497,41 @@ class ManagementViewingRequestListView(ManagementView, ListAPIView):
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         return super().get(parsed_query)
+
+
+class ManagementInquiryListView(ManagementView, ListAPIView):
+    output_schema = ManagementInquiryOutput
+
+    def get_queryset(self):
+        from marketplace.models import ContactInquiry
+
+        qs = ContactInquiry.objects.order_by("-created_at")
+        status = self.request.GET.get("status")
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return super().get(parsed_query)
+
+
+class ManagementInquiryStatusView(ManagementView, GenericController):
+    output_schema = ManagementInquiryOutput
+
+    def get_queryset(self):
+        from marketplace.models import ContactInquiry
+
+        return ContactInquiry.objects.all()
+
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementInquiryStatusInput]) -> dict:
+        from core.constants import ContactInquiryStatus
+
+        if parsed_body.status not in ContactInquiryStatus.values():
+            return self.fail(error=str(_("Invalid status")))
+        inquiry = self.get_object(pk=parsed_path.pk)
+        inquiry.status = parsed_body.status
+        inquiry.save(update_fields=["status", "updated_at"])
+        return self.ok(self.to_output(inquiry))
 
 
 class ManagementViewingRequestView(ManagementView, GenericController):
@@ -953,6 +1565,128 @@ class ManagementViewingRequestCancelView(ManagementViewingRequestView):
         vr = self.get_object(pk=parsed_path.pk)
         vr.status = ViewingRequestStatus.CANCELLED
         vr.save(update_fields=["status", "updated_at"])
+        return self.ok(self.to_output(vr), status_code=HTTPStatus.OK)
+
+
+def _lead_viewing_qs(tab, search):
+    from marketplace.models import ViewingRequest
+
+    qs = ViewingRequest.objects.select_related("listing__property").prefetch_related("listing__property__photos")
+    if tab and tab in _LEAD_TAB_VIEWING:
+        qs = qs.filter(status__in=_LEAD_TAB_VIEWING[tab])
+    if search:
+        cond = (
+            Q(full_name__icontains=search)
+            | Q(phone__icontains=search)
+            | Q(email__icontains=search)
+            | Q(listing__property__name__icontains=search)
+        )
+        if search.isdigit():
+            cond |= Q(id=int(search))
+        qs = qs.filter(cond)
+    return qs
+
+
+def _lead_booking_qs(tab, search):
+    from marketplace.models import Booking
+
+    qs = Booking.objects.select_related("property", "tenant", "listing", "reviewed_by").prefetch_related(
+        "property__photos"
+    )
+    if tab and tab in _LEAD_TAB_BOOKING:
+        qs = qs.filter(status__in=_LEAD_TAB_BOOKING[tab])
+    if search:
+        cond = (
+            Q(tenant__first_name__icontains=search)
+            | Q(tenant__last_name__icontains=search)
+            | Q(property__name__icontains=search)
+        )
+        if search.isdigit():
+            cond |= Q(id=int(search))
+        qs = qs.filter(cond)
+    return qs
+
+
+class ManagementLeadListView(ManagementView):
+    """Unified Leads queue: merges ViewingRequests and Bookings into one list.
+
+    The two sources are serialized independently, merged, then sorted newest-first
+    with a stable ``(created_at, type, source_id)`` tie-break, and paginated in
+    Python (the framework already materializes every list before paginating).
+    """
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        tab = self.request.GET.get("tab")
+        lead_type = self.request.GET.get("type")
+        search = self.request.GET.get("search")
+
+        rows = []
+        if lead_type != "booking":
+            rows.extend(
+                ManagementLeadOutput.from_viewing(vr, self.request).model_dump(mode="json")
+                for vr in _lead_viewing_qs(tab, search)
+            )
+        if lead_type != "viewing":
+            rows.extend(
+                ManagementLeadOutput.from_booking(b, self.request).model_dump(mode="json")
+                for b in _lead_booking_qs(tab, search)
+            )
+        rows.sort(key=lambda r: (r["created_at"], r["type"], r["source_id"]), reverse=True)
+
+        if parsed_query.page is not None:
+            return self.ok(build_paginated_response(rows, parsed_query.page, parsed_query.per_page))
+        return self.ok(rows)
+
+
+class ManagementLeadStatsView(ManagementView):
+    """Tab counts + open total for the Leads queue."""
+
+    def get(self) -> dict:
+        lead_type = self.request.GET.get("type")
+        search = self.request.GET.get("search")
+
+        counts = {}
+        by_type = {"viewing": 0, "booking": 0}
+        for tab in ("new", "scheduled", "awaiting", "closed"):
+            n = 0
+            if lead_type != "booking":
+                n += _lead_viewing_qs(tab, search).count()
+            if lead_type != "viewing":
+                n += _lead_booking_qs(tab, search).count()
+            counts[tab] = n
+        if lead_type != "booking":
+            by_type["viewing"] = _lead_viewing_qs(None, search).count()
+        if lead_type != "viewing":
+            by_type["booking"] = _lead_booking_qs(None, search).count()
+        counts["all"] = by_type["viewing"] + by_type["booking"]
+
+        return self.ok({"counts": counts, "by_type": by_type, "open": counts["new"]})
+
+
+class ManagementViewingRequestProposeTimeView(ManagementViewingRequestView):
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementViewingProposeTimeInput]) -> dict:
+        from core.constants import ViewingTimeSlot
+
+        vr = self.get_object(pk=parsed_path.pk)
+        if vr.status == ViewingRequestStatus.CANCELLED:
+            return self.fail(
+                error=str(_("Cannot propose a time for a cancelled viewing request")),
+                message=str(_("Invalid status transition")),
+            )
+        if parsed_body.preferred_time is not None and parsed_body.preferred_time not in ViewingTimeSlot.values():
+            return self.fail(
+                error=str(_("Invalid time slot")),
+                message=str(_("Validation error")),
+            )
+        vr.preferred_date = parsed_body.preferred_date
+        vr.preferred_time = parsed_body.preferred_time
+        update_fields = ["preferred_date", "preferred_time", "updated_at"]
+        # Re-proposing a time to a confirmed lead sends it back to New until the
+        # prospect re-confirms the new slot.
+        if vr.status == ViewingRequestStatus.CONFIRMED:
+            vr.status = ViewingRequestStatus.PENDING
+            update_fields.append("status")
+        vr.save(update_fields=update_fields)
         return self.ok(self.to_output(vr), status_code=HTTPStatus.OK)
 
 
@@ -996,43 +1730,104 @@ class ManagementVacancyView(ManagementView):
         )
 
 
-class ManagementVASOrderListView(ManagementView, ListAPIView):
+# Frontend sort values for the Services orders workbench.
+_VAS_ORDER_ORDERINGS = {
+    "recent": ["-created_at"],
+    "oldest": ["created_at"],
+    "cost": ["cost", "-id"],
+    "-cost": ["-cost", "-id"],
+    "scheduled": ["scheduled_for", "-id"],
+}
+
+
+def _vas_completed_recently_q(window_start: date) -> Q:
+    """Completed within the window, by ``completed_at`` with ``updated_at`` fallback for legacy rows."""
+    return Q(completed_at__date__gte=window_start) | Q(completed_at__isnull=True, updated_at__date__gte=window_start)
+
+
+class _VASOrderView(ManagementView):
     def get_queryset(self):
         from vas.models import ServiceOrder
 
-        qs = ServiceOrder.objects.select_related("catalog_item", "tenant", "property").order_by("-created_at")
-        status = self.request.GET.get("status")
-        tenant_id = self.request.GET.get("tenant_id")
-        property_id = self.request.GET.get("property_id")
-        if status:
-            qs = qs.filter(status=status)
-        if tenant_id:
-            qs = qs.filter(tenant_id=tenant_id)
-        if property_id:
-            qs = qs.filter(property_id=property_id)
-        return qs
+        return ServiceOrder.objects.select_related("catalog_item", "tenant", "property").order_by("-created_at")
 
     def to_output(self, instance):
         from api.v1.vas.schemas import ServiceOrderOutput
 
         return ServiceOrderOutput.model_validate(instance).model_dump(mode="json")
+
+
+class ManagementVASOrderListView(_VASOrderView, ListAPIView):
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.GET
+        for field, param in (
+            ("status", "status"),
+            ("tenant_id", "tenant_id"),
+            ("property_id", "property_id"),
+            ("catalog_item__service_type", "service_type"),
+            ("created_at__date__gte", "date_from"),
+            ("created_at__date__lte", "date_to"),
+            ("scheduled_for__gte", "scheduled_from"),
+            ("scheduled_for__lte", "scheduled_to"),
+        ):
+            value = params.get(param)
+            if value:
+                qs = qs.filter(**{field: value})
+        search = params.get("search")
+        if search:
+            cond = (
+                Q(catalog_item__name__icontains=search)
+                | Q(tenant__first_name__icontains=search)
+                | Q(tenant__last_name__icontains=search)
+                | Q(property__name__icontains=search)
+            )
+            if search.isdigit():
+                cond |= Q(id=int(search))
+            qs = qs.filter(cond)
+        order = params.get("order")
+        if order in _VAS_ORDER_ORDERINGS:
+            qs = qs.order_by(*_VAS_ORDER_ORDERINGS[order])
+        return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         return self.list_response(self.get_queryset(), parsed_query)
 
+    def post(self, parsed_body: Body[ManagementServiceOrderCreateInput]) -> dict:
+        """Management-initiated order; commission/cashback auto-compute in ServiceOrder.save()."""
+        from account.models import User
+        from property.models import Property
+        from vas.models import ServiceCatalogItem, ServiceOrder
 
-class ManagementVASOrderStatusView(ManagementView, GenericController):
-    def get_queryset(self):
-        from vas.models import ServiceOrder
+        item = ServiceCatalogItem.objects.filter(pk=parsed_body.catalog_item_id, is_active=True).first()
+        if item is None:
+            return self.fail(error=str(_("Catalog item not found or inactive")))
+        if not User.objects.filter(pk=parsed_body.tenant_id).exists():
+            return self.fail(error=str(_("Tenant not found")))
+        if not Property.objects.filter(pk=parsed_body.property_id).exists():
+            return self.fail(error=str(_("Property not found")))
 
-        return ServiceOrder.objects.select_related("catalog_item", "tenant", "property").all()
+        order = ServiceOrder.objects.create(
+            catalog_item=item,
+            tenant_id=parsed_body.tenant_id,
+            property_id=parsed_body.property_id,
+            lease_id=parsed_body.lease_id,
+            cost=parsed_body.cost if parsed_body.cost is not None else item.base_price,
+            currency=item.currency,
+            scheduled_for=parsed_body.scheduled_for,
+            notes=parsed_body.notes,
+        )
+        return self.ok(self.to_output(order), status_code=HTTPStatus.CREATED)
 
-    def to_output(self, instance):
-        from api.v1.vas.schemas import ServiceOrderOutput
 
-        return ServiceOrderOutput.model_validate(instance).model_dump(mode="json")
+class ManagementVASOrderDetailView(_VASOrderView, GenericController):
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        return self.ok(self.to_output(self.get_object(pk=parsed_path.pk)))
 
+
+class ManagementVASOrderStatusView(_VASOrderView, GenericController):
     def post(self, parsed_path: Path[DetailPath], parsed_body: Body[ServiceOrderStatusInput]) -> dict:
+        from django.utils import timezone
         from notification.services import notify
 
         from core.constants import NotificationType, VASOrderStatus
@@ -1041,8 +1836,18 @@ class ManagementVASOrderStatusView(ManagementView, GenericController):
             return self.fail(error=str(_("Invalid status")))
 
         order = self.get_object(pk=parsed_path.pk)
+        if order.status in (VASOrderStatus.COMPLETED, VASOrderStatus.CANCELLED):
+            return self.fail(error=str(_("Invalid status transition")))
+
         order.status = parsed_body.status
-        order.save(update_fields=["status", "updated_at"])
+        update_fields = ["status", "updated_at"]
+        if parsed_body.status == VASOrderStatus.CANCELLED and parsed_body.reason:
+            order.cancellation_reason = parsed_body.reason
+            update_fields.append("cancellation_reason")
+        if parsed_body.status == VASOrderStatus.COMPLETED:
+            order.completed_at = timezone.now()
+            update_fields.append("completed_at")
+        order.save(update_fields=update_fields)
         notify(
             recipient=order.tenant,
             type=NotificationType.SERVICE_ORDER_STATUS,
@@ -1053,3 +1858,110 @@ class ManagementVASOrderStatusView(ManagementView, GenericController):
             related_object_id=order.id,
         )
         return self.ok(self.to_output(order), status_code=HTTPStatus.OK)
+
+
+class ManagementVASStatsView(ManagementView):
+    """KPI strip + tab counts for the Services workbench."""
+
+    def get(self) -> dict:
+        from vas.models import ServiceCatalogItem, ServiceOrder
+
+        from core.constants import VASOrderStatus
+
+        window_start = date.today() - timedelta(days=30)
+        base = ServiceOrder.objects.all()
+        by_status = {row["status"]: row["n"] for row in base.values("status").annotate(n=Count("id"))}
+        completed_30d = base.filter(status=VASOrderStatus.COMPLETED).filter(_vas_completed_recently_q(window_start))
+        active_catalog = ServiceCatalogItem.objects.filter(is_active=True)
+
+        return self.ok(
+            {
+                "new": by_status.get(VASOrderStatus.REQUESTED, 0),
+                "revenue_30d": _sum_usd(completed_30d, field="cost"),
+                "commission_30d": _sum_usd(completed_30d, field="commission_earned"),
+                "catalog_count": active_catalog.count(),
+                "partners_count": active_catalog.exclude(partner_name__isnull=True)
+                .exclude(partner_name="")
+                .values("partner_name")
+                .distinct()
+                .count(),
+                "counts": {
+                    "requested": by_status.get(VASOrderStatus.REQUESTED, 0),
+                    "confirmed": by_status.get(VASOrderStatus.CONFIRMED, 0),
+                    "in_progress": by_status.get(VASOrderStatus.IN_PROGRESS, 0),
+                    "completed": by_status.get(VASOrderStatus.COMPLETED, 0),
+                    "cancelled": by_status.get(VASOrderStatus.CANCELLED, 0),
+                    "all": base.count(),
+                },
+            }
+        )
+
+
+class ManagementVASPartnersView(ManagementView):
+    """Partners tab of the Services workbench: active catalog grouped by partner."""
+
+    def get(self) -> dict:
+        from vas.models import ServiceCatalogItem, ServiceOrder
+
+        from core.constants import VASOrderStatus
+
+        window_start = date.today() - timedelta(days=30)
+        items = (
+            ServiceCatalogItem.objects.filter(is_active=True)
+            .exclude(partner_name__isnull=True)
+            .exclude(partner_name="")
+        )
+        partners: dict[str, dict] = {}
+        for item in items:
+            p = partners.setdefault(
+                item.partner_name, {"partner_name": item.partner_name, "service_types": set(), "item_ids": []}
+            )
+            p["service_types"].add(item.service_type)
+            p["item_ids"].append(item.id)
+
+        rows = []
+        for p in sorted(partners.values(), key=lambda x: x["partner_name"].lower()):
+            orders = ServiceOrder.objects.filter(catalog_item_id__in=p["item_ids"])
+            completed_30d = orders.filter(status=VASOrderStatus.COMPLETED).filter(
+                _vas_completed_recently_q(window_start)
+            )
+            rows.append(
+                {
+                    "partner_name": p["partner_name"],
+                    "service_types": sorted(p["service_types"]),
+                    "services_count": len(p["item_ids"]),
+                    "orders_total": orders.count(),
+                    "commission_30d": _sum_usd(completed_30d, field="commission_earned"),
+                }
+            )
+        return self.ok(rows)
+
+
+class ManagementQueueCountsView(ManagementView):
+    """Open-work counts for the sidebar queue badges (leads/onboardings/etc.)."""
+
+    def get(self) -> dict:
+        from contract.models import OwnerOnboarding
+        from finance.models import Payment, PayoutSchedule
+        from finance.utils import overdue_q
+        from maintenance.models import ServiceRequest
+
+        from core.constants import OnboardingStatus, PayoutStatus, ServiceRequestStatus
+
+        leads_open = _lead_viewing_qs("new", None).count() + _lead_booking_qs("new", None).count()
+        onboardings_open = OwnerOnboarding.objects.filter(
+            status__in=[OnboardingStatus.SUBMITTED, OnboardingStatus.OFFER_ACCEPTED]
+        ).count()
+        maintenance_open = ServiceRequest.objects.filter(status=ServiceRequestStatus.OPEN).count()
+        payments_overdue = Payment.objects.filter(overdue_q(date.today())).count()
+        payouts_due = PayoutSchedule.objects.filter(status=PayoutStatus.SCHEDULED).count()
+
+        return self.ok(
+            {
+                "leads": leads_open,
+                "onboardings": onboardings_open,
+                "maintenance": maintenance_open,
+                "payments": payments_overdue,
+                "payouts": payouts_due,
+            }
+        )

@@ -31,22 +31,26 @@ class ManagementPropertyOutput(pydantic.BaseModel):
     id: int
     name: str
     address: str
-    district_id: int
-    district_name: str
-    rooms: int
-    area_sqm: int
-    floor: int
+    # Nullable: draft properties (Phase 7) are saved partially, so these
+    # publish-required fields may be absent until the draft is published.
+    district_id: int | None
+    district_name: str | None
+    rooms: int | None
+    area_sqm: int | None
+    floor: int | None
     total_floors: int | None
-    owner_id: int
-    owner_name: str
+    owner_id: int | None
+    owner_name: str | None
     status: str
     tariff: str
-    ask_price: Decimal
+    ask_price: Decimal | None
     ask_currency: str
-    owner_guaranteed_price: Decimal
-    tenant_charge_price: Decimal
+    owner_guaranteed_price: Decimal | None
+    tenant_charge_price: Decimal | None
     vacant_since: date | None
     vacant_days: int
+    map_lat: Decimal | None
+    map_lon: Decimal | None
     description: str | None
     score: Decimal
     created_at: datetime
@@ -62,13 +66,13 @@ class ManagementPropertyOutput(pydantic.BaseModel):
             "name": v.name,
             "address": v.address,
             "district_id": v.district_id,
-            "district_name": v.district.name,
+            "district_name": v.district.name if v.district else None,
             "rooms": v.rooms,
             "area_sqm": v.area_sqm,
             "floor": v.floor,
             "total_floors": v.total_floors,
             "owner_id": v.owner_id,
-            "owner_name": f"{v.owner.first_name} {v.owner.last_name or ''}".strip(),
+            "owner_name": (f"{v.owner.first_name} {v.owner.last_name or ''}".strip() if v.owner else None),
             "status": v.status,
             "tariff": v.tariff,
             "ask_price": v.ask_price,
@@ -77,6 +81,8 @@ class ManagementPropertyOutput(pydantic.BaseModel):
             "tenant_charge_price": v.tenant_charge_price,
             "vacant_since": v.vacant_since,
             "vacant_days": v.vacant_days,
+            "map_lat": v.map_lat,
+            "map_lon": v.map_lon,
             "description": v.description,
             "score": v.score,
             "created_at": v.created_at,
@@ -269,7 +275,11 @@ class ManagementServiceRequestOutput(pydantic.BaseModel):
     priority: str
     status: str
     cost: Decimal | None
+    cost_bearer: str | None
     resolution_notes: str | None
+    resolved_at: datetime | None
+    photos_count: int
+    photo_urls: list[str] = []
     created_at: datetime
     updated_at: datetime
 
@@ -293,13 +303,46 @@ class ManagementServiceRequestOutput(pydantic.BaseModel):
             "priority": v.priority,
             "status": v.status,
             "cost": v.cost,
+            "cost_bearer": v.cost_bearer,
             "resolution_notes": v.resolution_notes,
+            "resolved_at": v.resolved_at,
+            "photos_count": v.photos.count(),
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }
 
 
+class ServiceRequestCommentOutput(pydantic.BaseModel):
+    id: int
+    author_id: int | None
+    author_name: str | None
+    body: str
+    created_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_related(cls, v):
+        if isinstance(v, dict):
+            return v
+        author = v.author
+        return {
+            "id": v.id,
+            "author_id": v.author_id,
+            "author_name": (f"{author.first_name} {author.last_name or ''}".strip() if author else None),
+            "body": v.body,
+            "created_at": v.created_at,
+        }
+
+
+class ServiceRequestCommentCreateInput(pydantic.BaseModel):
+    body: str
+
+
 class ManagementUserUpdateInput(pydantic.BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
     is_active: bool | None = None
     is_verified: bool | None = None
     role: str | None = None
@@ -413,15 +456,42 @@ class InvestorTakeHome(pydantic.BaseModel):
     scaled_50: str
 
 
+class PnlBreakdownRow(pydantic.BaseModel):
+    source: str
+    amount: str
+    share: str
+
+
+class PnlServiceTypeRow(pydantic.BaseModel):
+    service_type: str
+    amount: str
+
+
+class PnlBreakdown(pydantic.BaseModel):
+    revenue: list[PnlBreakdownRow]
+    expenses: list[PnlBreakdownRow]
+    vas_by_service_type: list[PnlServiceTypeRow]
+
+
 class PnLSummaryOutput(pydantic.BaseModel):
     summary: PnLSummaryCard
     monthly: list[MonthlyPnlRow]
     growth: GrowthData
     investor: InvestorTakeHome
+    # Phase 6 — additive; None-safe for consumers of the legacy shape.
+    year: int | None = None
+    currency: str | None = None
+    sources: list[str] | None = None
+    breakdown: PnlBreakdown | None = None
+
+
+def _onboarding_number(onboarding) -> str:
+    return f"ONB-{onboarding.created_at.year}-{onboarding.id:03d}"
 
 
 class ManagementOnboardingOutput(pydantic.BaseModel):
     id: int
+    number: str
     owner_id: int
     owner_name: str
     property_id: int
@@ -442,6 +512,7 @@ class ManagementOnboardingOutput(pydantic.BaseModel):
             return v
         return {
             "id": v.id,
+            "number": _onboarding_number(v),
             "owner_id": v.owner_id,
             "owner_name": f"{v.owner.first_name} {v.owner.last_name or ''}".strip(),
             "property_id": v.property_id,
@@ -455,6 +526,45 @@ class ManagementOnboardingOutput(pydantic.BaseModel):
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }
+
+
+class ManagementOnboardingDetailOutput(pydantic.BaseModel):
+    """Rich onboarding payload for the triage detail panel (fetched on select)."""
+
+    id: int
+    number: str
+    owner_id: int
+    owner_name: str
+    owner_phone: str | None
+    owner_properties_count: int
+    property_id: int
+    property_name: str
+    property_address: str
+    district_name: str
+    rooms: int
+    area_sqm: int
+    floor: int
+    total_floors: int | None
+    tariff: str
+    status: str
+    offer_version: str | None
+    offer_terms_snapshot: str | None
+    offer_accepted_at: datetime | None
+    review_notes: str | None
+    generated_agreement_id: int | None
+    ask_price: Decimal
+    ask_currency: str
+    market_min: Decimal | None
+    market_max: Decimal | None
+    market_median: Decimal | None
+    suggested_price: Decimal | None
+    photos: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ManagementOnboardingRequestInfoInput(pydantic.BaseModel):
+    note: str
 
 
 class ManagementOnboardingApproveInput(pydantic.BaseModel):
@@ -514,6 +624,32 @@ class ManagementBookingConvertInput(pydantic.BaseModel):
     owner_agreement_id: int | None = None
     monthly_rent: Decimal | None = None
     deposit: Decimal | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+
+    @model_validator(mode="after")
+    def check_dates(self):
+        if self.start_date and self.end_date and self.end_date <= self.start_date:
+            raise ValueError("End date must be after the start date")
+        return self
+
+
+class ManagementInquiryOutput(pydantic.BaseModel):
+    id: int
+    listing_id: int | None
+    full_name: str
+    phone: str
+    email: str | None
+    message: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = pydantic.ConfigDict(from_attributes=True)
+
+
+class ManagementInquiryStatusInput(pydantic.BaseModel):
+    status: str
 
 
 class ManagementViewingRequestOutput(pydantic.BaseModel):
@@ -522,8 +658,9 @@ class ManagementViewingRequestOutput(pydantic.BaseModel):
     property_name: str
     full_name: str
     phone: str
-    email: str
+    email: str | None
     preferred_date: date
+    preferred_time: str | None
     message: str | None
     status: str
     created_at: datetime
@@ -543,8 +680,135 @@ class ManagementViewingRequestOutput(pydantic.BaseModel):
             "phone": v.phone,
             "email": v.email,
             "preferred_date": v.preferred_date,
+            "preferred_time": v.preferred_time,
             "message": v.message,
             "status": v.status,
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }
+
+
+class ManagementViewingProposeTimeInput(pydantic.BaseModel):
+    preferred_date: date
+    preferred_time: str | None = None
+
+
+class ManagementLeadOutput(pydantic.BaseModel):
+    """A unified lead row merging a ViewingRequest or a Booking.
+
+    ``id`` is a composite string (``v-{pk}`` / ``b-{pk}``) so the two sources can
+    share one list without pk collisions; ``source_id`` is the underlying pk.
+    """
+
+    id: str
+    type: str  # "viewing" | "booking"
+    source_id: int
+    status: str
+    name: str
+    phone: str | None
+    email: str | None
+    listing_id: int | None
+    property_id: int | None
+    property_name: str
+    property_address: str | None
+    property_status: str | None
+    property_rooms: int | None
+    property_area_sqm: int | None
+    property_floor: int | None
+    property_photo_url: str | None
+    listing_price: Decimal | None
+    currency: str | None
+    preferred_date: date | None
+    preferred_time: str | None
+    requested_start_date: date | None
+    requested_end_date: date | None
+    monthly_rent_offer: Decimal | None
+    message: str | None
+    reviewed_by_name: str | None
+    converted_lease_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+    @staticmethod
+    def _photo_url(prop, request):
+        photo = prop.photos.all().order_by("-is_primary", "sort_order", "id").first() if prop else None
+        if photo is None:
+            return None
+        url = photo.image.url
+        return request.build_absolute_uri(url) if request is not None else url
+
+    @classmethod
+    def from_viewing(cls, vr, request=None):
+        listing = vr.listing
+        prop = listing.property if listing else None
+        return cls.model_validate(
+            {
+                "id": f"v-{vr.id}",
+                "type": "viewing",
+                "source_id": vr.id,
+                "status": vr.status,
+                "name": vr.full_name,
+                "phone": vr.phone,
+                "email": vr.email,
+                "listing_id": vr.listing_id,
+                "property_id": (prop.id if prop else None),
+                "property_name": (prop.name if prop else ""),
+                "property_address": (prop.address if prop else None),
+                "property_status": (prop.status if prop else None),
+                "property_rooms": (prop.rooms if prop else None),
+                "property_area_sqm": (prop.area_sqm if prop else None),
+                "property_floor": (prop.floor if prop else None),
+                "property_photo_url": cls._photo_url(prop, request),
+                "listing_price": (listing.monthly_price or listing.listed_price) if listing else None,
+                "currency": (listing.currency if listing else None),
+                "preferred_date": vr.preferred_date,
+                "preferred_time": vr.preferred_time,
+                "requested_start_date": None,
+                "requested_end_date": None,
+                "monthly_rent_offer": None,
+                "message": vr.message,
+                "reviewed_by_name": None,
+                "converted_lease_id": None,
+                "created_at": vr.created_at,
+                "updated_at": vr.updated_at,
+            }
+        )
+
+    @classmethod
+    def from_booking(cls, b, request=None):
+        prop = b.property
+        listing = b.listing
+        tenant = b.tenant
+        reviewer = b.reviewed_by
+        return cls.model_validate(
+            {
+                "id": f"b-{b.id}",
+                "type": "booking",
+                "source_id": b.id,
+                "status": b.status,
+                "name": f"{tenant.first_name} {tenant.last_name or ''}".strip(),
+                "phone": getattr(tenant, "phone", None),
+                "email": tenant.email,
+                "listing_id": b.listing_id,
+                "property_id": (prop.id if prop else None),
+                "property_name": (prop.name if prop else ""),
+                "property_address": (prop.address if prop else None),
+                "property_status": (prop.status if prop else None),
+                "property_rooms": (prop.rooms if prop else None),
+                "property_area_sqm": (prop.area_sqm if prop else None),
+                "property_floor": (prop.floor if prop else None),
+                "property_photo_url": cls._photo_url(prop, request),
+                "listing_price": (listing.monthly_price or listing.listed_price) if listing else None,
+                "currency": (listing.currency if listing else None),
+                "preferred_date": None,
+                "preferred_time": None,
+                "requested_start_date": b.requested_start_date,
+                "requested_end_date": b.requested_end_date,
+                "monthly_rent_offer": b.monthly_rent_offer,
+                "message": b.message,
+                "reviewed_by_name": (f"{reviewer.first_name} {reviewer.last_name or ''}".strip() if reviewer else None),
+                "converted_lease_id": b.converted_lease_id,
+                "created_at": b.created_at,
+                "updated_at": b.updated_at,
+            }
+        )

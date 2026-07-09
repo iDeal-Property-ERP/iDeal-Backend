@@ -32,6 +32,7 @@ class TestUserMeAPI:
             "email",
             "role",
             "is_verified",
+            "must_change_password",
             "nationality",
             "telegram_id",
             "created_at",

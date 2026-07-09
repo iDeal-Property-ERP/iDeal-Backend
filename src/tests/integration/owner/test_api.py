@@ -147,9 +147,7 @@ class TestOwnerListingWizard:
 
         response = api_client.patch(
             f"/api/v1/owner/listings/{draft['id']}/photos/reorder/",
-            data=json.dumps(
-                {"items": [{"id": pid, "sort_order": 0, "is_primary": True, "caption": "Living room"}]}
-            ),
+            data=json.dumps({"items": [{"id": pid, "sort_order": 0, "is_primary": True, "caption": "Living room"}]}),
             content_type="application/json",
             **_make_jwt(owner),
         )

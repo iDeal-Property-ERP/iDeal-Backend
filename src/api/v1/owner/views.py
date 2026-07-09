@@ -46,10 +46,16 @@ class OwnerEarningsView(BaseController):
         from finance.models import PayoutSchedule
         from property.models import Property
 
+        from core.constants import PropertyStatus
+
         by_property = PayoutSchedule.objects.filter(owner=user)
-        total_guaranteed = Property.objects.filter(owner=user).aggregate(total=Sum("owner_guaranteed_price"))[
-            "total"
-        ] or Decimal("0.00")
+        # Only properties under an active guarantee count toward the guaranteed
+        # figure — drafts and pending-review submissions are not yet guaranteed
+        # and would otherwise overstate the owner's contractual minimum.
+        managed_statuses = (PropertyStatus.RENTED, PropertyStatus.VACANT, PropertyStatus.MAINTENANCE)
+        total_guaranteed = Property.objects.filter(owner=user, status__in=managed_statuses).aggregate(
+            total=Sum("owner_guaranteed_price")
+        )["total"] or Decimal("0.00")
         total_paid = by_property.filter(status=PayoutStatus.PAID).aggregate(total=Sum("amount"))["total"] or Decimal(
             "0.00"
         )
@@ -431,7 +437,15 @@ class OwnerListingPhotoDeleteView(OwnerListingBaseView):
         photo = listing.property.photos.filter(pk=parsed_path.photo_id).first()
         if photo is None:
             return self.fail(error=str(_("Photo not found")), status_code=HTTPStatus.NOT_FOUND)
+        was_primary = photo.is_primary
         photo.delete()
+        # If the cover photo was removed, promote the next remaining photo so the
+        # listing never ends up with no primary image.
+        if was_primary:
+            successor = listing.property.photos.order_by("sort_order", "id").first()
+            if successor is not None and not successor.is_primary:
+                successor.is_primary = True
+                successor.save(update_fields=["is_primary"])
         return self.ok({"deleted": True})
 
 

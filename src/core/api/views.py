@@ -8,8 +8,8 @@ from django.utils.translation import gettext_lazy as _
 from dmr import Body, Controller, Path, Query
 from dmr.plugins.pydantic import PydanticFastSerializer
 from dmr.response import APIError
-from dmr.security.jwt.auth import JWTSyncAuth
 
+from core.api.permissions import BlacklistAwareJWTSyncAuth
 from core.models import BaseModel
 from core.utils.pagination import build_paginated_response
 
@@ -17,7 +17,7 @@ from core.utils.pagination import build_paginated_response
 class BaseController(Controller[PydanticFastSerializer]):
     SUCCESS_MESSAGE = _("OK")
     ERROR_MESSAGE = _("NOT OK")
-    auth = (JWTSyncAuth(),)
+    auth = (BlacklistAwareJWTSyncAuth(),)
 
     @staticmethod
     def ok(data, *, status_code=None):

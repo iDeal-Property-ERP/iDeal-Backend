@@ -451,11 +451,16 @@ class TestManagementUserInviteAPI:
         assert body["data"]["email"] == "nodira@example.com"
         assert body["data"]["role"] == UserRole.OWNER
         assert body["data"]["username"] == "nodira"
+        # The invite returns a one-time temporary password so the user can log in.
+        assert body["data"]["temporary_password"]
 
         from account.models import User
 
         created = User.objects.get(email="nodira@example.com")
-        assert created.has_usable_password() is False
+        # Invited users get a usable temporary password and must change it on first login.
+        assert created.has_usable_password() is True
+        assert created.must_change_password is True
+        assert created.check_password(body["data"]["temporary_password"]) is True
 
     def test_invite_user_unique_username(self, api_client):
         mgmt = _mgmt_user()

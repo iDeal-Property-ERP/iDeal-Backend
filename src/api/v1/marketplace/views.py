@@ -361,11 +361,27 @@ class ContactInquiryView(BaseController):
     auth = ()
 
     def post(self, parsed_body: Body[ContactInquiryCreateInput]) -> dict:
+        from account.models import User
+        from notification.services import notify
+
+        from core.constants import NotificationType, UserRole
+
         data = parsed_body.model_dump()
         listing_id = data.pop("listing_id", None)
         if listing_id is not None and not Listing.objects.filter(pk=listing_id).exists():
             listing_id = None
         inquiry = ContactInquiry.objects.create(listing_id=listing_id, **data)
+        # Make the lead actionable: notify management so it surfaces in the app,
+        # not only in the Django admin.
+        for manager in User.objects.filter(role=UserRole.MANAGEMENT, is_active=True):
+            notify(
+                recipient=manager,
+                type=NotificationType.GENERAL,
+                title=str(_("New contact inquiry")),
+                body=str(_("%(name)s sent a message via the marketplace.")) % {"name": inquiry.full_name},
+                related_object_type="contact_inquiry",
+                related_object_id=inquiry.id,
+            )
         return self.ok(
             {
                 "id": inquiry.id,

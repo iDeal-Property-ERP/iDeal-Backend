@@ -13,6 +13,7 @@ class UserMeOutput(pydantic.BaseModel):
     email: str
     role: str
     is_verified: bool
+    must_change_password: bool
     nationality: str | None
     telegram_id: str | None
     created_at: datetime.datetime
