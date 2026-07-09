@@ -74,7 +74,12 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.middleware.auth_cookies.AuthCookieMiddleware",
 ]
+
+# JWT auth cookies carry the Secure flag (HTTPS-only) outside DEBUG; dev serves
+# plain http://localhost so it must be off there. Overridable per-environment.
+AUTH_COOKIE_SECURE = not DEBUG
 
 ROOT_URLCONF = "config.urls"
 
