@@ -162,3 +162,36 @@ class TestInventoryActAccess:
     def test_requires_auth(self, api_client):
         resp = api_client.get("/api/v1/inventory/acts/")
         assert resp.status_code == 401
+
+
+@pytest.mark.django_db
+class TestInventoryActStatsAndAwaitingAck:
+    def test_awaiting_ack_filter(self, api_client):
+        from django.utils import timezone
+
+        mgmt = UserFactory()
+        InventoryActFactory(status=InventoryActStatus.DRAFT)
+        awaiting = InventoryActFactory(status=InventoryActStatus.FINALIZED, acknowledged_at=None)
+        InventoryActFactory(
+            status=InventoryActStatus.FINALIZED,
+            acknowledged_at=timezone.now(),
+            acknowledged_by_name="Tenant T.",
+        )
+
+        response = api_client.get("/api/v1/inventory/acts/?awaiting_ack=true", **_make_jwt(mgmt))
+        assert response.status_code == 200
+        rows = response.json()["data"]
+        assert [r["id"] for r in rows] == [awaiting.id]
+
+    def test_stats_counts(self, api_client):
+        from django.utils import timezone
+
+        mgmt = UserFactory()
+        InventoryActFactory(status=InventoryActStatus.DRAFT)
+        InventoryActFactory(status=InventoryActStatus.FINALIZED, acknowledged_at=None)
+        InventoryActFactory(status=InventoryActStatus.FINALIZED, acknowledged_at=timezone.now())
+
+        response = api_client.get("/api/v1/inventory/acts/stats/", **_make_jwt(mgmt))
+        assert response.status_code == 200
+        counts = response.json()["data"]["counts"]
+        assert counts == {"draft": 1, "finalized": 2, "awaiting_ack": 1, "all": 3}

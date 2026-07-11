@@ -579,15 +579,38 @@ class ManagementUserDetailUpdateView(ManagementView, GenericController):
         return self.ok(self.to_output(instance))
 
 
+class ManagementAssigneeListView(ManagementView):
+    """Staff users eligible for maintenance assignment — the ``assigned_to``
+    options list. Mirrors the user workbench's role=mgmt filter."""
+
+    def get(self) -> dict:
+        from account.models import User
+
+        staff = User.objects.filter(role=UserRole.MANAGEMENT, is_active=True).order_by("first_name", "last_name", "id")
+        return self.ok([{"id": u.id, "full_name": f"{u.first_name} {u.last_name or ''}".strip()} for u in staff])
+
+
 class ManagementPropertyListView(ManagementView, ListAPIView):
     output_schema = ManagementPropertyOutput
 
     def get_queryset(self):
+        from contract.models import Lease
+        from django.db.models import Prefetch
         from property.models import Property
 
-        from core.constants import PropertyStatus
+        from core.constants import LeaseStatus, PropertyStatus
 
-        qs = Property.objects.select_related("district", "owner").order_by("-created_at")
+        qs = (
+            Property.objects.select_related("district", "owner")
+            .prefetch_related(
+                Prefetch(
+                    "leases",
+                    queryset=Lease.objects.filter(status=LeaseStatus.ACTIVE).select_related("tenant"),
+                    to_attr="active_leases",
+                )
+            )
+            .order_by("-created_at")
+        )
         status = self.request.GET.get("status")
         district_id = self.request.GET.get("district_id")
         tariff = self.request.GET.get("tariff")
@@ -672,6 +695,78 @@ class ManagementPropertyMapView(ManagementView):
             row["lease_end_date"] = lease.end_date.isoformat() if lease else None
             rows.append(row)
         return self.ok(rows)
+
+
+class ManagementPropertyImportView(ManagementView):
+    """Bulk-create properties from a CSV upload.
+
+    Accepts multipart form data with the CSV under ``file`` (fallback: a JSON
+    body ``{"csv_text": "..."}``). Columns mirror ``PropertyCreateInput`` — the
+    same schema the single-create endpoint validates with — so required columns
+    are: name, address, district_id, rooms, area_sqm, floor, owner_id,
+    ask_price, owner_guaranteed_price, tenant_charge_price. Optional columns
+    (total_floors, status, tariff, description, map_lat, map_lon, currencies…)
+    are honored when present. Import is per-row: valid rows are created, invalid
+    rows are reported back with their 1-based CSV line number (header = row 1).
+    """
+
+    def post(self) -> dict:
+        import csv
+        import io
+
+        from django.db import transaction
+        from property.models import Property
+        from pydantic import ValidationError
+
+        from api.v1.property.schemas import PropertyCreateInput
+
+        # Multipart parsing consumes the request stream, so only touch
+        # request.body (the csv_text fallback) on non-multipart requests.
+        content_type = self.request.content_type or ""
+        if content_type.startswith("multipart"):
+            upload = self.request.FILES.get("file")
+            if upload is None:
+                csv_text = ""
+            else:
+                try:
+                    csv_text = upload.read().decode("utf-8-sig")
+                except UnicodeDecodeError:
+                    return self.fail(
+                        error=str(_("The file is not valid UTF-8 text")), message=str(_("Validation error"))
+                    )
+        else:
+            csv_text = _optional_json(self.request).get("csv_text") or ""
+        if not csv_text.strip():
+            return self.fail(
+                error=str(_("Provide a CSV file under 'file' or a 'csv_text' body field")),
+                message=str(_("Validation error")),
+            )
+
+        reader = csv.DictReader(io.StringIO(csv_text))
+        if not reader.fieldnames:
+            return self.fail(error=str(_("The CSV has no header row")), message=str(_("Validation error")))
+
+        allowed = set(PropertyCreateInput.model_fields)
+        created = 0
+        errors = []
+        for line_no, raw_row in enumerate(reader, start=2):
+            # Empty cells fall back to the schema's defaults; unknown columns are ignored.
+            row = {k.strip(): v.strip() for k, v in raw_row.items() if k and k.strip() in allowed and v and v.strip()}
+            try:
+                validated = PropertyCreateInput.model_validate(row)
+            except ValidationError as err:
+                messages = "; ".join(f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in err.errors())
+                errors.append({"row": line_no, "message": messages})
+                continue
+            try:
+                with transaction.atomic():
+                    Property.objects.create(**validated.model_dump())
+            except Exception as err:  # noqa: BLE001 — per-row report, never a 500
+                errors.append({"row": line_no, "message": str(err)})
+                continue
+            created += 1
+
+        return self.ok({"created": created, "errors": errors}, status_code=HTTPStatus.CREATED if created else None)
 
 
 class LeaseListView(ManagementView, ListAPIView):

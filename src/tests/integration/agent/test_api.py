@@ -63,15 +63,17 @@ class TestAgentListAPI:
 @pytest.mark.django_db
 class TestAgentDetailAPI:
     def test_agent_detail(self, api_client, jwt_header):
-        agent_user = AgentFactory(first_name="John")
+        agent_user = AgentFactory(first_name="John", last_name="Smith")
         agent_profile = AgentProfileFactory(user=agent_user)
 
         response = api_client.get(f"/api/v1/agents/{agent_profile.id}/", **jwt_header)
         assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
-        assert body["data"]["user_name"] == "John"
+        assert body["data"]["user_name"] == "John Smith"
         assert body["data"]["total_deals"] == 0
+        assert body["data"]["deals_ytd"] == 0
+        assert body["data"]["pending_commission_total"] is None
 
     def test_agent_detail_requires_auth(self, api_client):
         agent_user = AgentFactory()
@@ -307,3 +309,43 @@ class TestAgentDealCreateAPI:
             **jwt_header,
         )
         assert response.status_code == 404
+
+
+@pytest.mark.django_db
+class TestAgentStatsAndFilters:
+    def _agent_with_pending_deal(self):
+        profile = AgentProfileFactory()
+        AgentDealFactory(agent=profile, status=AgentDealStatus.PENDING, commission_amount=Decimal("120.50"))
+        return profile
+
+    def test_stats_counts(self, api_client, jwt_header):
+        self._agent_with_pending_deal()
+        AgentProfileFactory(is_active=False)
+        AgentProfileFactory()
+
+        response = api_client.get("/api/v1/agents/stats/", **jwt_header)
+        assert response.status_code == 200
+        counts = response.json()["data"]["counts"]
+        assert counts == {"active": 2, "pending_commission": 1, "all": 3}
+
+    def test_has_pending_commission_filter_and_totals(self, api_client, jwt_header):
+        profile = self._agent_with_pending_deal()
+        AgentDealFactory(agent=profile, status=AgentDealStatus.PENDING, commission_amount=Decimal("29.50"))
+        AgentDealFactory(agent=profile, status=AgentDealStatus.CLOSED, commission_amount=Decimal("999.00"))
+        AgentProfileFactory()  # no pending deals
+
+        response = api_client.get("/api/v1/agents/?has_pending_commission=true", **jwt_header)
+        assert response.status_code == 200
+        rows = response.json()["data"]
+        assert len(rows) == 1
+        assert rows[0]["id"] == profile.id
+        assert rows[0]["pending_commission_total"] == "150.00"
+        assert rows[0]["deals_ytd"] == 3
+
+    def test_is_active_filter(self, api_client, jwt_header):
+        active = AgentProfileFactory(is_active=True)
+        AgentProfileFactory(is_active=False)
+
+        response = api_client.get("/api/v1/agents/?is_active=true", **jwt_header)
+        rows = response.json()["data"]
+        assert [r["id"] for r in rows] == [active.id]

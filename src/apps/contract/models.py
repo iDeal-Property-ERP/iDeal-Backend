@@ -18,6 +18,10 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
     status = models.CharField(max_length=20, choices=OwnerAgreementStatus.choices, default=OwnerAgreementStatus.ACTIVE)
     terms = models.TextField(null=True, blank=True)
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2)
+    # Contracted amounts, snapshotted at signing time (the property's prices can
+    # drift afterwards). Nullable: legacy rows are backfilled by data migration.
+    owner_guaranteed_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    tenant_charge_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     class Meta:
         verbose_name = _("Owner Agreement")
@@ -48,6 +52,16 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
                 status=OwnerAgreementStatus.ACTIVE,
                 terms=terms if terms is not None else self.terms,
                 commission_rate=commission_rate if commission_rate is not None else self.commission_rate,
+                owner_guaranteed_amount=(
+                    self.owner_guaranteed_amount
+                    if self.owner_guaranteed_amount is not None
+                    else self.property.owner_guaranteed_price
+                ),
+                tenant_charge_amount=(
+                    self.tenant_charge_amount
+                    if self.tenant_charge_amount is not None
+                    else self.property.tenant_charge_price
+                ),
             )
             self.status = OwnerAgreementStatus.EXPIRED
             self.save(update_fields=["status", "updated_at"])
@@ -237,6 +251,8 @@ class OwnerOnboarding(TimestampedModel, SoftDeleteModel):
                 status=OwnerAgreementStatus.ACTIVE,
                 terms=terms or self.offer_terms_snapshot,
                 commission_rate=commission_rate,
+                owner_guaranteed_amount=prop.owner_guaranteed_price,
+                tenant_charge_amount=prop.tenant_charge_price,
             )
             self.status = OnboardingStatus.APPROVED
             self.reviewed_by = reviewed_by

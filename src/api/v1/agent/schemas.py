@@ -17,6 +17,8 @@ class AgentOutput(pydantic.BaseModel):
     total_revenue: Decimal
     commission_rate: Decimal
     is_active: bool
+    deals_ytd: int
+    pending_commission_total: Decimal | None
     created_at: datetime
     updated_at: datetime
 
@@ -30,11 +32,15 @@ class AgentOutput(pydantic.BaseModel):
         return {
             "id": v.id,
             "user_id": v.user_id,
-            "user_name": v.user.first_name,
+            "user_name": f"{v.user.first_name} {v.user.last_name or ''}".strip(),
             "total_deals": v.total_deals,
             "total_revenue": v.total_revenue,
             "commission_rate": v.commission_rate,
             "is_active": v.is_active,
+            # Annotated by the agent views' queryset; safe defaults elsewhere
+            # (e.g. the create path returns a freshly saved, deal-less agent).
+            "deals_ytd": getattr(v, "deals_ytd", 0),
+            "pending_commission_total": getattr(v, "pending_commission_total", None),
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }

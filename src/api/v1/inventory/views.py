@@ -29,6 +29,14 @@ class InventoryActFilterQuery(pydantic.BaseModel):
     property_id: int | None = None
     lease_id: int | None = None
     status: str | None = None
+    awaiting_ack: bool | None = None
+
+
+def _awaiting_ack_q():
+    """Finalized acts the counterparty has not acknowledged yet."""
+    from django.db.models import Q
+
+    return Q(status=InventoryActStatus.FINALIZED, acknowledged_at__isnull=True)
 
 
 class InventoryActListCreateView(GenericController):
@@ -50,6 +58,8 @@ class InventoryActListCreateView(GenericController):
             qs = qs.filter(lease_id=parsed_query.lease_id)
         if parsed_query.status is not None:
             qs = qs.filter(status=parsed_query.status)
+        if parsed_query.awaiting_ack:
+            qs = qs.filter(_awaiting_ack_q())
         items = [InventoryActListOutput.model_validate(obj).model_dump(mode="json") for obj in qs]
         if parsed_query.page is not None:
             return self.ok(build_paginated_response(items, parsed_query.page, parsed_query.per_page))
@@ -59,6 +69,25 @@ class InventoryActListCreateView(GenericController):
         data = parsed_body.model_dump()
         act = InventoryAct.objects.create(created_by=self.request.user, **data)
         return self.ok(InventoryActOutput.model_validate(act).model_dump(mode="json"))
+
+
+class InventoryActStatsView(BaseController):
+    """Saved-view counts for the Inventory acts workbench."""
+
+    auth = (RoleAuth(UserRole.MANAGEMENT, UserRole.AGENT),)
+
+    def get(self) -> dict:
+        base = InventoryAct.objects.all()
+        return self.ok(
+            {
+                "counts": {
+                    "draft": base.filter(status=InventoryActStatus.DRAFT).count(),
+                    "finalized": base.filter(status=InventoryActStatus.FINALIZED).count(),
+                    "awaiting_ack": base.filter(_awaiting_ack_q()).count(),
+                    "all": base.count(),
+                }
+            }
+        )
 
 
 class InventoryActDetailView(GenericController):

@@ -1,10 +1,20 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pydantic
 from pydantic import ConfigDict, model_validator
+
+# Maintenance SLA windows (hours) per priority. Requests still open past
+# created_at + window are flagged as breached.
+SLA_HOURS_BY_PRIORITY = {
+    "critical": 4,
+    "high": 8,
+    "medium": 24,
+    "low": 72,
+}
+_SLA_DEFAULT_HOURS = 24
 
 
 class ManagementUserOutput(pydantic.BaseModel):
@@ -48,11 +58,16 @@ class ManagementPropertyOutput(pydantic.BaseModel):
     owner_guaranteed_price: Decimal | None
     tenant_charge_price: Decimal | None
     vacant_since: date | None
-    vacant_days: int
+    vacant_days: int | None
     map_lat: Decimal | None
     map_lon: Decimal | None
     description: str | None
     score: Decimal
+    # Tenant / vacancy enrichment (populated from the active-lease prefetch;
+    # None when the view didn't prefetch or the state doesn't apply).
+    tenant_name: str | None = None
+    tenant_since: date | None = None
+    vacancy_loss_per_day: Decimal | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -61,6 +76,26 @@ class ManagementPropertyOutput(pydantic.BaseModel):
     def extract_related(cls, v):
         if isinstance(v, dict):
             return v
+        from core.constants import PropertyStatus
+
+        active_leases = getattr(v, "active_leases", [])
+        lease = active_leases[0] if active_leases else None
+        tenant_name = None
+        tenant_since = None
+        if lease is not None and lease.tenant is not None:
+            tenant_name = f"{lease.tenant.first_name} {lease.tenant.last_name or ''}".strip()
+            tenant_since = lease.start_date
+
+        # Vacancy figures are recomputed live: the stored ``vacant_days`` counter
+        # can go stale, so days are derived from ``vacant_since`` each read.
+        vacant_days = None
+        vacancy_loss_per_day = None
+        if v.status == PropertyStatus.VACANT:
+            vacant_days = max((date.today() - v.vacant_since).days, 0) if v.vacant_since is not None else v.vacant_days
+            base_price = v.owner_guaranteed_price or v.ask_price
+            if base_price is not None:
+                vacancy_loss_per_day = (base_price / Decimal("30")).quantize(Decimal("0.01"))
+
         return {
             "id": v.id,
             "name": v.name,
@@ -80,11 +115,14 @@ class ManagementPropertyOutput(pydantic.BaseModel):
             "owner_guaranteed_price": v.owner_guaranteed_price,
             "tenant_charge_price": v.tenant_charge_price,
             "vacant_since": v.vacant_since,
-            "vacant_days": v.vacant_days,
+            "vacant_days": vacant_days,
             "map_lat": v.map_lat,
             "map_lon": v.map_lon,
             "description": v.description,
             "score": v.score,
+            "tenant_name": tenant_name,
+            "tenant_since": tenant_since,
+            "vacancy_loss_per_day": vacancy_loss_per_day,
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }
@@ -139,6 +177,9 @@ class ManagementAgreementOutput(pydantic.BaseModel):
     end_date: date
     status: str
     commission_rate: Decimal
+    owner_guaranteed_amount: Decimal | None
+    tenant_charge_amount: Decimal | None
+    margin: Decimal | None
     created_at: datetime
     updated_at: datetime
 
@@ -147,6 +188,9 @@ class ManagementAgreementOutput(pydantic.BaseModel):
     def extract_related(cls, v):
         if isinstance(v, dict):
             return v
+        margin = None
+        if v.owner_guaranteed_amount is not None and v.tenant_charge_amount is not None:
+            margin = v.tenant_charge_amount - v.owner_guaranteed_amount
         return {
             "id": v.id,
             "agreement_number": v.agreement_number,
@@ -159,6 +203,9 @@ class ManagementAgreementOutput(pydantic.BaseModel):
             "end_date": v.end_date,
             "status": v.status,
             "commission_rate": v.commission_rate,
+            "owner_guaranteed_amount": v.owner_guaranteed_amount,
+            "tenant_charge_amount": v.tenant_charge_amount,
+            "margin": margin,
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }
@@ -268,6 +315,7 @@ class ManagementServiceRequestOutput(pydantic.BaseModel):
     property_name: str
     tenant_id: int
     tenant_name: str
+    tenant_phone: str | None
     assigned_to_id: int | None
     assigned_to_name: str | None
     title: str
@@ -278,6 +326,9 @@ class ManagementServiceRequestOutput(pydantic.BaseModel):
     cost_bearer: str | None
     resolution_notes: str | None
     resolved_at: datetime | None
+    sla_hours: int
+    sla_due_at: datetime
+    sla_breached: bool
     photos_count: int
     photo_urls: list[str] = []
     created_at: datetime
@@ -288,12 +339,24 @@ class ManagementServiceRequestOutput(pydantic.BaseModel):
     def extract_related(cls, v):
         if isinstance(v, dict):
             return v
+        from django.utils import timezone
+
+        from core.constants import ServiceRequestStatus
+
+        sla_hours = SLA_HOURS_BY_PRIORITY.get(v.priority, _SLA_DEFAULT_HOURS)
+        sla_due_at = v.created_at + timedelta(hours=sla_hours)
+        # Resolved/cancelled requests are terminal — they can no longer breach.
+        sla_breached = (
+            v.status not in (ServiceRequestStatus.RESOLVED, ServiceRequestStatus.CANCELLED)
+            and timezone.now() > sla_due_at
+        )
         return {
             "id": v.id,
             "property_id": v.property_id,
             "property_name": v.property.name,
             "tenant_id": v.tenant_id,
             "tenant_name": f"{v.tenant.first_name} {v.tenant.last_name or ''}".strip(),
+            "tenant_phone": (v.tenant.phone if v.tenant else None),
             "assigned_to_id": v.assigned_to_id,
             "assigned_to_name": (
                 f"{v.assigned_to.first_name} {v.assigned_to.last_name or ''}".strip() if v.assigned_to else None
@@ -306,6 +369,9 @@ class ManagementServiceRequestOutput(pydantic.BaseModel):
             "cost_bearer": v.cost_bearer,
             "resolution_notes": v.resolution_notes,
             "resolved_at": v.resolved_at,
+            "sla_hours": sla_hours,
+            "sla_due_at": sla_due_at,
+            "sla_breached": sla_breached,
             "photos_count": v.photos.count(),
             "created_at": v.created_at,
             "updated_at": v.updated_at,
