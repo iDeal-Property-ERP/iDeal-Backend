@@ -68,15 +68,34 @@ class ManagementPropertyOutput(pydantic.BaseModel):
     tenant_name: str | None = None
     tenant_since: date | None = None
     vacancy_loss_per_day: Decimal | None = None
+    # Absolute URL of the primary (cover) photo, for the workbench row thumbnail.
+    # None when the property has no photos. Needs the request in the validation
+    # context to build an absolute URL; falls back to the relative media URL.
+    cover_image_url: str | None = None
     created_at: datetime
     updated_at: datetime
 
+    @staticmethod
+    def _cover_url(prop, request):
+        # Uses the prefetched ``photos`` cache — no order_by, so it doesn't defeat
+        # prefetch_related. Prefers the primary photo, else the lowest sort_order.
+        photos = list(prop.photos.all())
+        if not photos:
+            return None
+        cover = next((p for p in photos if p.is_primary), None) or min(
+            photos, key=lambda p: (p.sort_order, p.id)
+        )
+        url = cover.image.url
+        return request.build_absolute_uri(url) if request is not None else url
+
     @model_validator(mode="before")
     @classmethod
-    def extract_related(cls, v):
+    def extract_related(cls, v, info):
         if isinstance(v, dict):
             return v
         from core.constants import PropertyStatus
+
+        request = info.context.get("request") if info.context else None
 
         active_leases = getattr(v, "active_leases", [])
         lease = active_leases[0] if active_leases else None
@@ -123,6 +142,7 @@ class ManagementPropertyOutput(pydantic.BaseModel):
             "tenant_name": tenant_name,
             "tenant_since": tenant_since,
             "vacancy_loss_per_day": vacancy_loss_per_day,
+            "cover_image_url": cls._cover_url(v, request),
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }

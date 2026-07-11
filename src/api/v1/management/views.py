@@ -593,6 +593,12 @@ class ManagementAssigneeListView(ManagementView):
 class ManagementPropertyListView(ManagementView, ListAPIView):
     output_schema = ManagementPropertyOutput
 
+    def to_output(self, instance):
+        # Pass the request so the schema can build absolute cover-photo URLs.
+        return ManagementPropertyOutput.model_validate(
+            instance, context={"request": self.request}
+        ).model_dump(mode="json")
+
     def get_queryset(self):
         from contract.models import Lease
         from django.db.models import Prefetch
@@ -607,7 +613,8 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
                     "leases",
                     queryset=Lease.objects.filter(status=LeaseStatus.ACTIVE).select_related("tenant"),
                     to_attr="active_leases",
-                )
+                ),
+                "photos",
             )
             .order_by("-created_at")
         )
@@ -656,7 +663,8 @@ class ManagementPropertyMapView(ManagementView):
                     "leases",
                     queryset=Lease.objects.filter(status=LeaseStatus.ACTIVE).select_related("tenant"),
                     to_attr="active_leases",
-                )
+                ),
+                "photos",
             )
             .order_by("-created_at")
         )
@@ -689,7 +697,9 @@ class ManagementPropertyMapView(ManagementView):
 
         rows = []
         for prop in qs:
-            row = ManagementPropertyOutput.model_validate(prop).model_dump(mode="json")
+            row = ManagementPropertyOutput.model_validate(
+                prop, context={"request": self.request}
+            ).model_dump(mode="json")
             lease = prop.active_leases[0] if prop.active_leases else None
             row["tenant_name"] = f"{lease.tenant.first_name} {lease.tenant.last_name or ''}".strip() if lease else None
             row["lease_end_date"] = lease.end_date.isoformat() if lease else None
