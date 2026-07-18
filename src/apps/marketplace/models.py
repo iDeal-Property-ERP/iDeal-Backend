@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 
@@ -177,6 +178,16 @@ class Booking(TimestampedModel, SoftDeleteModel):
     def __str__(self):
         return f"Booking #{self.id} — {self.tenant} ({self.get_status_display()})"
 
+    def clean(self):
+        from core.constants import PropertyEngagementType
+
+        if self.property.engagement_type == PropertyEngagementType.ONE_OFF:
+            raise ValidationError(_("One-off marketplace properties accept contact leads, not tenant bookings."))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
+
     def convert_to_lease(
         self,
         reviewed_by,
@@ -197,8 +208,10 @@ class Booking(TimestampedModel, SoftDeleteModel):
         from finance.models import Payment
         from notification.services import notify
 
-        from core.constants import LeaseStatus, NotificationType, PaymentStatus
+        from core.constants import LeaseStatus, NotificationType, PaymentStatus, PropertyEngagementType
 
+        if self.property.engagement_type == PropertyEngagementType.ONE_OFF:
+            raise ValueError("One-off brokerage properties cannot create leases")
         if self.status != BookingStatus.APPROVED:
             raise ValueError("Only approved bookings can be converted")
 

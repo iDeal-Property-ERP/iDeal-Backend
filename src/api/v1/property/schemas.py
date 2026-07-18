@@ -44,6 +44,23 @@ class VerificationVisitOutput(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(from_attributes=True)
 
 
+class OneOffDealDetailOutput(pydantic.BaseModel):
+    """The brokerage branch embedded on a one-off property detail response."""
+
+    id: int
+    seller_name: str
+    seller_phone: str
+    seller_email: str | None
+    channel: str
+    status: str
+    commission_type: str
+    commission_fixed_amount: Decimal | None
+    commission_percentage: Decimal | None
+    commission_currency: str
+    close_date: date | None
+    receipt_recorded: bool = False
+
+
 class PropertyOutput(pydantic.BaseModel):
     id: int
     name: str
@@ -55,6 +72,7 @@ class PropertyOutput(pydantic.BaseModel):
     floor: int | None
     total_floors: int | None
     owner: OwnerOutput | None
+    engagement_type: str
     status: str
     is_verified: bool
     score: Decimal
@@ -74,6 +92,9 @@ class PropertyOutput(pydantic.BaseModel):
     # aliased so `model_validate(property)` doesn't try to read the manager.
     photos: list[PropertyPhotoOutput] = pydantic.Field(default=[], validation_alias="_photos")
     verification: VerificationVisitOutput | None = pydantic.Field(default=None, validation_alias="_verification")
+    # Injected by the view. Avoid reading the reverse relation from managed
+    # properties, where Django raises RelatedObjectDoesNotExist.
+    one_off_deal: OneOffDealDetailOutput | None = pydantic.Field(default=None, validation_alias="_one_off_deal")
     created_at: datetime
     updated_at: datetime
 
@@ -87,7 +108,7 @@ class PropertyCreateInput(pydantic.BaseModel):
     rooms: int = pydantic.Field(ge=0)
     area_sqm: int = pydantic.Field(ge=0)
     floor: int = pydantic.Field(ge=0)
-    total_floors: int | None = pydantic.Field(default=None, ge=0)
+    total_floors: int = pydantic.Field(ge=0)
     owner_id: int
     status: str = "vacant"
     score: Decimal = Decimal("0.0")
@@ -177,6 +198,31 @@ class PropertyDraftCreateInput(PropertyUpdateInput):
     row is identifiable in the workbench."""
 
     name: str = "Untitled property"
+
+
+class OneOffDealDraftInput(pydantic.BaseModel):
+    """Draft-safe brokerage terms; lifecycle actions validate completeness."""
+
+    seller_name: str = ""
+    seller_phone: str = ""
+    seller_email: str | None = None
+    channel: str = "marketplace"
+    commission_type: str = "none"
+    commission_fixed_amount: Decimal | None = None
+    commission_percentage: Decimal | None = None
+    commission_currency: str = "USD"
+
+
+class OneOffPropertyDraftInput(PropertyDraftCreateInput):
+    """Creates the shared property draft and its one-off deal atomically."""
+
+    brokerage: OneOffDealDraftInput = pydantic.Field(default_factory=OneOffDealDraftInput)
+
+
+class OneOffPropertyUpdateInput(PropertyUpdateInput):
+    """Atomically updates shared property fields and one-off draft terms."""
+
+    brokerage: OneOffDealDraftInput | None = None
 
 
 class PropertyPublishInput(pydantic.BaseModel):

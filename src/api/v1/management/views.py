@@ -2,12 +2,14 @@ from datetime import date, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 
+from django.db import transaction
 from django.db.models import Case, Count, F, IntegerField, Max, Min, Q, Sum, Value, When
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 
 from api.v1.management.schemas import (
     DashboardKPIs,
+    DashboardBrokerage,
     DashboardOccupancy,
     DashboardOutput,
     GrowthData,
@@ -40,6 +42,12 @@ from api.v1.management.schemas import (
     ManagementViewingProposeTimeInput,
     ManagementViewingRequestOutput,
     MonthlyPnlRow,
+    OneOffDealCloseLostInput,
+    OneOffDealCloseWonInput,
+    OneOffDealCreateInput,
+    OneOffDealOutput,
+    OneOffDealUpdateInput,
+    OneOffReceiptCreateInput,
     PnlBreakdown,
     PnlBreakdownRow,
     PnlServiceTypeRow,
@@ -52,7 +60,15 @@ from api.v1.management.schemas import (
 from api.v1.vas.schemas import ManagementServiceOrderCreateInput, ServiceOrderStatusInput
 from core.api.permissions import RoleAuth
 from core.api.views import BaseController, DetailPath, GenericController, ListAPIView, ListQuery
-from core.constants import BookingStatus, PaymentStatus, PayoutStatus, UserRole, ViewingRequestStatus
+from core.constants import (
+    BookingStatus,
+    OneOffDealStatus,
+    PaymentStatus,
+    PayoutStatus,
+    PropertyEngagementType,
+    UserRole,
+    ViewingRequestStatus,
+)
 from core.utils.pagination import build_paginated_response
 
 
@@ -146,7 +162,7 @@ class DashboardView(ManagementView):
         from contract.models import Lease
         from finance.models import Payment, PayoutSchedule
         from maintenance.models import ServiceRequest
-        from property.models import District, Property
+        from property.models import District, OneOffDeal, Property
 
         # Greeting / Date / Location
         greeting = f"Xush kelibsiz, {user.first_name} \U0001f44b"
@@ -221,6 +237,24 @@ class DashboardView(ManagementView):
         maintenance = props_by_status.get("maintenance", 0)
         occ_rate = round(rented / total_properties * 100) if total_properties > 0 else 0
 
+        # Brokerage remains separate from rent/P&L KPIs: a won close creates
+        # expected revenue, while a receipt records cash actually collected.
+        brokerage_deals = OneOffDeal.objects.select_related("receipt").filter(
+            status__in=(OneOffDealStatus.CLOSED_WON, OneOffDealStatus.CLOSED_LOST, OneOffDealStatus.ARCHIVED)
+        )
+        brokerage_expected = Decimal("0.00")
+        brokerage_received = Decimal("0.00")
+        for deal in brokerage_deals:
+            amount = deal.commission_uzs_amount or Decimal("0.00")
+            if deal.status != OneOffDealStatus.CLOSED_LOST:
+                brokerage_expected += amount
+            try:
+                receipt = deal.receipt
+            except Exception:
+                receipt = None
+            if receipt:
+                brokerage_received += amount
+
         # ---- Maintenance Requests ----
         maint_qs = (
             ServiceRequest.objects.select_related("property", "tenant")
@@ -253,17 +287,23 @@ class DashboardView(ManagementView):
             ),
             recent_payments=recent_payments,
             occupancy=DashboardOccupancy(rate=occ_rate, rented=rented, vacant=vacant, maintenance=maintenance),
+            brokerage=DashboardBrokerage(
+                expected_uzs=_d(brokerage_expected),
+                received_uzs=_d(brokerage_received),
+                unpaid_uzs=_d(brokerage_expected - brokerage_received),
+                closed_count=brokerage_deals.count(),
+            ),
             maintenance_requests=maintenance_requests,
         )
 
         return self.ok(output.model_dump(mode="json"))
 
 
-# P&L revenue streams (lease, vas) and expense streams (payouts, maintenance).
+# P&L revenue streams (lease, VAS, brokerage) and expense streams (payouts, maintenance).
 # The ``sources`` query param picks which streams are included; the default
 # reproduces the pre-phase-6 math exactly (lease payments vs. owner payouts).
-_PNL_REVENUE_SOURCES = ("lease", "vas")
 _PNL_EXPENSE_SOURCES = ("payouts", "maintenance")
+_PNL_REVENUE_SOURCES = ("lease", "vas", "brokerage")
 _PNL_SOURCES = _PNL_REVENUE_SOURCES + _PNL_EXPENSE_SOURCES
 _PNL_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -286,6 +326,7 @@ def _pnl_month_buckets(year: int, month: int, convert) -> dict[str, Decimal]:
     """
     from finance.models import Payment, PayoutSchedule
     from maintenance.models import ServiceRequest
+    from property.models import OneOffCommissionReceipt
     from vas.models import ServiceOrder
 
     from core.constants import CostBearer, ServiceRequestStatus, VASOrderStatus
@@ -302,6 +343,15 @@ def _pnl_month_buckets(year: int, month: int, convert) -> dict[str, Decimal]:
     for o in vas_orders:
         vas += convert(o.commission_earned, o.currency, "UZS")
 
+    # Brokerage is realized revenue only after the one full receipt exists.
+    # The close-time UZS snapshot keeps historic reporting stable if rates change.
+    brokerage = sum(
+        (receipt.deal.commission_uzs_amount or Decimal("0.00"))
+        for receipt in OneOffCommissionReceipt.objects.select_related("deal").filter(
+            received_date__year=year, received_date__month=month
+        )
+    )
+
     payouts = Decimal("0.00")
     for po in PayoutSchedule.objects.filter(status="paid", paid_date__year=year, paid_date__month=month):
         payouts += convert(po.amount, po.currency, "UZS")
@@ -316,7 +366,7 @@ def _pnl_month_buckets(year: int, month: int, convert) -> dict[str, Decimal]:
     for sr in maint_qs:
         maintenance += convert(sr.cost, "USD", "UZS")
 
-    return {"lease": lease, "vas": vas, "payouts": payouts, "maintenance": maintenance}
+    return {"lease": lease, "vas": vas, "brokerage": brokerage, "payouts": payouts, "maintenance": maintenance}
 
 
 def _pnl_projection(growth_actual, last_month):
@@ -476,6 +526,55 @@ class PnLSummaryView(ManagementView):
         return self.ok(output.model_dump(mode="json"))
 
 
+class BrokerageCommissionStatsView(ManagementView):
+    """Expected pipeline vs received cash for the Finance brokerage workbench."""
+
+    def get(self) -> dict:
+        from property.models import OneOffDeal
+
+        deals = OneOffDeal.objects.select_related("receipt").all()
+        won = deals.filter(
+            Q(status=OneOffDealStatus.CLOSED_WON)
+            | Q(status=OneOffDealStatus.ARCHIVED, commission_amount__isnull=False)
+        )
+        expected = Decimal("0.00")
+        received = Decimal("0.00")
+        free_deals = 0
+        durations = []
+        for deal in won:
+            amount = deal.commission_uzs_amount or Decimal("0.00")
+            expected += amount
+            if amount == 0:
+                free_deals += 1
+            try:
+                receipt = deal.receipt
+            except Exception:
+                receipt = None
+            if receipt:
+                received += amount
+            if deal.close_date:
+                durations.append(max((deal.close_date - deal.created_at.date()).days, 0))
+        closed_total = deals.filter(
+            status__in=(OneOffDealStatus.CLOSED_WON, OneOffDealStatus.CLOSED_LOST, OneOffDealStatus.ARCHIVED)
+        ).count()
+        active_total = deals.filter(status__in=(OneOffDealStatus.ACTIVE, OneOffDealStatus.PAUSED)).count()
+        return self.ok(
+            {
+                "expected_uzs": _d(expected),
+                "received_uzs": _d(received),
+                "unpaid_uzs": _d(expected - received),
+                "free_deals": free_deals,
+                "close_rate": str(
+                    (Decimal(won.count()) / Decimal(closed_total) * Decimal("100")).quantize(Decimal("0.1"))
+                    if closed_total
+                    else Decimal("0.0")
+                ),
+                "average_days_to_close": round(sum(durations) / len(durations), 1) if durations else 0,
+                "counts": {"active": active_total, "won": won.count(), "closed": closed_total, "all": deals.count()},
+            }
+        )
+
+
 class ManagementUserListView(ManagementView, ListAPIView):
     output_schema = ManagementUserOutput
 
@@ -621,6 +720,7 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
         status = self.request.GET.get("status")
         district_id = self.request.GET.get("district_id")
         tariff = self.request.GET.get("tariff")
+        engagement_type = self.request.GET.get("engagement_type")
         search = self.request.GET.get("search")
 
         # Drafts live behind their own saved-view tab, not the default portfolio.
@@ -629,12 +729,249 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
             qs = qs.filter(district_id=district_id)
         if tariff:
             qs = qs.filter(tariff=tariff)
+        if engagement_type:
+            qs = qs.filter(engagement_type=engagement_type)
         if search:
             qs = qs.filter(Q(name__icontains=search) | Q(address__icontains=search))
         return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         return super().get(parsed_query)
+
+
+class OneOffDealListCreateView(ManagementView, ListAPIView):
+    """Staff-only brokerage workbench and the one-off property creation branch."""
+
+    output_schema = OneOffDealOutput
+
+    def get_queryset(self):
+        from property.models import OneOffDeal
+
+        qs = OneOffDeal.objects.select_related("property", "receipt__recorded_by").order_by("-created_at")
+        status = self.request.GET.get("status")
+        channel = self.request.GET.get("channel")
+        search = self.request.GET.get("search")
+        if status:
+            qs = qs.filter(status=status)
+        if channel:
+            qs = qs.filter(channel=channel)
+        if search:
+            qs = qs.filter(
+                Q(property__name__icontains=search)
+                | Q(seller_name__icontains=search)
+                | Q(seller_phone__icontains=search)
+                | Q(renter_name__icontains=search)
+                | Q(renter_phone__icontains=search)
+            )
+        return qs
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return super().get(parsed_query)
+
+    def post(self, parsed_body: Body[OneOffDealCreateInput]) -> dict:
+        from property.models import OneOffDeal, Property
+
+        data = parsed_body.model_dump()
+        seller = data.pop("seller")
+        with transaction.atomic():
+            prop = Property.objects.create(
+                name=data["name"],
+                address=data["address"],
+                district_id=data["district_id"],
+                property_type=data["property_type"],
+                rooms=data["rooms"],
+                bathrooms=data["bathrooms"],
+                area_sqm=data["area_sqm"],
+                floor=data["floor"],
+                total_floors=data["total_floors"],
+                furnishing=data["furnishing"],
+                description=data["description"],
+                map_lat=data["map_lat"],
+                map_lon=data["map_lon"],
+                ask_price=data["ask_price"],
+                ask_currency=data["ask_currency"],
+                engagement_type=PropertyEngagementType.ONE_OFF,
+                status="draft",
+            )
+            deal = OneOffDeal.objects.create(
+                property=prop,
+                seller_name=seller["name"],
+                seller_phone=seller["phone"],
+                seller_email=seller.get("email"),
+                channel=data["channel"],
+                commission_type=data["commission_type"],
+                commission_fixed_amount=data["commission_fixed_amount"],
+                commission_percentage=data["commission_percentage"],
+                commission_currency=data["commission_currency"],
+            )
+            deal.full_clean()
+        return self.ok(self.to_output(deal), status_code=HTTPStatus.CREATED)
+
+
+class OneOffDealDetailView(ManagementView, GenericController):
+    output_schema = OneOffDealOutput
+
+    def get_queryset(self):
+        from property.models import OneOffDeal
+
+        return OneOffDeal.objects.select_related("property", "receipt__recorded_by").prefetch_related("receipt__attachments").all()
+
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        return self.ok(self.to_output(self.get_object(pk=parsed_path.pk)))
+
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[OneOffDealUpdateInput]) -> dict:
+        deal = self.get_object(pk=parsed_path.pk)
+        if deal.status != OneOffDealStatus.DRAFT:
+            return self.fail(
+                error=str(_("Only draft one-off deals can be edited")),
+                message=str(_("Invalid status transition")),
+            )
+        data = parsed_body.model_dump(exclude_unset=True)
+        seller = data.pop("seller", None)
+        if seller:
+            deal.seller_name = seller["name"]
+            deal.seller_phone = seller["phone"]
+            deal.seller_email = seller.get("email")
+        for field, value in data.items():
+            setattr(deal, field, value)
+        try:
+            deal.full_clean()
+        except Exception as err:  # Django validation errors serialize poorly in DMR.
+            return self.fail(error=str(err), message=str(_("Validation error")))
+        deal.save()
+        return self.ok(self.to_output(deal), status_code=HTTPStatus.OK)
+
+
+class OneOffDealActionView(OneOffDealDetailView):
+    def _deal(self, parsed_path):
+        return self.get_object(pk=parsed_path.pk)
+
+
+class OneOffDealActivateView(OneOffDealActionView):
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        deal = self._deal(parsed_path)
+        try:
+            deal.activate()
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Cannot activate one-off deal")))
+        return self.ok(self.to_output(deal), status_code=HTTPStatus.OK)
+
+
+class OneOffDealPauseView(OneOffDealActionView):
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        deal = self._deal(parsed_path)
+        try:
+            deal.pause()
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Cannot pause one-off deal")))
+        return self.ok(self.to_output(deal), status_code=HTTPStatus.OK)
+
+
+class OneOffDealCloseWonView(OneOffDealActionView):
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[OneOffDealCloseWonInput]) -> dict:
+        deal = self._deal(parsed_path)
+        renter = parsed_body.renter
+        try:
+            deal.close_won(
+                renter_name=renter.name,
+                renter_phone=renter.phone,
+                renter_email=renter.email,
+                agreed_monthly_rent=parsed_body.agreed_monthly_rent,
+                agreed_currency=parsed_body.agreed_currency,
+                close_date=parsed_body.close_date,
+                notes=parsed_body.notes,
+                evidence=[item.model_dump() for item in parsed_body.evidence],
+                closed_by=self.request.user,
+            )
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Cannot close one-off deal")))
+        return self.ok(self.to_output(deal), status_code=HTTPStatus.OK)
+
+
+class OneOffDealCloseLostView(OneOffDealActionView):
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[OneOffDealCloseLostInput]) -> dict:
+        deal = self._deal(parsed_path)
+        try:
+            deal.close_lost(
+                close_date=parsed_body.close_date,
+                notes=parsed_body.notes,
+                evidence=[item.model_dump() for item in parsed_body.evidence],
+                closed_by=self.request.user,
+            )
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Cannot close one-off deal")))
+        return self.ok(self.to_output(deal), status_code=HTTPStatus.OK)
+
+
+class OneOffDealArchiveView(OneOffDealActionView):
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        deal = self._deal(parsed_path)
+        try:
+            deal.archive()
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Cannot archive one-off deal")))
+        return self.ok(self.to_output(deal), status_code=HTTPStatus.OK)
+
+
+class OneOffCommissionReceiptView(OneOffDealActionView):
+    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[OneOffReceiptCreateInput]) -> dict:
+        from property.models import OneOffCommissionReceipt
+
+        deal = self._deal(parsed_path)
+        if hasattr(deal, "receipt"):
+            return self.fail(error=str(_("A commission receipt is already recorded")), status_code=HTTPStatus.CONFLICT)
+        receipt = OneOffCommissionReceipt(
+            deal=deal,
+            amount=parsed_body.amount,
+            currency=parsed_body.currency,
+            received_date=parsed_body.received_date,
+            method=parsed_body.method,
+            reference=parsed_body.reference,
+            recorded_by=self.request.user,
+        )
+        try:
+            receipt.full_clean()
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Validation error")))
+        receipt.save()
+        deal = self.get_queryset().get(pk=deal.pk)
+        return self.ok(self.to_output(deal), status_code=HTTPStatus.CREATED)
+
+
+class OneOffCommissionReceiptAttachmentView(OneOffDealActionView):
+    """Stores staff-only PDF or image proof against an already-recorded receipt."""
+
+    _allowed_content_types = {"application/pdf", "image/jpeg", "image/png", "image/webp"}
+    _max_file_bytes = 10 * 1024 * 1024
+
+    def post(self, parsed_path: Path[DetailPath]) -> dict:
+        from property.models import OneOffCommissionReceiptAttachment
+
+        deal = self._deal(parsed_path)
+        try:
+            receipt = deal.receipt
+        except Exception:
+            return self.fail(error=str(_("Record the commission receipt before attaching proof.")))
+        files = self.request.FILES.getlist("files")
+        if not files:
+            return self.fail(error=str(_("No receipt attachments provided.")))
+        for uploaded in files:
+            content_type = getattr(uploaded, "content_type", "") or ""
+            if uploaded.size > self._max_file_bytes:
+                return self.fail(error=str(_("Receipt attachments must not exceed 10 MB.")))
+            if content_type not in self._allowed_content_types:
+                return self.fail(error=str(_("Receipt attachments must be a PDF, JPEG, PNG, or WebP file.")))
+        with transaction.atomic():
+            for uploaded in files:
+                OneOffCommissionReceiptAttachment.objects.create(
+                    receipt=receipt,
+                    file=uploaded,
+                    filename=uploaded.name[:255],
+                    content_type=getattr(uploaded, "content_type", "") or "",
+                    size_bytes=uploaded.size,
+                )
+        deal = self.get_queryset().get(pk=deal.pk)
+        return self.ok(self.to_output(deal), status_code=HTTPStatus.CREATED)
 
 
 class ManagementPropertyMapView(ManagementView):

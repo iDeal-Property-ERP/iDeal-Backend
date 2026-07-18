@@ -1,10 +1,11 @@
 from datetime import date
 
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from core.constants import LeaseStatus, OnboardingStatus, OwnerAgreementStatus, PropertyStatus
+from core.constants import LeaseStatus, OnboardingStatus, OwnerAgreementStatus, PropertyEngagementType, PropertyStatus
 from core.models import SoftDeleteModel, TimestampedModel
 
 
@@ -36,6 +37,14 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
 
     def __str__(self):
         return f"{self.agreement_number} — {self.property.name}"
+
+    def clean(self):
+        if self.property_id and self.property.engagement_type != PropertyEngagementType.MANAGED:
+            raise ValidationError(_("One-off brokerage properties cannot have owner agreements."))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
     def renew(self, new_start_date, new_end_date, commission_rate=None, agreement_number=None, terms=None):
         with transaction.atomic():
@@ -97,7 +106,12 @@ class Lease(TimestampedModel, SoftDeleteModel):
     def __str__(self):
         return f"Lease #{self.id} — {self.property.name} ({self.get_status_display()})"
 
+    def clean(self):
+        if self.property_id and self.property.engagement_type != PropertyEngagementType.MANAGED:
+            raise ValidationError(_("One-off brokerage properties cannot have leases."))
+
     def save(self, *args, **kwargs):
+        self.clean()
         is_new = self.pk is None
         old_instance = type(self).objects.filter(pk=self.pk).first() if not is_new else None
 
@@ -226,6 +240,14 @@ class OwnerOnboarding(TimestampedModel, SoftDeleteModel):
 
     def __str__(self):
         return f"Onboarding #{self.id} — {self.property.name} ({self.get_status_display()})"
+
+    def clean(self):
+        if self.property_id and self.property.engagement_type != PropertyEngagementType.MANAGED:
+            raise ValidationError(_("One-off brokerage properties cannot enter owner onboarding."))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
     def approve(self, reviewed_by, *, commission_rate, start_date, end_date, agreement_number=None, terms=None):
         """Approve the onboarding: free the property and generate an OwnerAgreement."""

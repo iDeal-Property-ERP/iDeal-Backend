@@ -25,7 +25,7 @@ from core.api.views import (
     ListQuery,
     RetrieveAPIView,
 )
-from core.constants import LeaseStatus, NotificationType, OwnerAgreementStatus, UserRole
+from core.constants import LeaseStatus, NotificationType, OwnerAgreementStatus, PropertyEngagementType, UserRole
 
 
 class OwnerAgreementListCreateView(CreateAPIView, ListAPIView):
@@ -38,6 +38,11 @@ class OwnerAgreementListCreateView(CreateAPIView, ListAPIView):
         return OwnerAgreement.objects.select_related("owner", "property").all()
 
     def post(self, parsed_body: Body[OwnerAgreementCreateInput]) -> OwnerAgreementOutput:
+        from property.models import Property
+
+        prop = Property.objects.filter(pk=parsed_body.property_id).first()
+        if prop is None or prop.engagement_type != PropertyEngagementType.MANAGED:
+            return self.fail(error=str(_("One-off brokerage properties cannot have owner agreements")))
         return super().post(parsed_body)
 
     def get(self, parsed_query: Query[ListQuery]) -> list[OwnerAgreementOutput] | Paginated[OwnerAgreementOutput]:
@@ -118,6 +123,11 @@ class LeaseListCreateView(CreateAPIView, ListAPIView):
         return Lease.objects.select_related("property", "owner_agreement", "tenant").all()
 
     def post(self, parsed_body: Body[LeaseCreateInput]) -> LeaseOutput:
+        from property.models import Property
+
+        prop = Property.objects.filter(pk=parsed_body.property_id).first()
+        if prop is None or prop.engagement_type != PropertyEngagementType.MANAGED:
+            return self.fail(error=str(_("One-off brokerage properties cannot have leases")))
         return super().post(parsed_body)
 
     def get(self, parsed_query: Query[ListQuery]) -> list[LeaseOutput] | Paginated[LeaseOutput]:

@@ -4,7 +4,7 @@ from django.utils import timezone
 from marketplace.models import Listing
 from property.models import Property
 
-from core.constants import ListingStatus, PropertyStatus
+from core.constants import ListingStatus, OneOffChannel, PropertyEngagementType, PropertyStatus
 
 
 def _publish(listing, instance):
@@ -29,6 +29,17 @@ def _create_published_listing(instance):
     )
 
 
+def _one_off_is_off_market(instance):
+    """Off-market brokerage inventory must never surface through a Listing."""
+    if instance.engagement_type != PropertyEngagementType.ONE_OFF:
+        return False
+    try:
+        return instance.one_off_deal.channel == OneOffChannel.OFF_MARKET
+    except Exception:
+        # The property is created before its paired deal inside one transaction.
+        return False
+
+
 @receiver(post_save, sender=Property)
 def manage_listing_on_property_change(sender, instance, created, update_fields, **kwargs):
     """Keep a property's Listing in sync with its status.
@@ -39,6 +50,9 @@ def manage_listing_on_property_change(sender, instance, created, update_fields, 
     - Auto-create only happens for the legacy path where a VACANT property has no listing
       at all (e.g. management-created properties that never went through the wizard).
     """
+    if _one_off_is_off_market(instance):
+        return
+
     if created and instance.status == PropertyStatus.VACANT:
         _create_published_listing(instance)
         return

@@ -46,12 +46,62 @@ class PropertyStatus(ConstantChoices):
     VACANT = "vacant"
     MAINTENANCE = "maintenance"
     PENDING_REVIEW = "pending_review"
+    ARCHIVED = "archived"
     CHOICES = [
         (DRAFT, _("Draft")),
         (RENTED, _("Rented")),
         (VACANT, _("Vacant")),
         (MAINTENANCE, _("Maintenance")),
         (PENDING_REVIEW, _("Pending Review")),
+        (ARCHIVED, _("Archived")),
+    ]
+
+
+class PropertyEngagementType(ConstantChoices):
+    """The immutable commercial model a property belongs to."""
+
+    MANAGED = "managed"
+    ONE_OFF = "one_off"
+    CHOICES = [
+        (MANAGED, _("Managed")),
+        (ONE_OFF, _("One-off brokerage")),
+    ]
+
+
+class OneOffChannel(ConstantChoices):
+    MARKETPLACE = "marketplace"
+    OFF_MARKET = "off_market"
+    CHOICES = [
+        (MARKETPLACE, _("Marketplace")),
+        (OFF_MARKET, _("Off-market")),
+    ]
+
+
+class OneOffDealStatus(ConstantChoices):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    PAUSED = "paused"
+    CLOSED_WON = "closed_won"
+    CLOSED_LOST = "closed_lost"
+    ARCHIVED = "archived"
+    CHOICES = [
+        (DRAFT, _("Draft")),
+        (ACTIVE, _("Active")),
+        (PAUSED, _("Paused")),
+        (CLOSED_WON, _("Closed won")),
+        (CLOSED_LOST, _("Closed lost")),
+        (ARCHIVED, _("Archived")),
+    ]
+
+
+class BrokerageCommissionType(ConstantChoices):
+    NONE = "none"
+    FIXED = "fixed"
+    PERCENTAGE = "percentage"
+    CHOICES = [
+        (NONE, _("No fee")),
+        (FIXED, _("Fixed fee")),
+        (PERCENTAGE, _("Percentage of monthly rent")),
     ]
 
 

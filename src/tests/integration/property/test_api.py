@@ -195,6 +195,23 @@ class TestPropertyDelete:
         assert body["data"]["deleted"] is True
         assert not Property.objects.filter(id=property_obj.id).exists()
 
+    def test_archive_property_with_contract_history(self, api_client, management, property_obj):
+        from tests.factories.contract import LeaseFactory, OwnerAgreementFactory
+
+        agreement = OwnerAgreementFactory(property=property_obj)
+        lease = LeaseFactory(property=property_obj, owner_agreement=agreement)
+
+        response = api_client.delete(
+            f"/api/v1/properties/{property_obj.id}/",
+            **_make_jwt(management),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["data"]["deleted"] is True
+        assert Property.deleted_objects.filter(id=property_obj.id).exists()
+        assert agreement.__class__.objects.filter(id=agreement.id).exists()
+        assert lease.__class__.objects.filter(id=lease.id).exists()
+
 
 @pytest.mark.django_db
 class TestPropertyPagination:

@@ -87,6 +87,13 @@ class PaymentListCreateView(CreateAPIView, ListAPIView):
         return Payment.objects.select_related("lease", "tenant", "paid_by").all()
 
     def post(self, parsed_body: Body[PaymentCreateInput]) -> PaymentOutput:
+        from contract.models import Lease
+
+        from core.constants import PropertyEngagementType
+
+        lease = Lease.objects.select_related("property").filter(pk=parsed_body.lease_id).first()
+        if lease is None or lease.property.engagement_type != PropertyEngagementType.MANAGED:
+            return self.fail(error=str(_("One-off brokerage properties cannot have rent payments")))
         # Bank transfers must carry a reference (mirrors the Record-payment dialog).
         if parsed_body.method == PaymentMethod.BANK_TRANSFER and not (parsed_body.gateway_ref or "").strip():
             return self.fail(
@@ -273,7 +280,11 @@ class PayoutScheduleListCreateView(CreateAPIView, ListAPIView):
     def post(self, parsed_body: Body[PayoutScheduleCreateInput]) -> PayoutScheduleOutput:
         from contract.models import OwnerAgreement
 
+        from core.constants import PropertyEngagementType
+
         agreement = get_object_or_404(OwnerAgreement, pk=parsed_body.owner_agreement_id)
+        if agreement.property.engagement_type != PropertyEngagementType.MANAGED:
+            return self.fail(error=str(_("One-off brokerage properties cannot have owner payouts")))
         payout = PayoutSchedule.objects.create(
             owner_agreement=agreement,
             owner=agreement.owner,

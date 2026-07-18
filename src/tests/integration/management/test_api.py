@@ -53,6 +53,7 @@ class TestManagementDashboardAPI:
         assert "kpi" in data
         assert "recent_payments" in data
         assert "occupancy" in data
+        assert "brokerage" in data
         assert "maintenance_requests" in data
 
         kpi = data["kpi"]
@@ -66,6 +67,12 @@ class TestManagementDashboardAPI:
         assert "rented" in occ
         assert "vacant" in occ
         assert "maintenance" in occ
+
+        brokerage = data["brokerage"]
+        assert "expected_uzs" in brokerage
+        assert "received_uzs" in brokerage
+        assert "unpaid_uzs" in brokerage
+        assert "closed_count" in brokerage
 
     def test_dashboard_greeting(self, api_client):
         mgmt = _mgmt_user()

@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -51,6 +52,16 @@ class Payment(TimestampedModel, SoftDeleteModel):
 
     def __str__(self):
         return f"Payment #{self.id} — {self.tenant} ({self.get_status_display()})"
+
+    def clean(self):
+        from core.constants import PropertyEngagementType
+
+        if self.lease_id and self.lease.property.engagement_type != PropertyEngagementType.MANAGED:
+            raise ValidationError(_("One-off brokerage properties cannot have rent payments."))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
 
 class ExchangeRate(TimestampedModel, SoftDeleteModel):
@@ -125,3 +136,13 @@ class PayoutSchedule(TimestampedModel, SoftDeleteModel):
 
     def __str__(self):
         return f"Payout #{self.id} — {self.owner} ({self.get_status_display()})"
+
+    def clean(self):
+        from core.constants import PropertyEngagementType
+
+        if self.owner_agreement_id and self.owner_agreement.property.engagement_type != PropertyEngagementType.MANAGED:
+            raise ValidationError(_("One-off brokerage properties cannot have owner payouts."))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)

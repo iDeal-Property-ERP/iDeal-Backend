@@ -4,7 +4,9 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pydantic
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, field_validator, model_validator
+
+from core.constants import BrokerageCommissionType, Currency, OneOffChannel, PaymentMethod
 
 # Maintenance SLA windows (hours) per priority. Requests still open past
 # created_at + window are flagged as breached.
@@ -51,6 +53,7 @@ class ManagementPropertyOutput(pydantic.BaseModel):
     total_floors: int | None
     owner_id: int | None
     owner_name: str | None
+    engagement_type: str
     status: str
     tariff: str
     ask_price: Decimal | None
@@ -127,6 +130,7 @@ class ManagementPropertyOutput(pydantic.BaseModel):
             "total_floors": v.total_floors,
             "owner_id": v.owner_id,
             "owner_name": (f"{v.owner.first_name} {v.owner.last_name or ''}".strip() if v.owner else None),
+            "engagement_type": v.engagement_type,
             "status": v.status,
             "tariff": v.tariff,
             "ask_price": v.ask_price,
@@ -145,6 +149,249 @@ class ManagementPropertyOutput(pydantic.BaseModel):
             "cover_image_url": cls._cover_url(v, request),
             "created_at": v.created_at,
             "updated_at": v.updated_at,
+        }
+
+
+class EvidenceMetadata(pydantic.BaseModel):
+    """Staff-only evidence metadata retained with a brokerage close archive."""
+
+    filename: str = pydantic.Field(min_length=1, max_length=255)
+    url: str = pydantic.Field(min_length=1, max_length=2048)
+    content_type: str | None = None
+    size_bytes: int | None = pydantic.Field(default=None, ge=0)
+
+
+class OneOffContactInput(pydantic.BaseModel):
+    name: str = pydantic.Field(min_length=1, max_length=150)
+    phone: str = pydantic.Field(min_length=1, max_length=30)
+    email: str | None = None
+
+
+class OneOffDealCreateInput(pydantic.BaseModel):
+    """Creates a one-off property and its staff-only brokerage deal together."""
+
+    name: str = pydantic.Field(min_length=1, max_length=200)
+    address: str = ""
+    district_id: int | None = None
+    property_type: str = "apartment"
+    rooms: int | None = pydantic.Field(default=None, ge=0)
+    bathrooms: int = pydantic.Field(default=1, ge=0)
+    area_sqm: int | None = pydantic.Field(default=None, ge=0)
+    floor: int | None = pydantic.Field(default=None, ge=0)
+    total_floors: int | None = pydantic.Field(default=None, ge=0)
+    furnishing: str = "unfurnished"
+    description: str | None = None
+    map_lat: Decimal | None = None
+    map_lon: Decimal | None = None
+    ask_price: Decimal | None = pydantic.Field(default=None, gt=0)
+    ask_currency: str = Currency.USD
+    seller: OneOffContactInput
+    channel: str
+    commission_type: str = BrokerageCommissionType.NONE
+    commission_fixed_amount: Decimal | None = pydantic.Field(default=None, gt=0)
+    commission_percentage: Decimal | None = pydantic.Field(default=None, gt=0, le=100)
+    commission_currency: str = Currency.USD
+
+    @field_validator("channel")
+    @classmethod
+    def validate_channel(cls, value: str) -> str:
+        if value not in OneOffChannel.values():
+            raise ValueError("Invalid one-off channel")
+        return value
+
+    @field_validator("commission_type")
+    @classmethod
+    def validate_commission_type(cls, value: str) -> str:
+        if value not in BrokerageCommissionType.values():
+            raise ValueError("Invalid commission type")
+        return value
+
+    @field_validator("ask_currency", "commission_currency")
+    @classmethod
+    def validate_currency(cls, value: str) -> str:
+        if value not in Currency.values():
+            raise ValueError("Unsupported currency")
+        return value
+
+    @model_validator(mode="after")
+    def validate_terms(self):
+        if self.commission_type == BrokerageCommissionType.NONE:
+            if self.commission_fixed_amount is not None or self.commission_percentage is not None:
+                raise ValueError("No-fee deals cannot have commission values")
+        elif self.commission_type == BrokerageCommissionType.FIXED:
+            if self.commission_fixed_amount is None or self.commission_percentage is not None:
+                raise ValueError("Fixed commission requires one fixed amount")
+        elif self.commission_percentage is None or self.commission_fixed_amount is not None:
+            raise ValueError("Percentage commission requires one percentage")
+        return self
+
+
+class OneOffDealUpdateInput(pydantic.BaseModel):
+    seller: OneOffContactInput | None = None
+    channel: str | None = None
+    commission_type: str | None = None
+    commission_fixed_amount: Decimal | None = pydantic.Field(default=None, gt=0)
+    commission_percentage: Decimal | None = pydantic.Field(default=None, gt=0, le=100)
+    commission_currency: str | None = None
+
+
+class OneOffDealCloseWonInput(pydantic.BaseModel):
+    renter: OneOffContactInput
+    agreed_monthly_rent: Decimal = pydantic.Field(gt=0)
+    agreed_currency: str
+    close_date: date
+    notes: str = ""
+    evidence: list[EvidenceMetadata] = pydantic.Field(default_factory=list)
+
+    @field_validator("agreed_currency")
+    @classmethod
+    def validate_currency(cls, value: str) -> str:
+        if value not in Currency.values():
+            raise ValueError("Unsupported currency")
+        return value
+
+
+class OneOffDealCloseLostInput(pydantic.BaseModel):
+    close_date: date
+    notes: str = ""
+    evidence: list[EvidenceMetadata] = pydantic.Field(default_factory=list)
+
+
+class OneOffReceiptCreateInput(pydantic.BaseModel):
+    amount: Decimal = pydantic.Field(ge=0)
+    currency: str
+    received_date: date
+    method: str
+    reference: str = ""
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str) -> str:
+        if value not in Currency.values():
+            raise ValueError("Unsupported currency")
+        return value
+
+    @field_validator("method")
+    @classmethod
+    def validate_method(cls, value: str) -> str:
+        if value not in PaymentMethod.values():
+            raise ValueError("Invalid receipt method")
+        return value
+
+
+class OneOffReceiptAttachmentOutput(pydantic.BaseModel):
+    id: int
+    filename: str
+    url: str
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+
+
+class OneOffReceiptOutput(pydantic.BaseModel):
+    id: int
+    amount: Decimal
+    currency: str
+    received_date: date
+    method: str
+    reference: str
+    recorded_by_id: int
+    recorded_by_name: str
+    attachments: list[OneOffReceiptAttachmentOutput]
+    created_at: datetime
+
+
+class OneOffDealOutput(pydantic.BaseModel):
+    id: int
+    property_id: int
+    property_name: str
+    property_address: str
+    status: str
+    channel: str
+    seller_name: str
+    seller_phone: str
+    seller_email: str | None
+    renter_name: str | None
+    renter_phone: str | None
+    renter_email: str | None
+    commission_type: str
+    commission_fixed_amount: Decimal | None
+    commission_percentage: Decimal | None
+    commission_currency: str
+    agreed_monthly_rent: Decimal | None
+    agreed_currency: str
+    close_date: date | None
+    close_notes: str
+    evidence: list[EvidenceMetadata]
+    commission_amount: Decimal | None
+    commission_uzs_amount: Decimal | None
+    commission_conversion_rate: Decimal | None
+    receipt: OneOffReceiptOutput | None
+    created_at: datetime
+    updated_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_related(cls, value):
+        if isinstance(value, dict):
+            return value
+        try:
+            receipt = value.receipt
+        except Exception:
+            receipt = None
+        return {
+            "id": value.id,
+            "property_id": value.property_id,
+            "property_name": value.property.name,
+            "property_address": value.property.address,
+            "status": value.status,
+            "channel": value.channel,
+            "seller_name": value.seller_name,
+            "seller_phone": value.seller_phone,
+            "seller_email": value.seller_email,
+            "renter_name": value.renter_name,
+            "renter_phone": value.renter_phone,
+            "renter_email": value.renter_email,
+            "commission_type": value.commission_type,
+            "commission_fixed_amount": value.commission_fixed_amount,
+            "commission_percentage": value.commission_percentage,
+            "commission_currency": value.commission_currency,
+            "agreed_monthly_rent": value.agreed_monthly_rent,
+            "agreed_currency": value.agreed_currency,
+            "close_date": value.close_date,
+            "close_notes": value.close_notes,
+            "evidence": value.evidence or [],
+            "commission_amount": value.commission_amount,
+            "commission_uzs_amount": value.commission_uzs_amount,
+            "commission_conversion_rate": value.commission_conversion_rate,
+            "receipt": (
+                {
+                    "id": receipt.id,
+                    "amount": receipt.amount,
+                    "currency": receipt.currency,
+                    "received_date": receipt.received_date,
+                    "method": receipt.method,
+                    "reference": receipt.reference,
+                    "recorded_by_id": receipt.recorded_by_id,
+                    "recorded_by_name": f"{receipt.recorded_by.first_name} {receipt.recorded_by.last_name or ''}".strip(),
+                    "attachments": [
+                        {
+                            "id": attachment.id,
+                            "filename": attachment.filename,
+                            "url": attachment.file.url,
+                            "content_type": attachment.content_type,
+                            "size_bytes": attachment.size_bytes,
+                            "created_at": attachment.created_at,
+                        }
+                        for attachment in receipt.attachments.all()
+                    ],
+                    "created_at": receipt.created_at,
+                }
+                if receipt
+                else None
+            ),
+            "created_at": value.created_at,
+            "updated_at": value.updated_at,
         }
 
 
@@ -489,6 +736,15 @@ class DashboardOccupancy(pydantic.BaseModel):
     maintenance: int
 
 
+class DashboardBrokerage(pydantic.BaseModel):
+    """Closed one-off brokerage pipeline kept separate from rental KPIs."""
+
+    expected_uzs: str
+    received_uzs: str
+    unpaid_uzs: str
+    closed_count: int
+
+
 class MaintenanceRequestRow(pydantic.BaseModel):
     id: int
     title: str
@@ -507,6 +763,7 @@ class DashboardOutput(pydantic.BaseModel):
     kpi: DashboardKPIs
     recent_payments: list[RecentPaymentRow]
     occupancy: DashboardOccupancy
+    brokerage: DashboardBrokerage
     maintenance_requests: list[MaintenanceRequestRow]
 
 

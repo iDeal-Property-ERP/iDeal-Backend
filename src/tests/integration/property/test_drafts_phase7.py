@@ -66,7 +66,7 @@ class TestPropertyDrafts:
         assert prop.status == PropertyStatus.DRAFT
 
     def test_publish_incomplete_returns_missing_codes(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT, district=None, ask_price=None)
+        prop = PropertyFactory(status=PropertyStatus.DRAFT, district=None, total_floors=None, ask_price=None)
         response = api_client.post(
             f"/api/v1/properties/{prop.id}/publish/",
             data=json.dumps({}),
@@ -77,6 +77,7 @@ class TestPropertyDrafts:
         error = response.json()["error"]
         assert error["code"] == "incomplete"
         assert "district" in error["missing"]
+        assert "total_floors" in error["missing"]
         assert "ask_price" in error["missing"]
         assert "photos" in error["missing"]
 
