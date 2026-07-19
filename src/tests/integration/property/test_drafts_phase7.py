@@ -5,7 +5,7 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from property.models import Property, VerificationVisit
 
-from core.constants import PropertyStatus
+from core.constants import PropertyEngagementType, PropertyStatus
 from tests.factories import PropertyFactory
 from tests.integration.property.test_api import _make_jwt
 
@@ -243,3 +243,15 @@ class TestVerificationVisits:
         )
         assert len(listed.json()["data"]) == 1
         assert listed.json()["data"][0]["notes"] == "Bring keys"
+
+    def test_rejected_for_one_off_property(self, api_client, management):
+        prop = PropertyFactory(engagement_type=PropertyEngagementType.ONE_OFF, owner=None)
+        when = (datetime.now(UTC) + timedelta(days=3)).isoformat()
+        response = api_client.post(
+            f"/api/v1/properties/{prop.id}/verification-visits/",
+            data=json.dumps({"scheduled_for": when}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 400
+        assert response.json()["success"] is False

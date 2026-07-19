@@ -53,7 +53,7 @@ class PropertyAdmin(BaseSoftDeleteModelAdmin):
             {
                 "fields": (
                     "property_type",
-                    ("rooms", "bathrooms"),
+                    ("rooms",),
                     ("area_sqm", "floor", "total_floors"),
                     "furnishing",
                     "amenities",

@@ -62,7 +62,6 @@ class Property(TimestampedModel, SoftDeleteModel):
     district = models.ForeignKey(District, on_delete=models.PROTECT, related_name="properties", null=True, blank=True)
     property_type = models.CharField(max_length=20, choices=PropertyType.choices, default=PropertyType.APARTMENT)
     rooms = models.PositiveSmallIntegerField(null=True, blank=True)
-    bathrooms = models.PositiveSmallIntegerField(default=1)
     area_sqm = models.PositiveSmallIntegerField(null=True, blank=True)
     floor = models.PositiveSmallIntegerField(null=True, blank=True)
     total_floors = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -247,11 +246,6 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
         if self.channel == OneOffChannel.MARKETPLACE:
             if prop.photos.count() < 5:
                 missing.append("photos")
-            verified_or_scheduled = prop.is_verified or prop.verification_visits.filter(
-                status__in=(VerificationVisitStatus.SCHEDULED, VerificationVisitStatus.COMPLETED)
-            ).exists()
-            if not verified_or_scheduled:
-                missing.append("verification")
         return missing
 
     def _depublish(self):
@@ -282,7 +276,7 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
         self._depublish()
         return self
 
-    def close_won(self, *, renter_name, renter_phone, renter_email, agreed_monthly_rent, agreed_currency, close_date, notes, evidence, closed_by):
+    def close_won(self, *, renter_name, renter_phone, renter_email, agreed_monthly_rent, agreed_currency, close_date, notes, evidence, closed_by, keep_property_active=False):
         from finance.utils import convert_amount
 
         if self.status not in (OneOffDealStatus.ACTIVE, OneOffDealStatus.PAUSED):
@@ -326,12 +320,13 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
             self.closed_by = closed_by
             self.status = OneOffDealStatus.CLOSED_WON
             self.save()
-            self.property.status = PropertyStatus.ARCHIVED
-            self.property.save(update_fields=["status", "updated_at"])
-            self._depublish()
+            if not keep_property_active:
+                self.property.status = PropertyStatus.ARCHIVED
+                self.property.save(update_fields=["status", "updated_at"])
+                self._depublish()
         return self
 
-    def close_lost(self, *, close_date, notes, evidence, closed_by):
+    def close_lost(self, *, close_date, notes, evidence, closed_by, keep_property_active=False):
         if self.status not in (OneOffDealStatus.ACTIVE, OneOffDealStatus.PAUSED):
             raise ValidationError(_("Only active or paused deals can be closed."))
         with transaction.atomic():
@@ -341,9 +336,10 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
             self.closed_by = closed_by
             self.status = OneOffDealStatus.CLOSED_LOST
             self.save()
-            self.property.status = PropertyStatus.ARCHIVED
-            self.property.save(update_fields=["status", "updated_at"])
-            self._depublish()
+            if not keep_property_active:
+                self.property.status = PropertyStatus.ARCHIVED
+                self.property.save(update_fields=["status", "updated_at"])
+                self._depublish()
         return self
 
     def archive(self):

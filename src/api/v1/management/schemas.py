@@ -175,7 +175,6 @@ class OneOffDealCreateInput(pydantic.BaseModel):
     district_id: int | None = None
     property_type: str = "apartment"
     rooms: int | None = pydantic.Field(default=None, ge=0)
-    bathrooms: int = pydantic.Field(default=1, ge=0)
     area_sqm: int | None = pydantic.Field(default=None, ge=0)
     floor: int | None = pydantic.Field(default=None, ge=0)
     total_floors: int | None = pydantic.Field(default=None, ge=0)
@@ -242,6 +241,7 @@ class OneOffDealCloseWonInput(pydantic.BaseModel):
     close_date: date
     notes: str = ""
     evidence: list[EvidenceMetadata] = pydantic.Field(default_factory=list)
+    keep_property_active: bool = False
 
     @field_validator("agreed_currency")
     @classmethod
@@ -255,6 +255,7 @@ class OneOffDealCloseLostInput(pydantic.BaseModel):
     close_date: date
     notes: str = ""
     evidence: list[EvidenceMetadata] = pydantic.Field(default_factory=list)
+    keep_property_active: bool = False
 
 
 class OneOffReceiptCreateInput(pydantic.BaseModel):

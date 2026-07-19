@@ -14,6 +14,7 @@ from api.v1.marketplace.schemas import (
 from core.api.views import BaseController, DetailPath, GenericController, ListAPIView, RetrieveAPIView
 from core.constants import ListingStatus, PropertyStatus
 from core.utils.pagination import build_paginated_response
+from core.utils.rate_limit import rate_limit
 
 # Static verification checklist shown on every verified listing's detail page.
 VERIFICATION_CHECKLIST = [
@@ -53,7 +54,6 @@ def _build_property_brief(prop, request=None):
         "district_name": prop.district.name if prop.district else None,
         "property_type": prop.property_type,
         "rooms": prop.rooms,
-        "bathrooms": prop.bathrooms,
         "area_sqm": prop.area_sqm,
         "floor": prop.floor,
         "total_floors": prop.total_floors,
@@ -116,7 +116,6 @@ def _build_listing_detail(listing, request=None):
             "specs": {
                 "property_type": prop.property_type,
                 "rooms": prop.rooms,
-                "bathrooms": prop.bathrooms,
                 "area_sqm": prop.area_sqm,
                 "floor": prop.floor,
                 "total_floors": prop.total_floors,
@@ -392,6 +391,115 @@ class ContactInquiryView(BaseController):
                 "message": inquiry.message,
                 "status": inquiry.status,
                 "created_at": inquiry.created_at.isoformat(),
-                "updated_at": inquiry.updated_at.isoformat(),
             }
         )
+
+class PublicListingSubmitView(BaseController):
+    auth = ()
+
+    @rate_limit(requests=3, window_seconds=3600)
+    def post(self) -> dict:
+        import json
+        import uuid
+        from django.db import transaction
+        from account.models import User
+        from contract.models import OwnerOnboarding, PublicOffer
+        from property.models import Amenity, PropertyPhoto
+        from core.utils.uploads import UploadError, save_uploaded_images
+        from core.constants import UserRole
+        from api.v1.marketplace.schemas import PublicListingSubmitInput
+
+        payload_str = self.request.POST.get("payload")
+        if not payload_str:
+            return self.fail(error=str(_("Missing payload data")))
+
+        try:
+            data = json.loads(payload_str)
+            validated = PublicListingSubmitInput.model_validate(data)
+        except (json.JSONDecodeError, pydantic.ValidationError) as e:
+            return self.fail(error=str(e), message=str(_("Invalid payload")))
+
+        files = self.request.FILES.getlist("images")
+        if len(files) < 5:
+            return self.fail(error=str(_("At least 5 photos are required")))
+
+        contact = validated.contact
+        
+        try:
+            with transaction.atomic():
+                # Find or create user
+                user = User.objects.filter(models.Q(email=contact.email) | models.Q(phone=contact.phone)).first()
+                if not user:
+                    user = User.objects.create(
+                        username=str(uuid.uuid4())[:30],
+                        email=contact.email,
+                        phone=contact.phone,
+                        first_name=contact.first_name,
+                        last_name=contact.last_name,
+                        role=UserRole.OWNER,
+                        is_active=False,
+                    )
+                    user.set_unusable_password()
+                    user.save(update_fields=["password"])
+
+                # Create Property
+                prop = Property.objects.create(
+                    name=validated.name,
+                    address=validated.name,  # Fallback to name if not provided
+                    district_id=validated.district_id,
+                    property_type=validated.property_type,
+                    rooms=validated.rooms,
+                    area_sqm=validated.area_sqm,
+                    floor=validated.floor,
+                    total_floors=validated.total_floors,
+                    furnishing=validated.furnishing,
+                    owner=user,
+                    status=PropertyStatus.PENDING_REVIEW,
+                    description=validated.description,
+                    ask_price=validated.monthly_price,
+                    ask_currency=validated.currency,
+                    owner_guaranteed_price=validated.monthly_price,
+                    owner_guaranteed_currency=validated.currency,
+                    tenant_charge_price=validated.monthly_price,
+                    tenant_charge_currency=validated.currency,
+                )
+
+                if validated.amenities:
+                    prop.amenities.set(Amenity.objects.filter(slug__in=validated.amenities, is_active=True))
+
+                # Create Listing
+                listing = Listing.objects.create(
+                    property=prop,
+                    status=ListingStatus.PENDING_REVIEW,
+                    is_active=False,
+                    description=validated.description,
+                    monthly_price=validated.monthly_price,
+                    listed_price=validated.monthly_price,
+                    deposit_amount=validated.deposit_amount,
+                    currency=validated.currency,
+                    minimum_stay=validated.minimum_stay,
+                    price_includes=validated.price_includes,
+                )
+
+                # Accept Offer
+                onboarding = OwnerOnboarding.objects.filter(property=prop).first()
+                if not onboarding:
+                    onboarding = OwnerOnboarding(owner=user, property=prop)
+                    onboarding.accept_offer(PublicOffer.get_active())
+                    onboarding.save()
+
+                # Upload Photos
+                try:
+                    created_photos = save_uploaded_images(PropertyPhoto, "property", prop, files)
+                    for idx, photo in enumerate(created_photos):
+                        photo.sort_order = idx
+                        photo.is_primary = (idx == 0)
+                        photo.save(update_fields=["sort_order", "is_primary", "updated_at"])
+                except UploadError as err:
+                    raise ValueError(str(err))
+
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Failed to process listing submission")))
+
+        return self.ok({"id": listing.id, "status": listing.status})
+

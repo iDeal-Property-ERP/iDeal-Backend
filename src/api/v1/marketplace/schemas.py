@@ -22,7 +22,6 @@ class PropertyBrief(pydantic.BaseModel):
     district_name: str | None = None
     property_type: str
     rooms: int
-    bathrooms: int
     area_sqm: int
     floor: int
     total_floors: int | None
@@ -128,3 +127,34 @@ class ContactInquiryOutput(pydantic.BaseModel):
     updated_at: datetime
 
     model_config = pydantic.ConfigDict(from_attributes=True)
+
+
+class PublicListingContactInput(pydantic.BaseModel):
+    first_name: str
+    last_name: str | None = None
+    email: str
+    phone: str
+
+
+class PublicListingSubmitInput(pydantic.BaseModel):
+    # Contact
+    contact: PublicListingContactInput
+
+    # Details
+    property_type: str
+    name: str
+    district_id: int
+    rooms: int = pydantic.Field(ge=1)
+    area_sqm: int = pydantic.Field(ge=0)
+    floor: int = pydantic.Field(default=0, ge=0)
+    total_floors: int | None = pydantic.Field(default=None, ge=0)
+    furnishing: str
+    description: str | None = None
+    amenities: list[str] = pydantic.Field(default_factory=list)
+
+    # Pricing
+    monthly_price: Decimal = pydantic.Field(ge=0)
+    deposit_amount: Decimal = pydantic.Field(ge=0)
+    currency: str = "USD"
+    minimum_stay: int = pydantic.Field(default=6, ge=0)
+    price_includes: list[str] = pydantic.Field(default_factory=list)

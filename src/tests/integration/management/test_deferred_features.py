@@ -160,10 +160,10 @@ class TestPropertyCsvImport:
         district = DistrictFactory()
         owner = OwnerFactory()
         csv_text = (
-            "name,address,district_id,rooms,area_sqm,floor,owner_id,"
+            "name,address,district_id,rooms,area_sqm,floor,total_floors,owner_id,"
             "ask_price,owner_guaranteed_price,tenant_charge_price\n"
-            f"Imported One,12 Amir Temur,{district.id},2,55,3,{owner.id},500,450,550\n"
-            f"Broken Row,13 Amir Temur,999999,2,55,3,{owner.id},500,450,550\n"
+            f"Imported One,12 Amir Temur,{district.id},2,55,3,5,{owner.id},500,450,550\n"
+            f"Broken Row,13 Amir Temur,999999,2,55,3,5,{owner.id},500,450,550\n"
         )
         upload = SimpleUploadedFile("props.csv", csv_text.encode(), content_type="text/csv")
 

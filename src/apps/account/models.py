@@ -24,8 +24,6 @@ class User(AbstractBaseUser, TimestampedModel, SoftDeleteModel):
     is_superuser = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
-    # Set for invited users given a temporary password: they must set their own
-    # password on first login before they can use the app.
     must_change_password = models.BooleanField(default=False)
 
     USERNAME_FIELD = "username"
@@ -49,19 +47,17 @@ class User(AbstractBaseUser, TimestampedModel, SoftDeleteModel):
         return self.is_superuser
 
     def save(self, *args, **kwargs):
+        self._ensure_password()
+        return super().save(*args, **kwargs)
+
+    def _ensure_password(self):
         from django.contrib.auth.hashers import identify_hasher, is_password_usable, make_password
 
-        # Hash a directly-assigned plaintext password, but never re-hash a value
-        # that is already a valid Django hash (any hasher — pbkdf2, argon2, md5 in
-        # tests, …) or an unusable "!" password. Detecting the hasher generically
-        # avoids corrupting non-pbkdf2 hashes (the previous prefix check did).
         if self.password and is_password_usable(self.password):
             try:
                 identify_hasher(self.password)
             except ValueError:
                 self.password = make_password(self.password)
-
-        return super().save(*args, **kwargs)
 
 
 class TokenBlacklist(TimestampedModel):

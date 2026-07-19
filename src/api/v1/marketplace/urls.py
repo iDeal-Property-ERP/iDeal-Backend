@@ -13,4 +13,5 @@ urlpatterns = [
     path("amenities/", views.AmenityListView.as_view(), name="amenity-list"),
     path("faqs/", views.FaqListView.as_view(), name="faq-list"),
     path("inquiries/", views.ContactInquiryView.as_view(), name="contact-inquiry"),
+    path("listings/submit/", views.PublicListingSubmitView.as_view(), name="listing-public-submit"),
 ]

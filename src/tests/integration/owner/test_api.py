@@ -112,7 +112,6 @@ class TestOwnerListingWizard:
                 "name": "Bright 2-room near Yunusobod metro",
                 "district_id": district.id,
                 "rooms": 2,
-                "bathrooms": 1,
                 "area_sqm": 68,
                 "furnishing": "furnished",
                 "description": "Sunny corner apartment.",

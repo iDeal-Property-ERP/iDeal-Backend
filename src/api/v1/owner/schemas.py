@@ -73,7 +73,6 @@ class OwnerListingCreateInput(pydantic.BaseModel):
     address: str | None = None
     district_id: int
     rooms: int
-    bathrooms: int = 1
     area_sqm: int
     floor: int = 1
     total_floors: int | None = None
@@ -90,7 +89,6 @@ class OwnerListingUpdateInput(pydantic.BaseModel):
     address: str | None = None
     district_id: int | None = None
     rooms: int | None = None
-    bathrooms: int | None = None
     area_sqm: int | None = None
     floor: int | None = None
     total_floors: int | None = None

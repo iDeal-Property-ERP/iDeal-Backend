@@ -780,8 +780,7 @@ class OneOffDealListCreateView(ManagementView, ListAPIView):
                 district_id=data["district_id"],
                 property_type=data["property_type"],
                 rooms=data["rooms"],
-                bathrooms=data["bathrooms"],
-                area_sqm=data["area_sqm"],
+                area_sqm=data.get("area_sqm"),
                 floor=data["floor"],
                 total_floors=data["total_floors"],
                 furnishing=data["furnishing"],
@@ -882,6 +881,7 @@ class OneOffDealCloseWonView(OneOffDealActionView):
                 notes=parsed_body.notes,
                 evidence=[item.model_dump() for item in parsed_body.evidence],
                 closed_by=self.request.user,
+                keep_property_active=parsed_body.keep_property_active,
             )
         except Exception as err:
             return self.fail(error=str(err), message=str(_("Cannot close one-off deal")))
@@ -897,6 +897,7 @@ class OneOffDealCloseLostView(OneOffDealActionView):
                 notes=parsed_body.notes,
                 evidence=[item.model_dump() for item in parsed_body.evidence],
                 closed_by=self.request.user,
+                keep_property_active=parsed_body.keep_property_active,
             )
         except Exception as err:
             return self.fail(error=str(err), message=str(_("Cannot close one-off deal")))

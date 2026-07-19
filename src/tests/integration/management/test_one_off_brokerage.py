@@ -14,7 +14,6 @@ from tests.factories import (
     ExchangeRateFactory,
     OwnerFactory,
     PropertyPhotoFactory,
-    VerificationVisitFactory,
 )
 from tests.integration.property.test_api import _make_jwt
 
@@ -28,6 +27,7 @@ def _create_one_off(api_client, management, **overrides):
         "rooms": 2,
         "area_sqm": 70,
         "floor": 5,
+        "total_floors": 9,
         "ask_price": "750.00",
         "seller": {"name": "Seller Snapshot", "phone": "+998901112233"},
         "channel": "marketplace",
@@ -67,7 +67,7 @@ class TestOneOffBrokerageAPI:
                 property=prop,
                 image=SimpleUploadedFile("home.jpg", b"image", content_type="image/jpeg"),
             )
-        VerificationVisitFactory(property=prop)
+
 
         activated = api_client.post(
             f"/api/v1/management/one-off-deals/{deal_id}/activate/",
@@ -208,6 +208,7 @@ def test_percentage_commission_uses_agreed_rent_snapshot(management):
         rooms=1,
         area_sqm=40,
         floor=2,
+        total_floors=5,
         ask_price=Decimal("850.00"),
         engagement_type=PropertyEngagementType.ONE_OFF,
         status=PropertyStatus.DRAFT,
@@ -275,6 +276,7 @@ class TestUnifiedOneOffPropertyDraftAPI:
                     "rooms": 1,
                     "area_sqm": 40,
                     "floor": 2,
+                    "total_floors": 5,
                     "ask_price": "500.00",
                     "brokerage": {
                         "seller_name": "Seller",

@@ -93,7 +93,7 @@ def _property_output(prop, request) -> dict:
         except OneOffDeal.DoesNotExist:
             data["one_off_deal"] = None
     data["photos"] = photos
-    if next_visit is not None:
+    if prop.engagement_type != PropertyEngagementType.ONE_OFF and next_visit is not None:
         data["verification"] = {
             "id": next_visit.id,
             "scheduled_for": next_visit.scheduled_for.isoformat(),
@@ -290,8 +290,6 @@ class OneOffPropertyUpdateView(GenericController):
         }
         if closed and (brokerage is not None or set(data) - ONE_OFF_CLOSED_EDITABLE_FIELDS):
             return self.fail(error=str(_("Closed one-off commercial terms are read-only")))
-        if not closed and deal.status != OneOffDealStatus.DRAFT and brokerage is not None:
-            return self.fail(error=str(_("Only draft one-off deal terms can be edited")))
         try:
             with transaction.atomic():
                 _apply_one_off_property_data(prop, data)
@@ -362,7 +360,10 @@ class PropertyPublishView(ManagementPropertyView):
             prop.vacant_since = timezone.now().date()
             prop.vacant_days = 0
             prop.save(update_fields=["status", "vacant_since", "vacant_days", "updated_at"])
-            if parsed_body.schedule_verification_at is not None:
+            if (
+                parsed_body.schedule_verification_at is not None
+                and prop.engagement_type != PropertyEngagementType.ONE_OFF
+            ):
                 VerificationVisit.objects.create(
                     property=prop,
                     scheduled_for=parsed_body.schedule_verification_at,
@@ -458,6 +459,8 @@ class PropertyVerificationVisitView(ManagementPropertyView):
     @require_role(UserRole.MANAGEMENT)
     def post(self, parsed_path: Path[DetailPath], parsed_body: Body[VerificationVisitCreateInput]) -> dict:
         prop = self.get_object(pk=parsed_path.pk)
+        if prop.engagement_type == PropertyEngagementType.ONE_OFF:
+            return self.fail(error=str(_("Verification visits are only for managed properties")))
         self.ensure_mutable(prop)
         visit = VerificationVisit.objects.create(
             property=prop,

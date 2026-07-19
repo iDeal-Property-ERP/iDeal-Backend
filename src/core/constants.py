@@ -58,8 +58,6 @@ class PropertyStatus(ConstantChoices):
 
 
 class PropertyEngagementType(ConstantChoices):
-    """The immutable commercial model a property belongs to."""
-
     MANAGED = "managed"
     ONE_OFF = "one_off"
     CHOICES = [
