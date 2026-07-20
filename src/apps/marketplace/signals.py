@@ -42,7 +42,7 @@ def _one_off_is_off_market(instance):
 
 @receiver(post_save, sender=Property)
 def manage_listing_on_property_change(sender, instance, created, update_fields, **kwargs):
-    """Keep a property's Listing in sync with its status.
+    """Keep a property's Listing in sync with its status and metadata.
 
     Idempotent + status-aware so the wizard's draft/review lifecycle is never bypassed:
     - On property→VACANT we only publish an *existing* listing when it has passed review
@@ -52,6 +52,24 @@ def manage_listing_on_property_change(sender, instance, created, update_fields, 
     """
     if _one_off_is_off_market(instance):
         return
+
+    if not created:
+        try:
+            listing = instance.listing
+            # Sync metadata to the marketplace listing
+            sync_fields = []
+            if listing.description != instance.description:
+                listing.description = instance.description
+                sync_fields.append("description")
+            if listing.monthly_price != instance.ask_price:
+                listing.monthly_price = instance.ask_price
+                listing.listed_price = instance.ask_price
+                sync_fields.extend(["monthly_price", "listed_price"])
+            if sync_fields:
+                sync_fields.append("updated_at")
+                listing.save(update_fields=sync_fields)
+        except Listing.DoesNotExist:
+            pass
 
     if created and instance.status == PropertyStatus.VACANT:
         _create_published_listing(instance)
