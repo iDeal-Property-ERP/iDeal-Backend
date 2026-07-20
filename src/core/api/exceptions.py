@@ -55,10 +55,12 @@ def global_error_handler(endpoint, controller, exc):
             exc_info=exc,
             extra={"request": getattr(controller, "request", None)},
         )
-        return JsonResponse(
+        resp = JsonResponse(
             {"success": False, "message": str(_("Internal server error")), "error": error_text},
             status=HTTPStatus.INTERNAL_SERVER_ERROR,
         )
+        resp._has_been_logged = True
+        return resp
 
     if isinstance(exc, Http404):
         return JsonResponse(
@@ -98,7 +100,10 @@ def global_error_handler(endpoint, controller, exc):
             extra={"request": getattr(controller, "request", None)},
         )
         
-    return JsonResponse(
+    resp = JsonResponse(
         {"success": False, "message": str(_("Internal server error")), "error": error_text},
         status=status_code,
     )
+    if status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
+        resp._has_been_logged = True
+    return resp
