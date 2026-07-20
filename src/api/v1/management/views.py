@@ -212,7 +212,7 @@ class DashboardView(ManagementView):
         # ---- KPI: Vacant units ----
         vacant_count = Property.objects.filter(status="vacant").count()
         vacant_props = list(Property.objects.filter(status="vacant").values_list("tenant_charge_price", flat=True))
-        loss_per_day = sum((p / Decimal("30")) for p in vacant_props if p) if vacant_props else Decimal("0.00")
+        loss_per_day = sum((p / Decimal("30") for p in vacant_props if p), Decimal("0.00"))
 
         # ---- Recent Payments ----
         recent_payments_qs = Payment.objects.select_related("tenant", "lease__property").order_by("-payment_date")[:5]
