@@ -53,6 +53,7 @@ def _build_property_brief(prop, request=None):
         "district_id": prop.district_id,
         "district_name": prop.district.name if prop.district else None,
         "property_type": prop.property_type,
+        "engagement_type": prop.engagement_type,
         "rooms": prop.rooms,
         "area_sqm": prop.area_sqm,
         "floor": prop.floor,
