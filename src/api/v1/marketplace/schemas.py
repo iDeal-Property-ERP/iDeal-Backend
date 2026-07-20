@@ -21,6 +21,7 @@ class PropertyBrief(pydantic.BaseModel):
     district_id: int
     district_name: str | None = None
     property_type: str
+    engagement_type: str = "managed"
     rooms: int
     area_sqm: int
     floor: int
@@ -142,6 +143,7 @@ class PublicListingSubmitInput(pydantic.BaseModel):
 
     # Details
     property_type: str
+    engagement_type: str = "managed"
     name: str
     district_id: int
     rooms: int = pydantic.Field(ge=1)
