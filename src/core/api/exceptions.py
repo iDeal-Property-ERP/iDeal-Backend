@@ -1,3 +1,4 @@
+import logging
 from http import HTTPStatus
 
 from django.conf import settings
@@ -16,6 +17,8 @@ from dmr.exceptions import (
     TooManyRequestsError,
     ValidationError,
 )
+
+logger = logging.getLogger("django.request")
 
 
 def global_error_handler(endpoint, controller, exc):
@@ -46,6 +49,12 @@ def global_error_handler(endpoint, controller, exc):
         )
     if isinstance(exc, (InternalServerError, DataRenderingError, ResponseSchemaError)):
         error_text = str(exc) if settings.DEBUG else force_str(InternalServerError.default_message)
+        logger.error(
+            "Internal Server Error: %s",
+            error_text,
+            exc_info=exc,
+            extra={"request": getattr(controller, "request", None)},
+        )
         return JsonResponse(
             {"success": False, "message": str(_("Internal server error")), "error": error_text},
             status=HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -80,6 +89,15 @@ def global_error_handler(endpoint, controller, exc):
 
     status_code = getattr(exc, "status_code", HTTPStatus.INTERNAL_SERVER_ERROR)
     error_text = str(exc) if settings.DEBUG else str(_("Internal server error"))
+    
+    if status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
+        logger.error(
+            "Internal Server Error: %s",
+            error_text,
+            exc_info=exc,
+            extra={"request": getattr(controller, "request", None)},
+        )
+        
     return JsonResponse(
         {"success": False, "message": str(_("Internal server error")), "error": error_text},
         status=status_code,
