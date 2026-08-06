@@ -15,6 +15,7 @@ from api.v1.owner.schemas import (
     OwnerOnboardingCreateInput,
     OwnerOnboardingOutput,
     OwnerPropertyOutput,
+    OwnerSettlementOutput,
     PublicOfferOutput,
 )
 from core.api.permissions import RoleAuth
@@ -43,30 +44,22 @@ class OwnerEarningsView(BaseController):
 
     def get(self) -> dict:
         user = self.request.user
-        from finance.models import PayoutSchedule
-        from property.models import Property
+        from finance.models import OwnerSettlement, PayoutSchedule
 
-        from core.constants import PropertyStatus
-
-        by_property = PayoutSchedule.objects.filter(owner=user)
-        # Only properties under an active guarantee count toward the guaranteed
-        # figure — drafts and pending-review submissions are not yet guaranteed
-        # and would otherwise overstate the owner's contractual minimum.
-        managed_statuses = (PropertyStatus.RENTED, PropertyStatus.VACANT, PropertyStatus.MAINTENANCE)
-        total_guaranteed = Property.objects.filter(owner=user, status__in=managed_statuses).aggregate(
-            total=Sum("owner_guaranteed_price")
-        )["total"] or Decimal("0.00")
-        total_paid = by_property.filter(status=PayoutStatus.PAID).aggregate(total=Sum("amount"))["total"] or Decimal(
-            "0.00"
-        )
-        total_pending = by_property.filter(status=PayoutStatus.SCHEDULED).aggregate(total=Sum("amount"))[
-            "total"
-        ] or Decimal("0.00")
+        settlements = OwnerSettlement.objects.filter(owner=user)
+        payouts = PayoutSchedule.objects.filter(owner=user)
+        total_guaranteed = settlements.aggregate(total=Sum("owner_payout_amount"))["total"] or Decimal("0.00")
+        total_paid = payouts.filter(status=PayoutStatus.PAID).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        total_pending = payouts.filter(status=PayoutStatus.SCHEDULED).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        above = settlements.aggregate(total=Sum("owner_payout_amount") - Sum("gross_floor_amount"))["total"] or Decimal("0.00")
+        next_payout = payouts.filter(status=PayoutStatus.SCHEDULED).order_by("scheduled_date").first()
         return self.ok(
             {
                 "total_guaranteed": str(total_guaranteed),
                 "total_paid": str(total_paid),
                 "total_pending": str(total_pending),
+                "total_above_guarantee": str(max(above, Decimal("0.00"))),
+                "next_payout_amount": str(next_payout.amount if next_payout else Decimal("0.00")),
                 "currency": "USD",
             }
         )
@@ -78,23 +71,58 @@ class OwnerWhyView(BaseController):
     def get(self) -> dict:
         return self.ok(
             {
-                "title": str(_("Guaranteed Rental Income")),
+                "title": str(_("Transparent guaranteed rental income")),
                 "description": str(
                     _(
-                        "With iDeal, you receive your rental income every month, "
-                        "on time, regardless of whether the property is occupied. "
-                        "We handle tenant management, maintenance, and legal compliance."
+                        "Your agreement states a gross monthly floor and commission rate. "
+                        "We pay the floor after commission even when rent is not collected; "
+                        "when collected rent is higher, you receive percentage-based upside."
                     )
                 ),
                 "benefits": [
-                    str(_("Monthly payouts on the 25th of every month")),
-                    str(_("No vacancy risk — we guarantee your income")),
+                    str(_("Statements show rent received, floor, commission and payout")),
+                    str(_("No vacancy risk for your agreed net payout")),
                     str(_("Professional tenant screening and management")),
                     str(_("24/7 maintenance support")),
                     str(_("Regular property inspections and reports")),
                 ],
             }
         )
+
+
+class OwnerSettlementListView(ListAPIView):
+    auth = (RoleAuth(UserRole.OWNER),)
+    output_schema = OwnerSettlementOutput
+
+    def get_queryset(self):
+        from finance.models import OwnerSettlement
+
+        return OwnerSettlement.objects.filter(owner=self.request.user).select_related("owner_agreement__property").prefetch_related(
+            "payouts"
+        )
+
+    def to_output(self, settlement):
+        payout = settlement.payouts.order_by("-created_at").first()
+        return {
+            "id": settlement.id,
+            "property_name": settlement.owner_agreement.property.name,
+            "period_start": settlement.period_start,
+            "period_end": settlement.period_end,
+            "gross_floor_amount": settlement.gross_floor_amount,
+            "commission_rate": settlement.commission_rate,
+            "currency": settlement.currency,
+            "rent_received_amount": settlement.rent_received_amount,
+            "settlement_base_amount": settlement.settlement_base_amount,
+            "commission_amount": settlement.commission_amount,
+            "owner_payout_amount": settlement.owner_payout_amount,
+            "ideal_cash_exposure": settlement.ideal_cash_exposure,
+            "payout_status": payout.status if payout else None,
+            "payout_amount": payout.amount if payout else None,
+            "payout_kind": payout.kind if payout else None,
+        }
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return super().get(parsed_query)
 
 
 class OwnerPublicOfferView(BaseController):

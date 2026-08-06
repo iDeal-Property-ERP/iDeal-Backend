@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 from dmr.pagination import Paginated
-from finance.models import ExchangeRate, Payment, PayoutSchedule
+from finance.models import ExchangeRate, OwnerSettlement, Payment, PayoutSchedule
 from finance.utils import convert_amount
 from notification.services import notify
 
@@ -29,6 +29,8 @@ from api.v1.finance.schemas import (
     PayoutScheduleOutput,
     PnLBreakdown,
     PnLFilter,
+    SettlementAllocationOutput,
+    SettlementOutput,
 )
 from core.api.permissions import RoleAuth
 from core.api.views import (
@@ -121,6 +123,13 @@ class PaymentPartialUpdateView(GenericController):
     def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[PaymentPartialUpdateInput]) -> PaymentOutput:
         payment = self.get_object(pk=parsed_path.pk)
         data = parsed_body.model_dump(exclude_unset=True)
+        if payment.status == PaymentStatus.PAID and set(data).intersection(
+            {"amount", "currency", "payment_date", "due_date", "rental_period", "kind"}
+        ):
+            return self.fail(
+                error=str(_("Paid rent receipts are immutable; record a reversal or adjustment instead")),
+                message=str(_("Invalid financial correction")),
+            )
         for attr, value in data.items():
             setattr(payment, attr, value)
         payment.save()
@@ -295,6 +304,48 @@ class PayoutScheduleListCreateView(CreateAPIView, ListAPIView):
             status=PayoutStatus.SCHEDULED,
         )
         return self.ok(self.to_output(payout), status_code=HTTPStatus.CREATED)
+
+
+class SettlementListView(ListAPIView):
+    """Management ledger view; owners use the scoped equivalent below."""
+
+    model = OwnerSettlement
+    output_schema = SettlementOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        qs = OwnerSettlement.objects.select_related("owner_agreement__property", "owner").prefetch_related(
+            "receipt_allocations"
+        )
+        if owner_id := self.request.GET.get("owner_id"):
+            qs = qs.filter(owner_id=owner_id)
+        if agreement_id := self.request.GET.get("owner_agreement_id"):
+            qs = qs.filter(owner_agreement_id=agreement_id)
+        return qs
+
+    def get(self, parsed_query: Query[ListQuery]) -> list[SettlementOutput] | Paginated[SettlementOutput]:
+        return super().get(parsed_query)
+
+
+class SettlementDetailView(RetrieveAPIView):
+    model = OwnerSettlement
+    output_schema = SettlementOutput
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get_queryset(self):
+        return OwnerSettlement.objects.select_related("owner_agreement__property", "owner").prefetch_related(
+            "receipt_allocations"
+        )
+
+
+class SettlementAllocationsView(GenericController):
+    auth = (RoleAuth(UserRole.MANAGEMENT),)
+
+    def get(self, parsed_path: Path[DetailPath]) -> list[SettlementAllocationOutput]:
+        settlement = get_object_or_404(OwnerSettlement, pk=parsed_path.pk)
+        return self.ok(
+            [SettlementAllocationOutput.model_validate(row).model_dump(mode="json") for row in settlement.receipt_allocations.all()]
+        )
 
 
 class PayoutScheduleBulkMarkPaidView(GenericController):
@@ -508,6 +559,8 @@ class PnLView(GenericController):
     auth = (RoleAuth(UserRole.MANAGEMENT),)
 
     def get(self, parsed_query: Query[PnLFilter]) -> PnLBreakdown:
+        from finance.models import OwnerSettlement
+
         year = parsed_query.year
         month = parsed_query.month
         start_date = parsed_query.start_date
@@ -546,6 +599,23 @@ class PnLView(GenericController):
         tax_estimate_usd = _safe_convert(tax_estimate_uzs, Currency.UZS, Currency.USD)
 
         payment_count = payment_qs.count()
+        settlement_qs = OwnerSettlement.objects.all()
+        if year:
+            settlement_qs = settlement_qs.filter(period_start__year=year)
+        if month:
+            settlement_qs = settlement_qs.filter(period_start__month=month)
+        if start_date:
+            settlement_qs = settlement_qs.filter(period_start__gte=start_date)
+        if end_date:
+            settlement_qs = settlement_qs.filter(period_start__lte=end_date)
+        contractual_commission = Decimal("0.00")
+        ideal_cash_exposure = Decimal("0.00")
+        for settlement in settlement_qs:
+            contractual_commission += _safe_convert(settlement.commission_amount, settlement.currency, Currency.USD)
+            ideal_cash_exposure += _safe_convert(settlement.ideal_cash_exposure, settlement.currency, Currency.USD)
+        cash_collected = sum(
+            (_safe_convert(payment.amount, payment.currency, Currency.USD) for payment in payment_qs), Decimal("0.00")
+        )
 
         breakdown = PnLBreakdown(
             gross_revenue=gross_revenue_usd,
@@ -557,5 +627,9 @@ class PnLView(GenericController):
             payment_count=payment_count,
             tax_estimate=tax_estimate_usd,
             tax_estimate_uzs=tax_estimate_uzs,
+            cash_collected=cash_collected,
+            contractual_commission=contractual_commission,
+            ideal_cash_exposure=ideal_cash_exposure,
+            net_cash_position=cash_collected - owner_payouts_usd,
         )
         return self.ok(breakdown.model_dump(mode="json"))

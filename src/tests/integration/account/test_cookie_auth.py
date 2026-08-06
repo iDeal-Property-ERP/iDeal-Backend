@@ -7,9 +7,8 @@ import json
 
 import pytest
 
-from tests.factories import UserFactory
-
 from core.auth_cookies import ACCESS_COOKIE, REFRESH_COOKIE
+from tests.factories import UserFactory
 
 PASSWORD = "testpass123"
 

@@ -85,6 +85,9 @@ class OwnerAgreementRenewView(GenericController):
             new_start_date=parsed_body.new_start_date,
             new_end_date=parsed_body.new_end_date,
             commission_rate=parsed_body.commission_rate,
+            gross_floor_amount=parsed_body.gross_floor_amount,
+            currency=parsed_body.currency,
+            payout_day=parsed_body.payout_day,
             agreement_number=parsed_body.agreement_number,
             terms=parsed_body.terms,
         )

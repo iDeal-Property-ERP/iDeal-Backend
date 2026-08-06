@@ -18,10 +18,6 @@ class OwnerPropertyOutput(pydantic.BaseModel):
     tariff: str
     ask_price: Decimal
     ask_currency: str
-    owner_guaranteed_price: Decimal
-    owner_guaranteed_currency: str
-    tenant_charge_price: Decimal
-    tenant_charge_currency: str
     vacant_since: date | None
     vacant_days: int
     created_at: datetime
@@ -34,7 +30,27 @@ class OwnerEarningsOutput(pydantic.BaseModel):
     total_guaranteed: Decimal
     total_paid: Decimal
     total_pending: Decimal
+    total_above_guarantee: Decimal
+    next_payout_amount: Decimal
     currency: str
+
+
+class OwnerSettlementOutput(pydantic.BaseModel):
+    id: int
+    property_name: str
+    period_start: date
+    period_end: date
+    gross_floor_amount: Decimal
+    commission_rate: Decimal
+    currency: str
+    rent_received_amount: Decimal
+    settlement_base_amount: Decimal
+    commission_amount: Decimal
+    owner_payout_amount: Decimal
+    ideal_cash_exposure: Decimal
+    payout_status: str | None
+    payout_amount: Decimal | None
+    payout_kind: str | None
 
 
 class OwnerWhyOutput(pydantic.BaseModel):

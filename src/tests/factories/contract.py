@@ -20,6 +20,9 @@ class OwnerAgreementFactory(factory.django.DjangoModelFactory):
     status = OwnerAgreementStatus.ACTIVE
     terms = factory.Faker("text", max_nb_chars=200)
     commission_rate = 10.00
+    gross_floor_amount = 500.00
+    currency = "USD"
+    payout_day = 25
 
 
 class LeaseFactory(factory.django.DjangoModelFactory):

@@ -1,9 +1,9 @@
-import time
 from functools import wraps
 from http import HTTPStatus
 
 from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
+
 
 def rate_limit(requests: int, window_seconds: int):
     """
@@ -20,10 +20,10 @@ def rate_limit(requests: int, window_seconds: int):
                 ip = ip.split(",")[0].strip()
             else:
                 ip = self.request.META.get("REMOTE_ADDR", "unknown-ip")
-            
+
             # Create a cache key unique to this view and IP
             cache_key = f"rl:{self.__class__.__name__}:{ip}"
-            
+
             # Simple rate limiting using Redis list of timestamps or counter
             current_count = cache.get(cache_key)
             if current_count is None:
@@ -37,8 +37,8 @@ def rate_limit(requests: int, window_seconds: int):
                 )
             else:
                 cache.incr(cache_key)
-                
+
             return func(self, *args, **kwargs)
-            
+
         return wrapper
     return decorator

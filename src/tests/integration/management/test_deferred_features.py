@@ -118,29 +118,32 @@ class TestPropertyTenantVacancyFields:
 
 
 @pytest.mark.django_db
-class TestAgreementAmounts:
-    def test_output_includes_amounts_and_margin(self, api_client):
+class TestAgreementEconomics:
+    def test_output_includes_settlement_terms(self, api_client):
         mgmt = _mgmt_user()
-        OwnerAgreementFactory(owner_guaranteed_amount=Decimal("450.00"), tenant_charge_amount=Decimal("550.00"))
-        OwnerAgreementFactory(owner_guaranteed_amount=None, tenant_charge_amount=None)
+        OwnerAgreementFactory(
+            gross_floor_amount=Decimal("450.00"),
+            currency="USD",
+            commission_rate=Decimal("20.00"),
+            payout_day=25,
+        )
+        OwnerAgreementFactory(gross_floor_amount=Decimal("0.00"), currency="UZS", payout_day=10)
 
         response = api_client.get("/api/v1/management/owner-agreements/", **_make_jwt(mgmt))
         rows = response.json()["data"]
-        with_amounts = next(r for r in rows if r["owner_guaranteed_amount"] is not None)
-        assert with_amounts["owner_guaranteed_amount"] == "450.00"
-        assert with_amounts["tenant_charge_amount"] == "550.00"
-        assert with_amounts["margin"] == "100.00"
-        without = next(r for r in rows if r["owner_guaranteed_amount"] is None)
-        assert without["margin"] is None
+        with_floor = next(r for r in rows if r["gross_floor_amount"] == "450.00")
+        assert with_floor["currency"] == "USD"
+        assert with_floor["commission_rate"] == "20.00"
+        assert with_floor["payout_day"] == 25
 
-    def test_onboarding_approve_snapshots_property_prices(self):
+    def test_onboarding_approve_creates_agreement_settlement_terms(self):
         from tests.factories import OwnerOnboardingFactory
 
         onboarding = OwnerOnboardingFactory(
             property=PropertyFactory(
                 status=PropertyStatus.PENDING_REVIEW,
-                owner_guaranteed_price=Decimal("400.00"),
-                tenant_charge_price=Decimal("500.00"),
+                ask_price=Decimal("500.00"),
+                ask_currency="USD",
             )
         )
         agreement = onboarding.approve(
@@ -149,8 +152,9 @@ class TestAgreementAmounts:
             start_date=date.today(),
             end_date=date.today() + timedelta(days=365),
         )
-        assert agreement.owner_guaranteed_amount == Decimal("400.00")
-        assert agreement.tenant_charge_amount == Decimal("500.00")
+        assert agreement.gross_floor_amount == Decimal("500.00")
+        assert agreement.currency == "USD"
+        assert agreement.payout_day == 25
 
 
 @pytest.mark.django_db

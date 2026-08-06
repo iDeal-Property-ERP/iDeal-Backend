@@ -1,12 +1,15 @@
 import json
+
 import pytest
-from tests.factories import DistrictFactory, PropertyFactory
+
+from tests.factories import DistrictFactory
+
 
 @pytest.mark.django_db
 class TestPublicListingSubmit:
     def test_submit_valid_listing(self, client):
         district = DistrictFactory(city="Toshkent")
-        
+
         payload = {
             "contact": {
                 "first_name": "John",
@@ -25,16 +28,17 @@ class TestPublicListingSubmit:
             "deposit_amount": 500,
             "currency": "USD"
         }
-        
+
         from io import BytesIO
+
         from django.core.files.uploadedfile import SimpleUploadedFile
         from PIL import Image
-        
+
         # Create a dummy image
         img_io = BytesIO()
         Image.new('RGB', (100, 100), color='red').save(img_io, 'JPEG')
         img_content = img_io.getvalue()
-        
+
         files = {
             "payload": json.dumps(payload),
         }
@@ -42,12 +46,12 @@ class TestPublicListingSubmit:
             files[f"images__{i}"] = SimpleUploadedFile(
                 f"photo_{i}.jpg", img_content, content_type="image/jpeg"
             )
-            
-        # Manually construct multipart data because django test client doesn't 
+
+        # Manually construct multipart data because django test client doesn't
         # seamlessly support array of files with the same key "images" via dict.
         # But wait, django test client DOES support it if you provide a list or use MultiPartParser.
         # Let's just use MultiValueDict logic or pass it as a list.
-        
+
         response = client.post("/api/v1/marketplace/listings/submit/", {
             "payload": json.dumps(payload),
             "images": [
@@ -58,17 +62,17 @@ class TestPublicListingSubmit:
                 SimpleUploadedFile("photo_4.jpg", img_content, content_type="image/jpeg")
             ]
         })
-        
+
         assert response.status_code == 201
         body = response.json()
         assert body["success"] is True
         assert "id" in body["data"]
-        
+
         from account.models import User
         user = User.objects.get(email="john.guest@example.com")
         assert user.is_active is False
         assert user.role == "owner"
-        
+
         from marketplace.models import Listing
         listing = Listing.objects.get(id=body["data"]["id"])
         assert listing.property.owner == user

@@ -17,6 +17,9 @@ class OwnerAgreementOutput(pydantic.BaseModel):
     status: str
     terms: str | None
     commission_rate: Decimal
+    gross_floor_amount: Decimal
+    currency: str
+    payout_day: int
     created_at: datetime
     updated_at: datetime
 
@@ -33,12 +36,18 @@ class OwnerAgreementCreateInput(pydantic.BaseModel):
     status: str = "active"
     terms: str | None = None
     commission_rate: Decimal
+    gross_floor_amount: Decimal
+    currency: str = "USD"
+    payout_day: int = pydantic.Field(default=25, ge=1, le=31)
 
 
 class OwnerAgreementUpdateInput(pydantic.BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     commission_rate: Decimal | None = None
+    gross_floor_amount: Decimal | None = None
+    currency: str | None = None
+    payout_day: int | None = pydantic.Field(default=None, ge=1, le=31)
     terms: str | None = None
     status: str | None = None
 
@@ -47,6 +56,9 @@ class OwnerAgreementRenewInput(pydantic.BaseModel):
     new_start_date: date
     new_end_date: date
     commission_rate: Decimal | None = None
+    gross_floor_amount: Decimal | None = None
+    currency: str | None = None
+    payout_day: int | None = pydantic.Field(default=None, ge=1, le=31)
     agreement_number: str | None = None
     terms: str | None = None
 

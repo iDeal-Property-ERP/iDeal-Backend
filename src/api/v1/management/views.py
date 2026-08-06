@@ -7,9 +7,10 @@ from django.db.models import Case, Count, F, IntegerField, Max, Min, Q, Sum, Val
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 
+from api.v1.finance.schemas import SettlementOutput
 from api.v1.management.schemas import (
-    DashboardKPIs,
     DashboardBrokerage,
+    DashboardKPIs,
     DashboardOccupancy,
     DashboardOutput,
     GrowthData,
@@ -1270,7 +1271,7 @@ class PayoutListView(ManagementView, ListAPIView):
     def get_queryset(self):
         from finance.models import PayoutSchedule
 
-        qs = PayoutSchedule.objects.select_related("owner", "owner_agreement__property", "source_payment").order_by(
+        qs = PayoutSchedule.objects.select_related("owner", "owner_agreement__property", "settlement").order_by(
             "-scheduled_date"
         )
         status = self.request.GET.get("status")
@@ -1299,6 +1300,25 @@ class PayoutListView(ManagementView, ListAPIView):
             qs = qs.filter(scheduled_date__lte=scheduled_to)
         if order in _PAYOUT_ORDERINGS:
             qs = qs.order_by(*_PAYOUT_ORDERINGS[order])
+        return qs
+
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
+        return super().get(parsed_query)
+
+
+class SettlementListView(ManagementView, ListAPIView):
+    """Agreement-month ledger for finance workbench filters and exports."""
+
+    output_schema = SettlementOutput
+
+    def get_queryset(self):
+        from finance.models import OwnerSettlement
+
+        qs = OwnerSettlement.objects.select_related("owner", "owner_agreement__property").order_by("-period_start")
+        if owner_id := self.request.GET.get("owner_id"):
+            qs = qs.filter(owner_id=owner_id)
+        if agreement_id := self.request.GET.get("owner_agreement_id"):
+            qs = qs.filter(owner_agreement_id=agreement_id)
         return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:

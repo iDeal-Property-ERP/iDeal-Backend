@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from core.constants import Currency, PaymentMethod, PaymentStatus, PayoutMethod, PayoutStatus
+from core.constants import Currency, PaymentKind, PaymentMethod, PaymentStatus, PayoutKind, PayoutMethod, PayoutStatus
 from core.models import SoftDeleteModel, TimestampedModel
 
 
@@ -21,6 +21,8 @@ class Payment(TimestampedModel, SoftDeleteModel):
     )
     payment_date = models.DateField(verbose_name=_("Payment Date"))
     due_date = models.DateField(verbose_name=_("Due Date"))
+    rental_period = models.DateField(null=True, blank=True, verbose_name=_("Rental Period"))
+    kind = models.CharField(max_length=20, choices=PaymentKind.choices, default=PaymentKind.RENT)
     status = models.CharField(
         max_length=20,
         choices=PaymentStatus.choices,
@@ -58,6 +60,10 @@ class Payment(TimestampedModel, SoftDeleteModel):
 
         if self.lease_id and self.lease.property.engagement_type != PropertyEngagementType.MANAGED:
             raise ValidationError(_("One-off brokerage properties cannot have rent payments."))
+        if self.kind == PaymentKind.RENT and self.lease_id:
+            agreement = self.lease.owner_agreement
+            if self.currency != agreement.currency:
+                raise ValidationError(_("Rent payment currency must match the owner agreement currency."))
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -92,16 +98,15 @@ class PayoutSchedule(TimestampedModel, SoftDeleteModel):
         related_name="payout_schedules",
         verbose_name=_("Owner"),
     )
-    # Links a payout accrual to the tenant payment that triggered it. The
-    # OneToOne enforces one-payout-per-payment at the DB level (idempotency).
-    source_payment = models.OneToOneField(
-        "finance.Payment",
+    settlement = models.ForeignKey(
+        "finance.OwnerSettlement",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
-        related_name="owner_payout",
-        verbose_name=_("Source Payment"),
+        related_name="payouts",
+        verbose_name=_("Settlement"),
     )
+    kind = models.CharField(max_length=30, choices=PayoutKind.choices, default=PayoutKind.BASE)
     amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name=_("Amount"))
     currency = models.CharField(
         max_length=3, choices=Currency.choices, default=Currency.USD, verbose_name=_("Currency")
@@ -146,3 +151,47 @@ class PayoutSchedule(TimestampedModel, SoftDeleteModel):
     def save(self, *args, **kwargs):
         self.clean()
         return super().save(*args, **kwargs)
+
+
+class OwnerSettlement(TimestampedModel, SoftDeleteModel):
+    """Immutable monthly contract snapshot and its transparent calculation."""
+
+    owner_agreement = models.ForeignKey("contract.OwnerAgreement", on_delete=models.PROTECT, related_name="settlements")
+    owner = models.ForeignKey("account.User", on_delete=models.PROTECT, related_name="owner_settlements")
+    period_start = models.DateField()
+    period_end = models.DateField()
+    covered_days = models.PositiveSmallIntegerField()
+    days_in_month = models.PositiveSmallIntegerField()
+    gross_floor_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2)
+    currency = models.CharField(max_length=3, choices=Currency.choices)
+    rent_received_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    settlement_base_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    commission_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    owner_payout_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    ideal_cash_exposure = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    class Meta:
+        db_table = "owner_settlements"
+        ordering = ["-period_start"]
+        constraints = [
+            models.UniqueConstraint(fields=["owner_agreement", "period_start"], name="unique_agreement_month")
+        ]
+        indexes = [models.Index(fields=["owner", "period_start"])]
+
+    def __str__(self):
+        return f"Settlement {self.owner_agreement_id} · {self.period_start:%Y-%m}"
+
+
+class RentReceiptAllocation(TimestampedModel):
+    """Append-only allocation of paid rent to one agreement month."""
+
+    payment = models.ForeignKey("finance.Payment", on_delete=models.PROTECT, related_name="settlement_allocations")
+    settlement = models.ForeignKey(OwnerSettlement, on_delete=models.PROTECT, related_name="receipt_allocations")
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        db_table = "rent_receipt_allocations"
+        constraints = [
+            models.UniqueConstraint(fields=["payment", "settlement"], name="unique_payment_settlement_allocation")
+        ]

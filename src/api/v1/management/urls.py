@@ -34,6 +34,7 @@ urlpatterns = [
     path("payments/stats/", views.PaymentStatsView.as_view(), name="payment-stats"),
     path("payouts/", views.PayoutListView.as_view(), name="payout-list"),
     path("payouts/stats/", views.PayoutStatsView.as_view(), name="payout-stats"),
+    path("settlements/", views.SettlementListView.as_view(), name="settlement-list"),
     path("service-requests/", views.ManagementServiceRequestListView.as_view(), name="service-request-list"),
     path("service-requests/stats/", views.ManagementServiceRequestStatsView.as_view(), name="service-request-stats"),
     path(

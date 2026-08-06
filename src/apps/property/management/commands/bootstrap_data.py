@@ -1,12 +1,13 @@
 from django.core.management.base import BaseCommand
-from property.models import District, Amenity
+from property.models import Amenity, District
+
 
 class Command(BaseCommand):
     help = "Bootstrap essential data like districts and amenities"
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.NOTICE("Starting data bootstrap..."))
-        
+
         # Add districts (Toshkent City Districts)
         districts = [
             {"name": "Bektemir", "city": "Toshkent"},
@@ -22,16 +23,16 @@ class Command(BaseCommand):
             {"name": "Yashnobod", "city": "Toshkent"},
             {"name": "Yunusabad", "city": "Toshkent"},
         ]
-        
+
         districts_created = 0
         for data in districts:
             _, created = District.objects.get_or_create(
-                name=data["name"], 
+                name=data["name"],
                 defaults={"city": data["city"]}
             )
             if created:
                 districts_created += 1
-                
+
         self.stdout.write(self.style.SUCCESS(f"Successfully bootstrapped {districts_created} new districts (Total: {len(districts)})"))
 
         # Add amenities (matching lucide icons commonly used)
@@ -51,17 +52,17 @@ class Command(BaseCommand):
             {"slug": "fridge", "name": "Refrigerator", "icon": "refrigerator", "sort_order": 130},
             {"slug": "furnished", "name": "Furnished", "icon": "sofa", "sort_order": 140},
         ]
-        
+
         amenities_created = 0
         for data in amenities:
             defaults = data.copy()
             defaults.pop("slug")
             _, created = Amenity.objects.get_or_create(
-                slug=data["slug"], 
+                slug=data["slug"],
                 defaults=defaults
             )
             if created:
                 amenities_created += 1
-                
+
         self.stdout.write(self.style.SUCCESS(f"Successfully bootstrapped {amenities_created} new amenities (Total: {len(amenities)})"))
         self.stdout.write(self.style.SUCCESS("Bootstrap completed!"))

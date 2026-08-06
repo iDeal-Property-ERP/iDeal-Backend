@@ -91,7 +91,7 @@ def global_error_handler(endpoint, controller, exc):
 
     status_code = getattr(exc, "status_code", HTTPStatus.INTERNAL_SERVER_ERROR)
     error_text = str(exc) if settings.DEBUG else str(_("Internal server error"))
-    
+
     if status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
         logger.error(
             "Internal Server Error: %s",
@@ -99,7 +99,7 @@ def global_error_handler(endpoint, controller, exc):
             exc_info=exc,
             extra={"request": getattr(controller, "request", None)},
         )
-        
+
     resp = JsonResponse(
         {"success": False, "message": str(_("Internal server error")), "error": error_text},
         status=status_code,

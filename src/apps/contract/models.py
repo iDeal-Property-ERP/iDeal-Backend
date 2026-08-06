@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -19,10 +20,11 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
     status = models.CharField(max_length=20, choices=OwnerAgreementStatus.choices, default=OwnerAgreementStatus.ACTIVE)
     terms = models.TextField(null=True, blank=True)
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2)
-    # Contracted amounts, snapshotted at signing time (the property's prices can
-    # drift afterwards). Nullable: legacy rows are backfilled by data migration.
-    owner_guaranteed_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    tenant_charge_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    # Agreement economics are the legal source of truth. Property pricing is
+    # market/listing data and must never change an existing settlement.
+    gross_floor_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    currency = models.CharField(max_length=3, default="USD")
+    payout_day = models.PositiveSmallIntegerField(default=25)
 
     class Meta:
         verbose_name = _("Owner Agreement")
@@ -41,12 +43,26 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
     def clean(self):
         if self.property_id and self.property.engagement_type != PropertyEngagementType.MANAGED:
             raise ValidationError(_("One-off brokerage properties cannot have owner agreements."))
+        if self.commission_rate is not None and not Decimal("0") <= self.commission_rate <= Decimal("100"):
+            raise ValidationError(_("Commission rate must be between 0 and 100."))
+        if self.payout_day and not 1 <= self.payout_day <= 31:
+            raise ValidationError(_("Payout day must be between 1 and 31."))
 
     def save(self, *args, **kwargs):
         self.clean()
         return super().save(*args, **kwargs)
 
-    def renew(self, new_start_date, new_end_date, commission_rate=None, agreement_number=None, terms=None):
+    def renew(
+        self,
+        new_start_date,
+        new_end_date,
+        commission_rate=None,
+        gross_floor_amount=None,
+        currency=None,
+        payout_day=None,
+        agreement_number=None,
+        terms=None,
+    ):
         with transaction.atomic():
             if agreement_number is None:
                 n = OwnerAgreement.objects.filter(agreement_number__startswith=f"{self.agreement_number}-R").count() + 1
@@ -61,16 +77,9 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
                 status=OwnerAgreementStatus.ACTIVE,
                 terms=terms if terms is not None else self.terms,
                 commission_rate=commission_rate if commission_rate is not None else self.commission_rate,
-                owner_guaranteed_amount=(
-                    self.owner_guaranteed_amount
-                    if self.owner_guaranteed_amount is not None
-                    else self.property.owner_guaranteed_price
-                ),
-                tenant_charge_amount=(
-                    self.tenant_charge_amount
-                    if self.tenant_charge_amount is not None
-                    else self.property.tenant_charge_price
-                ),
+                gross_floor_amount=gross_floor_amount if gross_floor_amount is not None else self.gross_floor_amount,
+                currency=currency if currency is not None else self.currency,
+                payout_day=payout_day if payout_day is not None else self.payout_day,
             )
             self.status = OwnerAgreementStatus.EXPIRED
             self.save(update_fields=["status", "updated_at"])
@@ -273,8 +282,9 @@ class OwnerOnboarding(TimestampedModel, SoftDeleteModel):
                 status=OwnerAgreementStatus.ACTIVE,
                 terms=terms or self.offer_terms_snapshot,
                 commission_rate=commission_rate,
-                owner_guaranteed_amount=prop.owner_guaranteed_price,
-                tenant_charge_amount=prop.tenant_charge_price,
+                gross_floor_amount=prop.ask_price or Decimal("0.00"),
+                currency=prop.ask_currency,
+                payout_day=25,
             )
             self.status = OnboardingStatus.APPROVED
             self.reviewed_by = reviewed_by

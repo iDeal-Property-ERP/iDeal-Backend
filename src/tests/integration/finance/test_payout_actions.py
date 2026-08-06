@@ -1,7 +1,8 @@
 import json
+from datetime import date
 
 import pytest
-from finance.models import PayoutSchedule
+from finance.models import OwnerSettlement, PayoutSchedule
 from notification.models import Notification
 
 from core.constants import NotificationType, PaymentStatus, PayoutStatus
@@ -55,21 +56,30 @@ class TestPayoutMarkPaid:
 class TestTransitFinanceSignal:
     def test_marking_payment_paid_accrues_single_payout(self, api_client):
         mgmt = UserFactory()
-        payment = PaymentFactory(status=PaymentStatus.PENDING)
+        agreement = OwnerAgreementFactory(start_date=date(2026, 6, 1), end_date=date(2026, 6, 30))
+        payment = PaymentFactory(
+            lease__owner_agreement=agreement, status=PaymentStatus.PENDING,
+            due_date=date(2026, 6, 1), payment_date=date(2026, 6, 10), rental_period=date(2026, 6, 1),
+        )
 
         response = api_client.post(f"/api/v1/finance/payments/{payment.id}/mark-paid/", **_make_jwt(mgmt))
 
         assert response.status_code == 200
-        payouts = PayoutSchedule.objects.filter(source_payment=payment)
+        payouts = PayoutSchedule.objects.filter(settlement__owner_agreement=agreement)
         assert payouts.count() == 1
-        assert payouts.first().amount == payment.lease.owner_agreement.property.owner_guaranteed_price
+        assert payouts.first().amount == agreement.gross_floor_amount * (1 - agreement.commission_rate / 100)
         assert Notification.objects.filter(recipient=payment.tenant, type=NotificationType.PAYMENT_PAID).exists()
 
     def test_paid_payment_does_not_double_accrue_on_resave(self, api_client):
-        payment = PaymentFactory(status=PaymentStatus.PAID)
+        agreement = OwnerAgreementFactory(start_date=date(2026, 6, 1), end_date=date(2026, 6, 30))
+        payment = PaymentFactory(
+            lease__owner_agreement=agreement, status=PaymentStatus.PAID,
+            due_date=date(2026, 6, 1), payment_date=date(2026, 6, 10), rental_period=date(2026, 6, 1),
+        )
         # Re-save the already-paid payment; signal must not create a second payout.
         payment.save()
-        assert PayoutSchedule.objects.filter(source_payment=payment).count() == 1
+        assert OwnerSettlement.objects.filter(owner_agreement=agreement).count() == 1
+        assert PayoutSchedule.objects.filter(settlement__owner_agreement=agreement).count() == 1
 
 
 @pytest.mark.django_db
@@ -142,7 +152,7 @@ class TestPayoutManualCreate:
         assert response.status_code == 201
         data = response.json()["data"]
         assert data["owner_id"] == agreement.owner_id
-        assert data["source_payment_id"] is None
+        assert data["settlement_id"] is None
 
 
 @pytest.mark.django_db
@@ -166,11 +176,13 @@ class TestPayoutBulkMarkPaid:
 
 @pytest.mark.django_db
 class TestPaymentBulkAndRemind:
-    def test_bulk_mark_paid_accrues_payouts(self, api_client):
+    def test_bulk_mark_paid_allocates_settlements(self, api_client):
         mgmt = UserFactory()
-        p1 = PaymentFactory(status=PaymentStatus.PENDING)
-        p2 = PaymentFactory(status=PaymentStatus.OVERDUE)
-        paid = PaymentFactory(status=PaymentStatus.PAID)
+        agreement = OwnerAgreementFactory(start_date=date(2026, 6, 1), end_date=date(2026, 6, 30))
+        defaults = {"lease__owner_agreement": agreement, "due_date": date(2026, 6, 1), "payment_date": date(2026, 6, 10), "rental_period": date(2026, 6, 1)}
+        p1 = PaymentFactory(status=PaymentStatus.PENDING, **defaults)
+        p2 = PaymentFactory(status=PaymentStatus.OVERDUE, **defaults)
+        paid = PaymentFactory(status=PaymentStatus.PAID, **defaults)
         response = _json_post(
             api_client,
             "/api/v1/finance/payments/bulk-mark-paid/",
@@ -181,7 +193,7 @@ class TestPaymentBulkAndRemind:
         data = response.json()["data"]
         assert data["updated"] == 2
         assert data["skipped"] == 1
-        assert PayoutSchedule.objects.filter(source_payment__in=[p1, p2]).count() == 2
+        assert OwnerSettlement.objects.filter(owner_agreement=agreement).count() == 1
 
     def test_bulk_remind(self, api_client):
         mgmt = UserFactory()

@@ -445,9 +445,9 @@ class ManagementAgreementOutput(pydantic.BaseModel):
     end_date: date
     status: str
     commission_rate: Decimal
-    owner_guaranteed_amount: Decimal | None
-    tenant_charge_amount: Decimal | None
-    margin: Decimal | None
+    gross_floor_amount: Decimal
+    currency: str
+    payout_day: int
     created_at: datetime
     updated_at: datetime
 
@@ -456,9 +456,6 @@ class ManagementAgreementOutput(pydantic.BaseModel):
     def extract_related(cls, v):
         if isinstance(v, dict):
             return v
-        margin = None
-        if v.owner_guaranteed_amount is not None and v.tenant_charge_amount is not None:
-            margin = v.tenant_charge_amount - v.owner_guaranteed_amount
         return {
             "id": v.id,
             "agreement_number": v.agreement_number,
@@ -471,9 +468,9 @@ class ManagementAgreementOutput(pydantic.BaseModel):
             "end_date": v.end_date,
             "status": v.status,
             "commission_rate": v.commission_rate,
-            "owner_guaranteed_amount": v.owner_guaranteed_amount,
-            "tenant_charge_amount": v.tenant_charge_amount,
-            "margin": margin,
+            "gross_floor_amount": v.gross_floor_amount,
+            "currency": v.currency,
+            "payout_day": v.payout_day,
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }
@@ -492,6 +489,8 @@ class ManagementPaymentOutput(pydantic.BaseModel):
     currency: str
     payment_date: date
     due_date: date
+    rental_period: date | None
+    kind: str
     status: str
     method: str
     gateway_ref: str | None
@@ -506,11 +505,7 @@ class ManagementPaymentOutput(pydantic.BaseModel):
             return v
         prop = getattr(v.lease, "property", None)
         paid_by = v.paid_by
-        # Reverse OneToOne (owner_payout) may not exist for unpaid payments.
-        try:
-            linked_payout_id = v.owner_payout.id
-        except Exception:
-            linked_payout_id = None
+        linked_payout_id = None
         return {
             "id": v.id,
             "lease_id": v.lease_id,
@@ -524,6 +519,8 @@ class ManagementPaymentOutput(pydantic.BaseModel):
             "currency": v.currency,
             "payment_date": v.payment_date,
             "due_date": v.due_date,
+            "rental_period": v.rental_period,
+            "kind": v.kind,
             "status": v.status,
             "method": v.method,
             "gateway_ref": v.gateway_ref,
@@ -541,7 +538,8 @@ class ManagementPayoutOutput(pydantic.BaseModel):
     property_id: int | None
     property_name: str | None
     property_address: str | None
-    source_payment_id: int | None
+    settlement_id: int | None
+    kind: str
     amount: Decimal
     currency: str
     scheduled_date: date
@@ -565,7 +563,8 @@ class ManagementPayoutOutput(pydantic.BaseModel):
             "property_id": (prop.id if prop else None),
             "property_name": (prop.name if prop else None),
             "property_address": (getattr(prop, "address", None) if prop else None),
-            "source_payment_id": v.source_payment_id,
+            "settlement_id": v.settlement_id,
+            "kind": v.kind,
             "amount": v.amount,
             "currency": v.currency,
             "scheduled_date": v.scheduled_date,

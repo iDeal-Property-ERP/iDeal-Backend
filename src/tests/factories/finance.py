@@ -1,7 +1,7 @@
 import factory
 from finance.models import ExchangeRate, Payment, PayoutSchedule
 
-from core.constants import Currency, PaymentMethod, PaymentStatus, PayoutMethod, PayoutStatus
+from core.constants import Currency, PaymentKind, PaymentMethod, PaymentStatus, PayoutMethod, PayoutStatus
 
 from .account import OwnerFactory, TenantFactory, UserFactory
 from .contract import LeaseFactory, OwnerAgreementFactory
@@ -18,6 +18,8 @@ class PaymentFactory(factory.django.DjangoModelFactory):
     currency = Currency.USD
     payment_date = factory.Faker("date_this_year")
     due_date = factory.Faker("date_this_year")
+    rental_period = None
+    kind = PaymentKind.RENT
     status = PaymentStatus.PENDING
     method = PaymentMethod.CASH
     notes = factory.Faker("text", max_nb_chars=200)

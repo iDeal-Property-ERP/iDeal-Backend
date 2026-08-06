@@ -6,7 +6,7 @@ from typing import Annotated
 
 import pydantic
 
-from core.constants import Currency, PaymentMethod, PaymentStatus, PayoutMethod
+from core.constants import Currency, PaymentKind, PaymentMethod, PaymentStatus, PayoutMethod
 
 PositiveAmount = Annotated[Decimal, pydantic.Field(gt=0)]
 
@@ -29,6 +29,8 @@ class PaymentOutput(pydantic.BaseModel):
     currency: str
     payment_date: date
     due_date: date
+    rental_period: date | None
+    kind: str
     status: str
     method: str
     notes: str | None
@@ -46,6 +48,8 @@ class PaymentCreateInput(pydantic.BaseModel):
     currency: CurrencyStr = "USD"
     payment_date: date
     due_date: date
+    rental_period: date | None = None
+    kind: str = PaymentKind.RENT
     status: str = PaymentStatus.PENDING
     method: str = PaymentMethod.CASH
     gateway_ref: str | None = None
@@ -57,6 +61,8 @@ class PaymentPartialUpdateInput(pydantic.BaseModel):
     currency: str | None = None
     payment_date: date | None = None
     due_date: date | None = None
+    rental_period: date | None = None
+    kind: str | None = None
     method: str | None = None
     gateway_ref: str | None = None
     notes: str | None = None
@@ -107,7 +113,8 @@ class PayoutScheduleOutput(pydantic.BaseModel):
     id: int
     owner_agreement_id: int
     owner_id: int
-    source_payment_id: int | None
+    settlement_id: int | None
+    kind: str
     amount: Decimal
     currency: str
     scheduled_date: date
@@ -127,6 +134,37 @@ class PayoutScheduleCreateInput(pydantic.BaseModel):
     currency: CurrencyStr = "USD"
     scheduled_date: date
     method: str = PayoutMethod.BANK_TRANSFER
+
+
+class SettlementOutput(pydantic.BaseModel):
+    id: int
+    owner_agreement_id: int
+    owner_id: int
+    period_start: date
+    period_end: date
+    covered_days: int
+    days_in_month: int
+    gross_floor_amount: Decimal
+    commission_rate: Decimal
+    currency: str
+    rent_received_amount: Decimal
+    settlement_base_amount: Decimal
+    commission_amount: Decimal
+    owner_payout_amount: Decimal
+    ideal_cash_exposure: Decimal
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = pydantic.ConfigDict(from_attributes=True)
+
+
+class SettlementAllocationOutput(pydantic.BaseModel):
+    id: int
+    payment_id: int
+    amount: Decimal
+    created_at: datetime
+
+    model_config = pydantic.ConfigDict(from_attributes=True)
 
 
 class PayoutBulkMarkPaidInput(pydantic.BaseModel):
@@ -169,6 +207,10 @@ class PnLBreakdown(pydantic.BaseModel):
     payment_count: int
     tax_estimate: Decimal
     tax_estimate_uzs: Decimal
+    cash_collected: Decimal
+    contractual_commission: Decimal
+    ideal_cash_exposure: Decimal
+    net_cash_position: Decimal
 
 
 class PnLFilter(pydantic.BaseModel):

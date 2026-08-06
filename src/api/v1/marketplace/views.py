@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import datetime
+
 import pydantic
+from contract.models import Lease
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
@@ -12,7 +15,7 @@ from api.v1.marketplace.schemas import (
     ViewingRequestCreateInput,
 )
 from core.api.views import BaseController, DetailPath, GenericController, ListAPIView, RetrieveAPIView
-from core.constants import ListingStatus, PropertyStatus
+from core.constants import LeaseStatus, ListingStatus, OwnerAgreementStatus, PropertyStatus
 from core.utils.pagination import build_paginated_response
 from core.utils.rate_limit import rate_limit
 
@@ -144,6 +147,9 @@ class ListingFilterQuery(pydantic.BaseModel):
     page: int = 1
     per_page: int = 20
     district_id: int | None = None
+    start_date: datetime.date | None = None
+    end_date: datetime.date | None = None
+    flexibility_days: int | None = None
     price_min: float | None = None
     price_max: float | None = None
     rooms: int | None = None
@@ -160,6 +166,16 @@ class ListingFilterQuery(pydantic.BaseModel):
     q: str | None = None
     bbox: str | None = None  # "minLon,minLat,maxLon,maxLat" for "search this area"
 
+    @pydantic.model_validator(mode="after")
+    def validate_dates(self):
+        if bool(self.start_date) != bool(self.end_date):
+            raise ValueError("Both start_date and end_date must be provided.")
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValueError("end_date cannot be before start_date.")
+        if self.flexibility_days is not None and self.flexibility_days < 0:
+            raise ValueError("flexibility_days cannot be negative.")
+        return self
+
 
 class ListingListView(ListAPIView):
     model = Listing
@@ -169,7 +185,7 @@ class ListingListView(ListAPIView):
         return (
             Listing.objects.select_related("property__district")
             .prefetch_related("property__photos", "property__amenities")
-            .filter(is_active=True, status=ListingStatus.PUBLISHED, property__status=PropertyStatus.VACANT)
+            .filter(status=ListingStatus.PUBLISHED)
         )
 
     def _price_field(self):
@@ -179,6 +195,27 @@ class ListingListView(ListAPIView):
     def get(self, parsed_query: Query[ListingFilterQuery]) -> dict:
         qs = self.get_queryset().annotate(_price=self._price_field())
         q = parsed_query
+
+        if q.start_date and q.end_date:
+            flex = q.flexibility_days if q.flexibility_days is not None else 3
+            latest_acceptable_start = q.start_date + datetime.timedelta(days=flex)
+            earliest_acceptable_end = q.end_date - datetime.timedelta(days=flex)
+
+            overlapping_leases = Lease.objects.filter(
+                status=LeaseStatus.ACTIVE,
+                start_date__lte=earliest_acceptable_end,
+                end_date__gte=latest_acceptable_start,
+            )
+
+            qs = qs.filter(
+                property__owner_agreements__status=OwnerAgreementStatus.ACTIVE,
+                property__owner_agreements__start_date__lte=latest_acceptable_start,
+                property__owner_agreements__end_date__gte=earliest_acceptable_end,
+            ).exclude(
+                property__leases__in=overlapping_leases
+            ).distinct()
+        else:
+            qs = qs.filter(property__status=PropertyStatus.VACANT)
 
         if q.district_id is not None:
             qs = qs.filter(property__district_id=q.district_id)
@@ -402,13 +439,15 @@ class PublicListingSubmitView(BaseController):
     def post(self) -> dict:
         import json
         import uuid
-        from django.db import transaction
+
         from account.models import User
         from contract.models import OwnerOnboarding, PublicOffer
+        from django.db import transaction
         from property.models import Amenity, PropertyPhoto
-        from core.utils.uploads import UploadError, save_uploaded_images
-        from core.constants import UserRole
+
         from api.v1.marketplace.schemas import PublicListingSubmitInput
+        from core.constants import UserRole
+        from core.utils.uploads import UploadError, save_uploaded_images
 
         payload_str = self.request.POST.get("payload")
         if not payload_str:
@@ -425,7 +464,7 @@ class PublicListingSubmitView(BaseController):
             return self.fail(error=str(_("At least 5 photos are required")))
 
         contact = validated.contact
-        
+
         try:
             with transaction.atomic():
                 # Find or create user
@@ -497,10 +536,9 @@ class PublicListingSubmitView(BaseController):
                         photo.is_primary = (idx == 0)
                         photo.save(update_fields=["sort_order", "is_primary", "updated_at"])
                 except UploadError as err:
-                    raise ValueError(str(err))
+                    raise ValueError(str(err)) from err
 
         except Exception as err:
             return self.fail(error=str(err), message=str(_("Failed to process listing submission")))
 
         return self.ok({"id": listing.id, "status": listing.status})
-

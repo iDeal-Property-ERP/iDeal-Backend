@@ -233,6 +233,28 @@ class PaymentMethod(ConstantChoices):
     ]
 
 
+class PaymentKind(ConstantChoices):
+    """Classifies cash so deposits never affect owner rent settlements."""
+
+    RENT = "rent"
+    DEPOSIT = "deposit"
+    OTHER = "other"
+    CHOICES = [
+        (RENT, _("Rent")),
+        (DEPOSIT, _("Deposit")),
+        (OTHER, _("Other")),
+    ]
+
+
+class PayoutKind(ConstantChoices):
+    BASE = "base"
+    UPSIDE_ADJUSTMENT = "upside_adjustment"
+    CHOICES = [
+        (BASE, _("Base settlement")),
+        (UPSIDE_ADJUSTMENT, _("Late rent upside adjustment")),
+    ]
+
+
 class PayoutStatus(ConstantChoices):
     SCHEDULED = "scheduled"
     HELD = "held"
