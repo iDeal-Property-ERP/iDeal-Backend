@@ -59,6 +59,7 @@ assets/
 # Local settings
 local_settings.py
 settings_local.py
+.secrets/
 
 # dotenv
 .env

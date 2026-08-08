@@ -243,9 +243,8 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
         )
         if invalid_commission:
             missing.append("commission")
-        if self.channel == OneOffChannel.MARKETPLACE:
-            if prop.photos.count() < 5:
-                missing.append("photos")
+        if self.channel == OneOffChannel.MARKETPLACE and prop.photos.count() < 5:
+            missing.append("photos")
         return missing
 
     def _depublish(self):

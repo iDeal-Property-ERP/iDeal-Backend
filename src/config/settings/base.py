@@ -141,6 +141,25 @@ LOGGING_TELEGRAM_BOT_TOKEN = config("LOGGING_TELEGRAM_BOT_TOKEN", default="")
 LOGGING_TELEGRAM_CHAT_ID = config("LOGGING_TELEGRAM_CHAT_ID", default="")
 PROJECT_NAME = config("PROJECT_NAME", default="iDeal Backend")
 
+# OTP delivery
+OTP_DEV_BYPASS_CODE = config("OTP_DEV_BYPASS_CODE", default="")
+
+## Eskiz SMS
+ESKIZ_EMAIL = config("ESKIZ_EMAIL", default="")
+ESKIZ_PASSWORD = config("ESKIZ_PASSWORD", default="")
+ESKIZ_FROM = config("ESKIZ_FROM", default="4546")
+ESKIZ_BASE_URL = config("ESKIZ_BASE_URL", default="https://notify.eskiz.uz/api")
+
+## Telegram Gateway
+TELEGRAM_GATEWAY_TOKEN = config("TELEGRAM_GATEWAY_TOKEN", default="")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": config("REDIS_URL", default="redis://localhost:6379"),
+    }
+}
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

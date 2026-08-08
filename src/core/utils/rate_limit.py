@@ -16,10 +16,7 @@ def rate_limit(requests: int, window_seconds: int):
         def wrapper(self, *args, **kwargs):
             # Get client IP address
             ip = self.request.META.get("HTTP_X_FORWARDED_FOR")
-            if ip:
-                ip = ip.split(",")[0].strip()
-            else:
-                ip = self.request.META.get("REMOTE_ADDR", "unknown-ip")
+            ip = ip.split(",")[0].strip() if ip else self.request.META.get("REMOTE_ADDR", "unknown-ip")
 
             # Create a cache key unique to this view and IP
             cache_key = f"rl:{self.__class__.__name__}:{ip}"

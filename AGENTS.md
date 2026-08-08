@@ -83,6 +83,13 @@ This project uses DMR v0.10.0 with `PydanticFastSerializer`, NOT Django REST Fra
 
 **Always include `id` in API responses for any entity** (payment, service request, etc.) — the frontend relies on stable IDs for keys, updates, and navigation.
 
+### Services
+
+- Keep app-specific service code under `src/apps/<app>/services/<domain>.py` or a nested domain package such as `services/auth/`; keep provider adapters under that domain's `providers/` package.
+- Prefer an instantiable service class for business operations and inject only replaceable dependencies such as clients or repositories.
+- Use `@staticmethod` only for stateless, reusable helpers; avoid module-level business functions for new services.
+- Keep API validation, localization, response formatting, and transport-specific HTTP concerns in their owning layers unless they are part of the service operation itself.
+
 ## Models
 
 - Every model that persists data inherits `TimestampedModel` and `SoftDeleteModel` from `core.models`

@@ -1,0 +1,76 @@
+import logging
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+OTP_PROVIDER_TIMEOUT = 10
+
+
+@dataclass(frozen=True, slots=True)
+class OTPMessage:
+    phone: str
+    code: str
+
+
+class OTPDeliveryError(Exception):
+    """Raised when an OTP provider cannot accept a verification message."""
+
+
+class OTPProvider(ABC):
+    """Normalized delivery interface shared by all OTP gateways."""
+
+    provider_name = "otp"
+
+    def __init__(self, *, http_client=requests):
+        self.http = http_client
+
+    @abstractmethod
+    def send(self, message: OTPMessage) -> None:
+        """Deliver an OTP message or raise OTPDeliveryError."""
+
+    def _post(self, url: str, **kwargs) -> requests.Response:
+        try:
+            return self.http.post(url, timeout=OTP_PROVIDER_TIMEOUT, **kwargs)
+        except requests.RequestException as exc:
+            logger.warning("OTP provider request failed provider=%s", self.provider_name)
+            raise OTPDeliveryError from exc
+
+    def _json_payload(self, response: requests.Response) -> dict:
+        try:
+            payload = response.json()
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "OTP provider returned invalid JSON provider=%s status=%s",
+                self.provider_name,
+                response.status_code,
+            )
+            raise OTPDeliveryError from exc
+        if not isinstance(payload, dict):
+            logger.warning(
+                "OTP provider returned an unexpected payload provider=%s status=%s",
+                self.provider_name,
+                response.status_code,
+            )
+            raise OTPDeliveryError
+        return payload
+
+    def _provider_error(self, response: requests.Response) -> OTPDeliveryError:
+        logger.warning(
+            "OTP provider rejected request provider=%s status=%s",
+            self.provider_name,
+            response.status_code,
+        )
+        return OTPDeliveryError("OTP provider error")
+
+    @staticmethod
+    def _payload_indicates_error(payload: dict) -> bool:
+        status = payload.get("status")
+        return (
+            payload.get("ok") is False
+            or payload.get("success") is False
+            or status is False
+            or str(status).lower() in {"error", "failed", "fail", "false"}
+        )

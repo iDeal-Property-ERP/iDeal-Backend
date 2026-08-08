@@ -3,6 +3,7 @@ from django.urls import include, path
 app_name = "url_router"
 
 urlpatterns = [
+    path("mobile/", include("api.v1.mobile.urls", namespace="mobile")),
     path("users/", include("api.v1.account.urls", namespace="account")),
     path("auth/", include("api.v1.core.urls.auth", namespace="auth")),
     path("misc/", include("api.v1.core.urls.misc", namespace="health")),
