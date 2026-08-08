@@ -14,6 +14,7 @@ class User(AbstractBaseUser, TimestampedModel, SoftDeleteModel):
     username = models.CharField(max_length=150, unique=True)
     phone = models.CharField(max_length=15, unique=True, null=True, blank=True)
     email = models.EmailField(unique=True)
+    avatar = models.ImageField(upload_to="users/avatars/", blank=True, null=True)
 
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.MANAGEMENT)
     is_verified = models.BooleanField(default=False)
