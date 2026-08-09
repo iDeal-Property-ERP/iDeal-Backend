@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-import datetime
-
 import pydantic
-from contract.models import Lease
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 from marketplace.models import ContactInquiry, FaqItem, Listing, ViewingRequest
+from marketplace.services.listings import (
+    ListingFilters,
+    apply_listing_filters,
+    ordered_photos,
+    photo_url,
+    published_listings_queryset,
+)
 from property.models import District, Property
 
 from api.v1.marketplace.schemas import (
@@ -15,7 +19,7 @@ from api.v1.marketplace.schemas import (
     ViewingRequestCreateInput,
 )
 from core.api.views import BaseController, DetailPath, GenericController, ListAPIView, RetrieveAPIView
-from core.constants import LeaseStatus, ListingStatus, OwnerAgreementStatus, PropertyStatus
+from core.constants import ListingStatus, PropertyStatus
 from core.utils.pagination import build_paginated_response
 from core.utils.rate_limit import rate_limit
 
@@ -29,26 +33,13 @@ VERIFICATION_CHECKLIST = [
 RESPONSE_TIME = _("Usually responds within 1 hour")
 
 
-def _photo_url(photo, request):
-    """Build an absolute URL for a property photo, falling back to the relative media URL."""
-    url = photo.image.url
-    if request is not None:
-        return request.build_absolute_uri(url)
-    return url
-
-
-def _ordered_photos(prop):
-    """Photos ordered primary-first, then by sort_order (uses prefetched cache when available)."""
-    return sorted(prop.photos.all(), key=lambda p: (not p.is_primary, p.sort_order))
-
-
 def _amenities_brief(prop):
     return [{"slug": a.slug, "name": a.name, "icon": a.icon} for a in prop.amenities.all() if a.is_active]
 
 
 def _build_property_brief(prop, request=None):
-    photos = _ordered_photos(prop)
-    image_urls = [_photo_url(p, request) for p in photos[:5]]
+    photos = ordered_photos(prop)
+    image_urls = [photo_url(p, request) for p in photos[:5]]
     return {
         "id": prop.id,
         "name": prop.name,
@@ -101,7 +92,7 @@ def _build_listing_detail(listing, request=None):
     """Enriched detail payload: full photo gallery, labelled amenities, specs, price card
     and a static verification block."""
     prop = listing.property
-    photos = _ordered_photos(prop)
+    photos = ordered_photos(prop)
     monthly_price = listing.monthly_price if listing.monthly_price is not None else listing.listed_price
     deposit = listing.deposit_amount if listing.deposit_amount is not None else prop.deposit_amount
     output = _build_listing_output(listing, request)
@@ -110,7 +101,7 @@ def _build_listing_detail(listing, request=None):
             "photos": [
                 {
                     "id": p.id,
-                    "image_url": _photo_url(p, request),
+                    "image_url": photo_url(p, request),
                     "caption": p.caption or None,
                     "is_primary": p.is_primary,
                     "sort_order": p.sort_order,
@@ -143,136 +134,17 @@ def _build_listing_detail(listing, request=None):
     return output
 
 
-class ListingFilterQuery(pydantic.BaseModel):
-    page: int = 1
-    per_page: int = 20
-    district_id: int | None = None
-    start_date: datetime.date | None = None
-    end_date: datetime.date | None = None
-    flexibility_days: int | None = None
-    price_min: float | None = None
-    price_max: float | None = None
-    rooms: int | None = None
-    rooms_min: int | None = None
-    rooms_max: int | None = None
-    area_min: int | None = None
-    area_max: int | None = None
-    verified: bool | None = None
-    furnishing: str | None = None
-    tariff: str | None = None
-    property_type: str | None = None
-    amenities: str | None = None  # csv of amenity slugs (AND-match)
-    sort: str | None = None  # newest | price_asc | price_desc
-    q: str | None = None
-    bbox: str | None = None  # "minLon,minLat,maxLon,maxLat" for "search this area"
-
-    @pydantic.model_validator(mode="after")
-    def validate_dates(self):
-        if bool(self.start_date) != bool(self.end_date):
-            raise ValueError("Both start_date and end_date must be provided.")
-        if self.start_date and self.end_date and self.end_date < self.start_date:
-            raise ValueError("end_date cannot be before start_date.")
-        if self.flexibility_days is not None and self.flexibility_days < 0:
-            raise ValueError("flexibility_days cannot be negative.")
-        return self
+ListingFilterQuery = ListingFilters
 
 
 class ListingListView(ListAPIView):
     model = Listing
     auth = ()
 
-    def get_queryset(self):
-        return (
-            Listing.objects.select_related("property__district")
-            .prefetch_related("property__photos", "property__amenities")
-            .filter(status=ListingStatus.PUBLISHED)
-        )
-
-    def _price_field(self):
-        # Prefer monthly_price, fall back to legacy listed_price for older rows.
-        return models.functions.Coalesce("monthly_price", "listed_price")
-
     def get(self, parsed_query: Query[ListingFilterQuery]) -> dict:
-        qs = self.get_queryset().annotate(_price=self._price_field())
-        q = parsed_query
-
-        if q.start_date and q.end_date:
-            flex = q.flexibility_days if q.flexibility_days is not None else 3
-            latest_acceptable_start = q.start_date + datetime.timedelta(days=flex)
-            earliest_acceptable_end = q.end_date - datetime.timedelta(days=flex)
-
-            overlapping_leases = Lease.objects.filter(
-                status=LeaseStatus.ACTIVE,
-                start_date__lte=earliest_acceptable_end,
-                end_date__gte=latest_acceptable_start,
-            )
-
-            qs = qs.filter(
-                property__owner_agreements__status=OwnerAgreementStatus.ACTIVE,
-                property__owner_agreements__start_date__lte=latest_acceptable_start,
-                property__owner_agreements__end_date__gte=earliest_acceptable_end,
-            ).exclude(
-                property__leases__in=overlapping_leases
-            ).distinct()
-        else:
-            qs = qs.filter(property__status=PropertyStatus.VACANT)
-
-        if q.district_id is not None:
-            qs = qs.filter(property__district_id=q.district_id)
-        if q.price_min is not None:
-            qs = qs.filter(_price__gte=q.price_min)
-        if q.price_max is not None:
-            qs = qs.filter(_price__lte=q.price_max)
-        if q.rooms is not None:
-            qs = qs.filter(property__rooms=q.rooms)
-        if q.rooms_min is not None:
-            qs = qs.filter(property__rooms__gte=q.rooms_min)
-        if q.rooms_max is not None:
-            qs = qs.filter(property__rooms__lte=q.rooms_max)
-        if q.area_min is not None:
-            qs = qs.filter(property__area_sqm__gte=q.area_min)
-        if q.area_max is not None:
-            qs = qs.filter(property__area_sqm__lte=q.area_max)
-        if q.verified is not None:
-            qs = qs.filter(property__is_verified=q.verified)
-        if q.furnishing:
-            qs = qs.filter(property__furnishing=q.furnishing)
-        if q.tariff:
-            qs = qs.filter(property__tariff=q.tariff)
-        if q.property_type:
-            qs = qs.filter(property__property_type=q.property_type)
-        if q.amenities:
-            slugs = [s.strip() for s in q.amenities.split(",") if s.strip()]
-            for slug in slugs:  # AND-match: every requested amenity must be present
-                qs = qs.filter(property__amenities__slug=slug)
-            qs = qs.distinct()
-        if q.q:
-            qs = qs.filter(
-                models.Q(property__name__icontains=q.q)
-                | models.Q(property__address__icontains=q.q)
-                | models.Q(property__district__name__icontains=q.q)
-            )
-        if q.bbox:
-            try:
-                min_lon, min_lat, max_lon, max_lat = (float(v) for v in q.bbox.split(","))
-                qs = qs.filter(
-                    property__map_lat__gte=min_lat,
-                    property__map_lat__lte=max_lat,
-                    property__map_lon__gte=min_lon,
-                    property__map_lon__lte=max_lon,
-                )
-            except ValueError, TypeError:
-                pass
-
-        if q.sort == "price_asc":
-            qs = qs.order_by("_price", "-created_at")
-        elif q.sort == "price_desc":
-            qs = qs.order_by("-_price", "-created_at")
-        else:  # newest (default) — featured first
-            qs = qs.order_by("-is_featured", "-created_at")
-
+        qs = apply_listing_filters(published_listings_queryset(), parsed_query)
         items = [_build_listing_output(obj, self.request) for obj in qs]
-        paginated = build_paginated_response(items, q.page, q.per_page)
+        paginated = build_paginated_response(items, parsed_query.page, parsed_query.per_page)
         return self.ok(paginated)
 
 
@@ -304,7 +176,7 @@ class ListingMapView(GenericController):
         )
         features = []
         for prop in properties:
-            photos = _ordered_photos(prop)
+            photos = ordered_photos(prop)
             features.append(
                 {
                     "type": "Feature",
@@ -322,7 +194,7 @@ class ListingMapView(GenericController):
                         "price": str(prop.ask_price),
                         "currency": prop.ask_currency,
                         "is_verified": prop.is_verified,
-                        "image_url": _photo_url(photos[0], self.request) if photos else None,
+                        "image_url": photo_url(photos[0], self.request) if photos else None,
                     },
                 }
             )
