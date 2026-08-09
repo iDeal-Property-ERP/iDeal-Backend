@@ -122,11 +122,24 @@ class Property(TimestampedModel, SoftDeleteModel):
             models.CheckConstraint(
                 condition=models.Q(engagement_type=PropertyEngagementType.MANAGED) | models.Q(owner__isnull=True),
                 name="one_off_property_has_no_owner",
-            )
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(floor__isnull=True)
+                    | models.Q(total_floors__isnull=True)
+                    | models.Q(floor__lte=models.F("total_floors"))
+                ),
+                name="property_floor_lte_total_floors",
+            ),
         ]
 
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"
+
+    def clean(self):
+        super().clean()
+        if self.floor is not None and self.total_floors is not None and self.floor > self.total_floors:
+            raise ValidationError({"floor": _("Floor cannot be greater than total floors.")})
 
     def save(self, *args, **kwargs):
         """Keep engagement immutable once a property becomes commercially active."""

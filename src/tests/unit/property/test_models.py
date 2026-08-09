@@ -1,4 +1,5 @@
 import pytest
+from django.core.exceptions import ValidationError
 from django.db.utils import IntegrityError
 from property.models import District, Property
 
@@ -59,3 +60,21 @@ class TestPropertyModel:
         PropertyFactory(district=district, owner=owner)
         with pytest.raises(IntegrityError):
             district.delete()
+
+    def test_clean_rejects_floor_above_total_floors(self):
+        prop = PropertyFactory.build(floor=7, total_floors=5)
+
+        with pytest.raises(ValidationError, match="Floor cannot be greater than total floors"):
+            prop.clean()
+
+    @pytest.mark.parametrize(("floor", "total_floors"), [(5, 5), (None, 5), (5, None)])
+    def test_clean_accepts_valid_or_partial_floor_bounds(self, floor, total_floors):
+        prop = PropertyFactory(floor=floor, total_floors=total_floors)
+
+        prop.clean()
+
+    def test_database_constraint_rejects_raw_invalid_floor_update(self):
+        prop = PropertyFactory(floor=1, total_floors=5)
+
+        with pytest.raises(IntegrityError):
+            Property.objects.filter(pk=prop.pk).update(floor=99)

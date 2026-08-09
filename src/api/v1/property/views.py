@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 from dmr.pagination import Paginated
 from property.models import OneOffDeal, Property, VerificationVisit
+from property.services.validation import validate_floor_bounds
 
 from api.v1.property.schemas import (
     OneOffPropertyDraftInput,
@@ -148,6 +149,16 @@ class PropertyDetailView(RetrieveAPIView, PartialUpdateAPIView, DeleteAPIView):
 
     def to_output(self, instance):
         return _property_output(instance, self.request)
+
+    def perform_update(self, instance, validated_data):
+        try:
+            validate_floor_bounds(
+                validated_data.get("floor", instance.floor),
+                validated_data.get("total_floors", instance.total_floors),
+            )
+        except ValueError as err:
+            return self.fail(error=str(err), message=str(_("Validation error")))
+        return super().perform_update(instance, validated_data)
 
     @require_role(UserRole.MANAGEMENT, UserRole.OWNER)
     def get(self, parsed_path: Path[DetailPath]) -> PropertyOutput:
@@ -293,6 +304,7 @@ class OneOffPropertyUpdateView(GenericController):
         try:
             with transaction.atomic():
                 _apply_one_off_property_data(prop, data)
+                validate_floor_bounds(prop.floor, prop.total_floors)
                 prop.save()
                 if brokerage is not None:
                     for field, value in brokerage.items():

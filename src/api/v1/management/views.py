@@ -6,6 +6,7 @@ from django.db import transaction
 from django.db.models import Case, Count, F, IntegerField, Max, Min, Q, Sum, Value, When
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
+from property.services.validation import validate_floor_bounds
 
 from api.v1.finance.schemas import SettlementOutput
 from api.v1.management.schemas import (
@@ -774,6 +775,10 @@ class OneOffDealListCreateView(ManagementView, ListAPIView):
 
         data = parsed_body.model_dump()
         seller = data.pop("seller")
+        try:
+            validate_floor_bounds(data["floor"], data["total_floors"])
+        except ValueError as err:
+            return self.fail(error=str(err), message=str(_("Validation error")))
         with transaction.atomic():
             prop = Property.objects.create(
                 name=data["name"],

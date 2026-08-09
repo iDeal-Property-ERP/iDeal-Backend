@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pydantic
 from django.utils.translation import gettext_lazy as _
+from property.services.validation import validate_floor_bounds
 from pydantic import field_validator
 
 
@@ -125,6 +126,11 @@ class PropertyCreateInput(pydantic.BaseModel):
     vacant_since: date | None = None
     vacant_days: int = pydantic.Field(default=0, ge=0)
 
+    @pydantic.model_validator(mode="after")
+    def validate_floor_bounds(self):
+        validate_floor_bounds(self.floor, self.total_floors)
+        return self
+
     @field_validator("district_id")
     @classmethod
     def check_district_exists(cls, v: int) -> int:
@@ -169,6 +175,11 @@ class PropertyUpdateInput(pydantic.BaseModel):
     tenant_charge_currency: str | None = None
     vacant_since: date | None = None
     vacant_days: int | None = pydantic.Field(default=None, ge=0)
+
+    @pydantic.model_validator(mode="after")
+    def validate_floor_bounds(self):
+        validate_floor_bounds(self.floor, self.total_floors)
+        return self
 
     @field_validator("district_id")
     @classmethod

@@ -318,6 +318,8 @@ class TestMobileHomeListingDetail:
 
     def test_detail_verification_checklist_has_key_and_label(self, api_client):
         listing = _make_vacant_listing()
+        listing.property.is_verified = True
+        listing.property.save(update_fields=["is_verified"])
 
         response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
 
@@ -326,6 +328,15 @@ class TestMobileHomeListingDetail:
         assert checklist
         assert all(set(item) == {"key", "label"} for item in checklist)
         assert all(item["key"] and item["label"] for item in checklist)
+
+    def test_detail_hides_verification_checklist_when_unverified(self, api_client):
+        listing = _make_vacant_listing()
+
+        response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 200
+        verification = response.json()["data"]["verification"]
+        assert verification == {"is_verified": False, "checklist": []}
 
     def test_detail_returns_404_for_unpublished_listing(self, api_client):
         listing = _make_vacant_listing(status=ListingStatus.DRAFT)

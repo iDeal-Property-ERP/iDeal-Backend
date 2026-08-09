@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pydantic
+from property.services.validation import validate_floor_bounds
 
 
 class AmenityBrief(pydantic.BaseModel):
@@ -160,3 +161,8 @@ class PublicListingSubmitInput(pydantic.BaseModel):
     currency: str = "USD"
     minimum_stay: int = pydantic.Field(default=6, ge=0)
     price_includes: list[str] = pydantic.Field(default_factory=list)
+
+    @pydantic.model_validator(mode="after")
+    def validate_floor_bounds(self):
+        validate_floor_bounds(self.floor, self.total_floors)
+        return self

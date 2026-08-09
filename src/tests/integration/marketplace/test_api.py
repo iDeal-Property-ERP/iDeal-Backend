@@ -120,6 +120,8 @@ class TestPublicListingAPI:
 
     def test_retrieve_listing_public(self, api_client):
         listing = _make_vacant_listing()
+        listing.property.is_verified = True
+        listing.property.save(update_fields=["is_verified"])
         response = api_client.get(f"/api/v1/marketplace/listings/{listing.id}/")
         assert response.status_code == 200
         body = response.json()
@@ -136,6 +138,15 @@ class TestPublicListingAPI:
         assert "price_card" in data
         assert data["verification"]["is_verified"] == listing.property.is_verified
         assert len(data["verification"]["checklist"]) == 4
+
+    def test_retrieve_listing_hides_verification_checklist_when_unverified(self, api_client):
+        listing = _make_vacant_listing()
+
+        response = api_client.get(f"/api/v1/marketplace/listings/{listing.id}/")
+
+        assert response.status_code == 200
+        verification = response.json()["data"]["verification"]
+        assert verification == {"is_verified": False, "checklist": []}
 
     def test_retrieve_listing_photo_caption(self, api_client):
         from property.models import PropertyPhoto

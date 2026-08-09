@@ -21,8 +21,8 @@ class PropertyFactory(factory.django.DjangoModelFactory):
     district = factory.SubFactory(DistrictFactory)
     rooms = factory.Faker("random_int", min=1, max=5)
     area_sqm = factory.Faker("random_int", min=20, max=200)
-    floor = factory.Faker("random_int", min=1, max=15)
     total_floors = factory.Faker("random_int", min=1, max=20)
+    floor = factory.LazyAttribute(lambda obj: obj.total_floors)
     owner = factory.SubFactory(OwnerFactory)
     ask_price = 500.00
     ask_currency = "USD"

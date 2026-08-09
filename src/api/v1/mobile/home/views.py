@@ -11,7 +11,7 @@ from marketplace.services.listings import (
 )
 from property.models import District
 
-from api.v1.marketplace.views import RESPONSE_TIME, VERIFICATION_CHECKLIST
+from api.v1.marketplace.views import RESPONSE_TIME, _verification_checklist
 from api.v1.mobile.home.schemas import (
     MobileHomeFeedQuery,
     MobileListingAmenity,
@@ -113,7 +113,7 @@ def serialize_mobile_listing_detail(listing, request) -> dict:
             is_verified=prop.is_verified,
             checklist=[
                 MobileVerificationItem(key=item["key"], label=str(item["label"]))
-                for item in VERIFICATION_CHECKLIST
+                for item in _verification_checklist(prop)
             ],
         ),
     ).model_dump(mode="json")

@@ -181,6 +181,23 @@ class TestPropertyUpdate:
         assert body["success"] is False
         assert any("owner_id" in str(e.get("loc", [])) for e in body.get("error", []))
 
+    def test_partial_update_rejects_floor_above_persisted_total_floors(self, api_client, management, property_obj):
+        property_obj.total_floors = 5
+        property_obj.floor = 1
+        property_obj.save(update_fields=["total_floors", "floor"])
+
+        response = api_client.patch(
+            f"/api/v1/properties/{property_obj.id}/",
+            json.dumps({"floor": 7}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+
+        assert response.status_code == 400
+        assert response.json()["success"] is False
+        property_obj.refresh_from_db()
+        assert property_obj.floor == 1
+
 
 @pytest.mark.django_db
 class TestPropertyDelete:

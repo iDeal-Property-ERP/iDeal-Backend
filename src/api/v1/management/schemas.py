@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pydantic
+from property.services.validation import validate_floor_bounds
 from pydantic import ConfigDict, field_validator, model_validator
 
 from core.constants import BrokerageCommissionType, Currency, OneOffChannel, PaymentMethod
@@ -222,6 +223,11 @@ class OneOffDealCreateInput(pydantic.BaseModel):
                 raise ValueError("Fixed commission requires one fixed amount")
         elif self.commission_percentage is None or self.commission_fixed_amount is not None:
             raise ValueError("Percentage commission requires one percentage")
+        return self
+
+    @model_validator(mode="after")
+    def validate_floor_bounds(self):
+        validate_floor_bounds(self.floor, self.total_floors)
         return self
 
 

@@ -355,18 +355,22 @@ class Command(BaseCommand):
                 if track in ("onboarding_approved", "onboarding_pending")
                 else PropertyStatus.VACANT
             )
+            total_floors = self.rng.randint(4, 22)
+            is_verified = track in ("rented", "vacant") and self.rng.random() < 0.6
             prop = Property.objects.create(
                 name=f"{district.name} {self.faker.street_name()} Apt {self.rng.randint(1, 200)}",
                 address=self.faker.street_address(),
                 district=district,
                 rooms=self.rng.randint(1, 5),
                 area_sqm=self.rng.randint(28, 180),
-                floor=self.rng.randint(1, 16),
-                total_floors=self.rng.randint(4, 22),
+                floor=self.rng.randint(1, total_floors),
+                total_floors=total_floors,
                 owner=owner,
                 status=initial_status,
                 score=Decimal(f"{self.rng.uniform(8.0, 9.9):.1f}"),
                 review_count=self.rng.randint(12, 180),
+                is_verified=is_verified,
+                verified_at=timezone.now() if is_verified else None,
                 map_lat=Decimal(f"{self.rng.uniform(*TASHKENT_LAT):.7f}"),
                 map_lon=Decimal(f"{self.rng.uniform(*TASHKENT_LON):.7f}"),
                 description=self.faker.paragraph(nb_sentences=4),

@@ -23,7 +23,7 @@ from core.constants import ListingStatus, PropertyStatus
 from core.utils.pagination import build_paginated_response
 from core.utils.rate_limit import rate_limit
 
-# Static verification checklist shown on every verified listing's detail page.
+# Static verification checklist shown only on verified listing detail pages.
 VERIFICATION_CHECKLIST = [
     {"key": "ownership", "label": _("Official ownership check")},
     {"key": "team", "label": _("Verified by iDeal team")},
@@ -35,6 +35,12 @@ RESPONSE_TIME = _("Usually responds within 1 hour")
 
 def _amenities_brief(prop):
     return [{"slug": a.slug, "name": a.name, "icon": a.icon} for a in prop.amenities.all() if a.is_active]
+
+
+def _verification_checklist(prop):
+    if not prop.is_verified:
+        return []
+    return [{"key": item["key"], "label": str(item["label"])} for item in VERIFICATION_CHECKLIST]
 
 
 def _build_property_brief(prop, request=None):
@@ -127,7 +133,7 @@ def _build_listing_detail(listing, request=None):
             },
             "verification": {
                 "is_verified": prop.is_verified,
-                "checklist": [{"key": item["key"], "label": str(item["label"])} for item in VERIFICATION_CHECKLIST],
+                "checklist": _verification_checklist(prop),
             },
         }
     )

@@ -6,6 +6,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
+from property.services.validation import validate_floor_bounds
 
 from api.v1.owner.schemas import (
     OwnerListingCreateInput,
@@ -368,6 +369,11 @@ class OwnerListingDetailView(OwnerListingBaseView):
         for key, attr in property_fields.items():
             if key in data:
                 setattr(prop, attr, data[key])
+
+        try:
+            validate_floor_bounds(prop.floor, prop.total_floors)
+        except ValueError as err:
+            return self.fail(error=str(err), message=str(_("Validation error")))
 
         # Pricing (step 3) mirrors onto the property's pricing columns.
         if "monthly_price" in data and data["monthly_price"] is not None:

@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pydantic
+from property.services.validation import validate_floor_bounds
 
 
 class OwnerPropertyOutput(pydantic.BaseModel):
@@ -73,12 +74,17 @@ class OwnerOnboardingCreateInput(pydantic.BaseModel):
     district_id: int
     rooms: int
     area_sqm: int
-    floor: int
-    total_floors: int | None = None
+    floor: int = pydantic.Field(ge=0)
+    total_floors: int | None = pydantic.Field(default=None, ge=0)
     description: str | None = None
     ask_price: Decimal
     ask_currency: str = "USD"
     accept_offer: bool
+
+    @pydantic.model_validator(mode="after")
+    def validate_floor_bounds(self):
+        validate_floor_bounds(self.floor, self.total_floors)
+        return self
 
 
 class OwnerListingCreateInput(pydantic.BaseModel):
@@ -90,11 +96,16 @@ class OwnerListingCreateInput(pydantic.BaseModel):
     district_id: int
     rooms: int
     area_sqm: int
-    floor: int = 1
-    total_floors: int | None = None
+    floor: int = pydantic.Field(default=1, ge=0)
+    total_floors: int | None = pydantic.Field(default=None, ge=0)
     furnishing: str = "unfurnished"
     description: str | None = None
     amenities: list[str] = []  # amenity slugs
+
+    @pydantic.model_validator(mode="after")
+    def validate_floor_bounds(self):
+        validate_floor_bounds(self.floor, self.total_floors)
+        return self
 
 
 class OwnerListingUpdateInput(pydantic.BaseModel):
@@ -106,8 +117,8 @@ class OwnerListingUpdateInput(pydantic.BaseModel):
     district_id: int | None = None
     rooms: int | None = None
     area_sqm: int | None = None
-    floor: int | None = None
-    total_floors: int | None = None
+    floor: int | None = pydantic.Field(default=None, ge=0)
+    total_floors: int | None = pydantic.Field(default=None, ge=0)
     furnishing: str | None = None
     tariff: str | None = None
     description: str | None = None
@@ -117,6 +128,11 @@ class OwnerListingUpdateInput(pydantic.BaseModel):
     currency: str | None = None
     minimum_stay: int | None = None
     price_includes: list[str] | None = None
+
+    @pydantic.model_validator(mode="after")
+    def validate_floor_bounds(self):
+        validate_floor_bounds(self.floor, self.total_floors)
+        return self
 
 
 class OwnerListingPhotoReorderItem(pydantic.BaseModel):
