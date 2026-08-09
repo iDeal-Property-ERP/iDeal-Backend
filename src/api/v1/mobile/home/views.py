@@ -1,6 +1,7 @@
 from django.db.models import Max, Min
+from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
-from dmr import Query
+from dmr import Path, Query
 from marketplace.services.listings import (
     ListingFilters,
     apply_listing_filters,
@@ -10,8 +11,17 @@ from marketplace.services.listings import (
 )
 from property.models import District
 
-from api.v1.mobile.home.schemas import MobileHomeFeedQuery, MobileListingCard
-from core.api.views import BaseController
+from api.v1.marketplace.views import RESPONSE_TIME, VERIFICATION_CHECKLIST
+from api.v1.mobile.home.schemas import (
+    MobileHomeFeedQuery,
+    MobileListingAmenity,
+    MobileListingCard,
+    MobileListingDetail,
+    MobileListingPhoto,
+    MobileListingVerification,
+    MobileVerificationItem,
+)
+from core.api.views import BaseController, DetailPath
 from core.constants import FurnishingType, TariffChoices
 from core.utils.pagination import build_paginated_response_from_queryset
 
@@ -45,6 +55,70 @@ def serialize_mobile_listing_card(listing, request) -> dict:
     ).model_dump(mode="json")
 
 
+def serialize_mobile_listing_detail(listing, request) -> dict:
+    prop = listing.property
+    monthly_price = listing.monthly_price if listing.monthly_price is not None else listing.listed_price
+    deposit = listing.deposit_amount if listing.deposit_amount is not None else prop.deposit_amount
+    photos = ordered_photos(prop)
+    amenities = sorted(
+        (amenity for amenity in prop.amenities.all() if amenity.is_active),
+        key=lambda amenity: (amenity.sort_order, amenity.name),
+    )
+    return MobileListingDetail(
+        id=listing.id,
+        property_id=listing.property_id,
+        title=prop.name,
+        district=prop.district.name if prop.district else None,
+        address=prop.address,
+        property_type=prop.property_type,
+        rooms=prop.rooms,
+        area_sqm=prop.area_sqm,
+        floor=prop.floor,
+        total_floors=prop.total_floors,
+        furnishing=prop.furnishing,
+        price=float(monthly_price) if monthly_price is not None else None,
+        currency=listing.currency or prop.ask_currency,
+        tariff=prop.tariff,
+        is_verified=prop.is_verified,
+        is_featured=listing.is_featured,
+        score=float(prop.score),
+        review_count=prop.review_count,
+        map_lat=float(prop.map_lat) if prop.map_lat is not None else None,
+        map_lon=float(prop.map_lon) if prop.map_lon is not None else None,
+        description=listing.description or prop.description or None,
+        deposit_amount=float(deposit) if deposit is not None else None,
+        minimum_stay=listing.minimum_stay,
+        price_includes=listing.price_includes or [],
+        response_time=str(RESPONSE_TIME),
+        created_at=listing.created_at.isoformat(),
+        photos=[
+            MobileListingPhoto(
+                id=photo.id,
+                image_url=photo_url(photo, request),
+                caption=photo.caption or None,
+                is_primary=photo.is_primary,
+                sort_order=photo.sort_order,
+            )
+            for photo in photos
+        ],
+        amenities=[
+            MobileListingAmenity(
+                slug=amenity.slug,
+                name=amenity.name,
+                icon=amenity.icon or None,
+            )
+            for amenity in amenities
+        ],
+        verification=MobileListingVerification(
+            is_verified=prop.is_verified,
+            checklist=[
+                MobileVerificationItem(key=item["key"], label=str(item["label"]))
+                for item in VERIFICATION_CHECKLIST
+            ],
+        ),
+    ).model_dump(mode="json")
+
+
 class MobileHomeListingsView(BaseController):
     auth = ()
 
@@ -58,6 +132,14 @@ class MobileHomeListingsView(BaseController):
             lambda listing: serialize_mobile_listing_card(listing, self.request),
         )
         return self.ok(paginated)
+
+
+class MobileHomeListingDetailView(BaseController):
+    auth = ()
+
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        listing = get_object_or_404(published_listings_queryset(), pk=parsed_path.pk)
+        return self.ok(serialize_mobile_listing_detail(listing, self.request))
 
 
 class MobileHomeFiltersView(BaseController):

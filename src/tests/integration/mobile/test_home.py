@@ -2,14 +2,15 @@ from urllib.parse import urlparse
 
 import pytest
 from marketplace.models import Listing
-from property.models import PropertyPhoto
+from property.models import Amenity, PropertyPhoto
 
 from core.constants import FurnishingType, ListingStatus, PropertyStatus, TariffChoices
-from tests.factories import DistrictFactory, ListingFactory, PropertyFactory
+from tests.factories import DistrictFactory, ListingFactory, PropertyFactory, PropertyPhotoFactory
 
 pytestmark = pytest.mark.django_db
 
 LISTINGS_URL = "/api/v1/mobile/home/listings/"
+LISTING_DETAIL_URL = "/api/v1/mobile/home/listings/"
 FILTERS_URL = "/api/v1/mobile/home/filters/"
 
 
@@ -199,6 +200,152 @@ class TestMobileHomeListings:
         assert page_one["data"]["num_pages"] == 3
         assert [item["id"] for item in _items(page_one)] == expected_ids[:2]
         assert [item["id"] for item in _items(page_two)] == expected_ids[2:4]
+
+
+class TestMobileHomeListingDetail:
+    def test_anonymous_detail_shape_and_numeric_types(self, api_client):
+        listing = _make_vacant_listing()
+        listing.property.score = 4.7
+        listing.property.deposit_amount = 300
+        listing.property.description = "A bright home near the city center."
+        listing.property.save(update_fields=["score", "deposit_amount", "description", "updated_at"])
+        # Saving the property re-fires manage_listing_on_property_change, which mirrors
+        # ask_price/description onto the listing — so set the listing's own values after it.
+        listing.refresh_from_db()
+        listing.monthly_price = 850
+        listing.listed_price = 900
+        listing.description = None
+        listing.deposit_amount = None
+        listing.price_includes = ["utilities"]
+        listing.save(
+            update_fields=[
+                "monthly_price",
+                "listed_price",
+                "description",
+                "deposit_amount",
+                "price_includes",
+                "updated_at",
+            ]
+        )
+
+        response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        data = body["data"]
+        assert set(data) == {
+            "id",
+            "property_id",
+            "title",
+            "district",
+            "address",
+            "property_type",
+            "rooms",
+            "area_sqm",
+            "floor",
+            "total_floors",
+            "furnishing",
+            "price",
+            "currency",
+            "tariff",
+            "is_verified",
+            "is_featured",
+            "score",
+            "review_count",
+            "map_lat",
+            "map_lon",
+            "description",
+            "deposit_amount",
+            "minimum_stay",
+            "price_includes",
+            "response_time",
+            "created_at",
+            "photos",
+            "amenities",
+            "verification",
+        }
+        assert data["price"] == 850.0
+        assert isinstance(data["price"], float)
+        assert isinstance(data["score"], float)
+        assert isinstance(data["deposit_amount"], (float, type(None)))
+        assert data["deposit_amount"] == 300.0
+        assert data["description"] == listing.property.description
+
+    def test_detail_photos_are_primary_first_and_have_absolute_urls(self, api_client):
+        listing = _make_vacant_listing()
+        late = PropertyPhotoFactory(
+            property=listing.property,
+            image="properties/photos/late.jpg",
+            caption="Late photo",
+            sort_order=20,
+        )
+        primary = PropertyPhotoFactory(
+            property=listing.property,
+            image="properties/photos/primary.jpg",
+            is_primary=True,
+            sort_order=99,
+        )
+        early = PropertyPhotoFactory(
+            property=listing.property,
+            image="properties/photos/early.jpg",
+            sort_order=1,
+        )
+
+        response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 200
+        photos = response.json()["data"]["photos"]
+        assert [photo["id"] for photo in photos] == [primary.id, early.id, late.id]
+        assert all(set(photo) == {"id", "image_url", "caption", "is_primary", "sort_order"} for photo in photos)
+        assert all(photo["image_url"].startswith(("http://", "https://")) for photo in photos)
+        assert photos[0]["caption"] is None
+        assert urlparse(photos[0]["image_url"]).path.endswith("primary.jpg")
+
+    def test_detail_amenities_exclude_inactive_entries(self, api_client):
+        listing = _make_vacant_listing()
+        active_late = Amenity.objects.create(slug="mobile-active-late", name="Zeta", sort_order=20)
+        inactive = Amenity.objects.create(slug="mobile-inactive", name="Hidden", sort_order=0, is_active=False)
+        active_early = Amenity.objects.create(slug="mobile-active-early", name="Alpha", sort_order=10)
+        listing.property.amenities.set([active_late, inactive, active_early])
+
+        response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 200
+        amenities = response.json()["data"]["amenities"]
+        assert [amenity["slug"] for amenity in amenities] == [active_early.slug, active_late.slug]
+        assert inactive.slug not in {amenity["slug"] for amenity in amenities}
+
+    def test_detail_verification_checklist_has_key_and_label(self, api_client):
+        listing = _make_vacant_listing()
+
+        response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 200
+        checklist = response.json()["data"]["verification"]["checklist"]
+        assert checklist
+        assert all(set(item) == {"key", "label"} for item in checklist)
+        assert all(item["key"] and item["label"] for item in checklist)
+
+    def test_detail_returns_404_for_unpublished_listing(self, api_client):
+        listing = _make_vacant_listing(status=ListingStatus.DRAFT)
+
+        response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 404
+
+    def test_detail_returns_404_for_unknown_listing(self, api_client):
+        response = api_client.get(f"{LISTING_DETAIL_URL}999999999/")
+
+        assert response.status_code == 404
+
+    def test_detail_allows_published_listing_when_property_is_rented(self, api_client):
+        prop = PropertyFactory(status=PropertyStatus.RENTED)
+        listing = ListingFactory(property=prop, status=ListingStatus.PUBLISHED)
+
+        response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 200
 
 
 class TestMobileHomeFilters:
