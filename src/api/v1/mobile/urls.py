@@ -6,4 +6,9 @@ urlpatterns = [
     path("auth/", include("api.v1.mobile.auth.urls")),
     path("account/", include("api.v1.mobile.account.urls", namespace="account")),
     path("home/", include("api.v1.mobile.home.urls", namespace="home")),
+    path("notifications/", include("api.v1.mobile.notifications.urls", namespace="notifications")),
+    path("devices/", include("api.v1.mobile.devices.urls", namespace="devices")),
+    path(
+        "notification-settings/", include("api.v1.mobile.notification_settings.urls", namespace="notification-settings")
+    ),
 ]

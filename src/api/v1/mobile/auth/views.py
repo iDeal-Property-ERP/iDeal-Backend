@@ -18,6 +18,7 @@ from dmr.security.jwt.token import JWToken
 from api.v1.mobile.auth.schemas import OTPRequestInput, OTPVerifyInput
 from core.api.mixins import JWTMixin
 from core.api.views import BaseController
+from core.constants import UserRole
 from core.utils.rate_limit import rate_limit
 
 PHONE_PATTERN = re.compile(r"\+998\d{9}\Z")
@@ -57,6 +58,7 @@ def _get_or_create_phone_user(phone: str) -> User:
         email=f"{uuid.uuid4().hex}@phone.ideal.local",
         first_name="",
         phone=phone,
+        role=UserRole.TENANT,
         is_verified=True,
     )
     user.set_unusable_password()

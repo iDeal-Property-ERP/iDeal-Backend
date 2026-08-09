@@ -18,6 +18,9 @@ INTERNAL_IPS = ["127.0.0.1"]
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+# Local development must not block repeated manual OTP and marketplace flows.
+RATE_LIMIT_ENABLED = False
+
 JWT_SETTINGS = {
     # Access tokens are short-lived; the client silently refreshes on 401. A
     # 30-day access token (previously set here for dev convenience) means a

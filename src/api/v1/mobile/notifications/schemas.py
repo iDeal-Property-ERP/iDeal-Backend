@@ -5,10 +5,16 @@ from datetime import datetime
 import pydantic
 
 
-class NotificationOutput(pydantic.BaseModel):
+class MobileNotificationFilterQuery(pydantic.BaseModel):
+    page: int = 1
+    per_page: int = 20
+    is_read: bool | None = None
+    category: str | None = None
+
+
+class MobileNotificationOutput(pydantic.BaseModel):
     id: int
     type: str
-    audience: str
     category: str
     title: str
     body: str | None
@@ -24,9 +30,3 @@ class NotificationOutput(pydantic.BaseModel):
 
 class UnreadCountOutput(pydantic.BaseModel):
     unread_count: int
-
-
-class NotificationFilterQuery(pydantic.BaseModel):
-    page: int | None = None
-    per_page: int = 20
-    is_read: bool | None = None

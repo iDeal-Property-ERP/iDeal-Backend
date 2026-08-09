@@ -143,6 +143,7 @@ PROJECT_NAME = config("PROJECT_NAME", default="iDeal Backend")
 
 # OTP delivery
 OTP_DEV_BYPASS_CODE = config("OTP_DEV_BYPASS_CODE", default="")
+RATE_LIMIT_ENABLED = True
 
 ## Eskiz SMS
 ESKIZ_EMAIL = config("ESKIZ_EMAIL", default="")
@@ -152,6 +153,11 @@ ESKIZ_BASE_URL = config("ESKIZ_BASE_URL", default="https://notify.eskiz.uz/api")
 
 ## Telegram Gateway
 TELEGRAM_GATEWAY_TOKEN = config("TELEGRAM_GATEWAY_TOKEN", default="")
+
+## Firebase Cloud Messaging
+FCM_ENABLED = config("FCM_ENABLED", default=False, cast=bool)
+FCM_CREDENTIALS_PATH = config("FCM_CREDENTIALS_PATH", default="")
+FCM_PROJECT_ID = config("FCM_PROJECT_ID", default="")
 
 CACHES = {
     "default": {

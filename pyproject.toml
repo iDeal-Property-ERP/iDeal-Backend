@@ -29,6 +29,7 @@ dependencies = [
     "django-q2>=1.7.5",
     "redis>=5.2.1",
     "pillow>=12.2.0",
+    "firebase-admin>=7.5.0",
 ]
 
 [dependency-groups]

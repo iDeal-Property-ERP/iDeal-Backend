@@ -51,7 +51,7 @@ from finance.models import ExchangeRate, Payment, PayoutSchedule
 from inventory.models import InventoryAct, InventoryActItem, InventoryActPhoto
 from maintenance.models import ServiceRequest, ServiceRequestPhoto
 from marketplace.models import Booking, Listing, ViewingRequest
-from notification.models import Notification
+from notification.models import DeviceToken, Notification, NotificationPreference
 from property.models import District, Property, PropertyPhoto
 from vas.models import ServiceCatalogItem, ServiceOrder
 
@@ -60,9 +60,11 @@ from core.constants import (
     BookingStatus,
     ConditionRating,
     Currency,
+    DevicePlatform,
     InventoryActStatus,
     InventoryActType,
     LeaseStatus,
+    NotificationAudience,
     NotificationType,
     OwnerAgreementStatus,
     PaymentMethod,
@@ -159,6 +161,8 @@ REPORT_MODELS = [
     ("Agents", Agent),
     ("Agent deals", AgentDeal),
     ("Notifications", Notification),
+    ("Device tokens", DeviceToken),
+    ("Notification preferences", NotificationPreference),
 ]
 
 
@@ -667,12 +671,36 @@ class Command(BaseCommand):
 
     def _seed_notifications(self, users):
         types = NotificationType.values()
+        audiences = [NotificationAudience.MOBILE, NotificationAudience.ERP, NotificationAudience.BOTH]
         for user in users:
+            preference, _ = NotificationPreference.objects.get_or_create(
+                user=user,
+                defaults={
+                    "push_enabled": self.rng.random() >= 0.15,
+                    "payments_enabled": self.rng.random() >= 0.10,
+                    "bookings_enabled": self.rng.random() >= 0.10,
+                    "maintenance_enabled": self.rng.random() >= 0.10,
+                    "leases_enabled": self.rng.random() >= 0.10,
+                    "general_enabled": self.rng.random() >= 0.10,
+                },
+            )
+            if preference.push_enabled:
+                DeviceToken.objects.create(
+                    user=user,
+                    token=f"mock-fcm-{self.token}-{user.pk}-{uuid.uuid4().hex}",
+                    platform=self.rng.choice([DevicePlatform.ANDROID, DevicePlatform.IOS]),
+                    device_id=f"mock-device-{self.token}-{user.pk}",
+                    app_version="1.0.0-mock",
+                    locale=self.rng.choice(["en", "ru", "uz"]),
+                    is_active=True,
+                    last_seen_at=timezone.now() - timedelta(minutes=self.rng.randint(0, 60 * 24 * 14)),
+                )
             for _ in range(self.rng.randint(1, 4)):
                 read = self.rng.random() < 0.4
                 Notification.objects.create(
                     recipient=user,
                     type=self.rng.choice(types),
+                    audience=self.rng.choice(audiences),
                     title=self.faker.sentence(nb_words=5).rstrip("."),
                     body=self.faker.paragraph(nb_sentences=2),
                     is_read=read,

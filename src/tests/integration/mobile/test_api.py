@@ -10,6 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 
 from api.v1.mobile.auth import views
+from core.constants import UserRole
 from tests.factories import UserFactory
 
 
@@ -75,6 +76,7 @@ def test_request_and_verify_provisions_user_and_returns_valid_jwt(api_client, mo
     user = User.objects.get(phone="+998901234567")
     assert user.is_verified is True
     assert user.has_usable_password() is False
+    assert user.role == UserRole.TENANT
 
     payload = jwt.decode(tokens["access_token"], settings.SECRET_KEY, algorithms=["HS256"])
     assert payload["sub"] == str(user.pk)
@@ -140,6 +142,16 @@ def test_otp_request_is_rate_limited(api_client, monkeypatch):
     limited_response = _request_otp(api_client, phone="+998901234599")
     assert limited_response.status_code == 429
     assert limited_response.json()["success"] is False
+
+
+def test_otp_request_is_not_rate_limited_when_disabled(api_client, monkeypatch):
+    monkeypatch.setattr(settings, "RATE_LIMIT_ENABLED", False)
+    monkeypatch.setattr(settings, "OTP_DEV_BYPASS_CODE", "123456")
+    monkeypatch.setattr(views.otp_service, "generate_otp", lambda: "999999")
+
+    for index in range(4):
+        response = _request_otp(api_client, phone=f"+9989012345{index:02d}")
+        assert response.status_code == 200
 
 
 @pytest.mark.django_db

@@ -1,6 +1,7 @@
 from functools import wraps
 from http import HTTPStatus
 
+from django.conf import settings
 from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 
@@ -14,6 +15,9 @@ def rate_limit(requests: int, window_seconds: int):
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
+            if not settings.RATE_LIMIT_ENABLED:
+                return func(self, *args, **kwargs)
+
             # Get client IP address
             ip = self.request.META.get("HTTP_X_FORWARDED_FOR")
             ip = ip.split(",")[0].strip() if ip else self.request.META.get("REMOTE_ADDR", "unknown-ip")

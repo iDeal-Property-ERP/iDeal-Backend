@@ -1,0 +1,1 @@
+"""Mobile notification preference endpoints."""

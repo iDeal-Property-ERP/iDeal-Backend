@@ -1,6 +1,6 @@
 import pytest
 
-from core.constants import NotificationType
+from core.constants import NotificationAudience, NotificationCategory, NotificationType
 from tests.factories import NotificationFactory, TenantFactory
 from tests.integration.property.test_api import _make_jwt
 
@@ -32,6 +32,20 @@ class TestNotificationAPI:
 
         assert response.status_code == 200
         assert response.json()["data"]["unread_count"] == 2
+
+    def test_erp_endpoints_include_erp_and_both_but_exclude_mobile(self, api_client):
+        user = TenantFactory()
+        erp = NotificationFactory(recipient=user, audience=NotificationAudience.ERP)
+        both = NotificationFactory(recipient=user, audience=NotificationAudience.BOTH)
+        mobile = NotificationFactory(recipient=user, audience=NotificationAudience.MOBILE)
+
+        response = api_client.get("/api/v1/notifications/", **_make_jwt(user))
+
+        assert response.status_code == 200
+        notifications = response.json()["data"]
+        assert {item["id"] for item in notifications} == {erp.id, both.id}
+        assert all(item["category"] == NotificationCategory.GENERAL for item in notifications)
+        assert mobile.id not in {item["id"] for item in notifications}
 
     def test_mark_read(self, api_client):
         user = TenantFactory()

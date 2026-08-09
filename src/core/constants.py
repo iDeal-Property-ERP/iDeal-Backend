@@ -500,3 +500,55 @@ class NotificationType(ConstantChoices):
         (SERVICE_ORDER_STATUS, _("Service Order Status")),
         (GENERAL, _("General")),
     ]
+
+
+class NotificationAudience(ConstantChoices):
+    MOBILE = "mobile"
+    ERP = "erp"
+    BOTH = "both"
+    CHOICES = [
+        (MOBILE, _("Mobile")),
+        (ERP, _("ERP")),
+        (BOTH, _("Both")),
+    ]
+
+
+class NotificationCategory(ConstantChoices):
+    PAYMENTS = "payments"
+    BOOKINGS = "bookings"
+    MAINTENANCE = "maintenance"
+    LEASES = "leases"
+    GENERAL = "general"
+    CHOICES = [
+        (PAYMENTS, _("Payments")),
+        (BOOKINGS, _("Bookings")),
+        (MAINTENANCE, _("Maintenance")),
+        (LEASES, _("Leases")),
+        (GENERAL, _("General")),
+    ]
+
+
+class DevicePlatform(ConstantChoices):
+    ANDROID = "android"
+    IOS = "ios"
+    CHOICES = [
+        (ANDROID, _("Android")),
+        (IOS, _("iOS")),
+    ]
+
+
+NOTIFICATION_TYPE_CATEGORY = {
+    NotificationType.PAYMENT_DUE: NotificationCategory.PAYMENTS,
+    NotificationType.PAYMENT_PAID: NotificationCategory.PAYMENTS,
+    NotificationType.PAYOUT_PAID: NotificationCategory.PAYMENTS,
+    NotificationType.BOOKING_STATUS: NotificationCategory.BOOKINGS,
+    NotificationType.SERVICE_REQUEST_STATUS: NotificationCategory.MAINTENANCE,
+    NotificationType.SERVICE_ORDER_STATUS: NotificationCategory.MAINTENANCE,
+    NotificationType.LEASE_RENEWAL: NotificationCategory.LEASES,
+    NotificationType.OWNER_ONBOARDING: NotificationCategory.GENERAL,
+    NotificationType.GENERAL: NotificationCategory.GENERAL,
+}
+
+
+def category_for_notification_type(value: str) -> str:
+    return NOTIFICATION_TYPE_CATEGORY.get(value, NotificationCategory.GENERAL)

@@ -1,0 +1,51 @@
+"""Notification dispatch — the single choke point for in-app notifications."""
+
+import logging
+
+import django_q.tasks
+from notification.models import DeviceToken, Notification
+from notification.services.push import PushService
+
+from core.constants import NotificationAudience
+
+logger = logging.getLogger(__name__)
+
+
+def notify(
+    *,
+    recipient,
+    type,
+    title,
+    body=None,
+    related_object_type=None,
+    related_object_id=None,
+    audience: str = NotificationAudience.BOTH,
+):
+    """Create an in-app notification for ``recipient`` and dispatch mobile push when applicable."""
+    notification = Notification.objects.create(
+        recipient=recipient,
+        type=type,
+        audience=audience,
+        title=title,
+        body=body,
+        related_object_type=related_object_type,
+        related_object_id=related_object_id,
+    )
+
+    if audience in (NotificationAudience.MOBILE, NotificationAudience.BOTH) and _should_enqueue_mobile_push(
+        notification
+    ):
+        try:
+            django_q.tasks.async_task("notification.tasks.send_push_for_notification", notification.id)
+        except Exception:
+            logger.warning("Unable to enqueue push notification id=%s", notification.id, exc_info=True)
+
+    return notification
+
+
+def _should_enqueue_mobile_push(notification: Notification) -> bool:
+    """Avoid queueing a delivery task when there is no eligible mobile target."""
+    if not DeviceToken.objects.filter(user_id=notification.recipient_id, is_active=True).exists():
+        return False
+
+    return PushService().should_send(notification)

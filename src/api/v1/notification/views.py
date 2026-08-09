@@ -12,6 +12,7 @@ from api.v1.notification.schemas import (
     UnreadCountOutput,
 )
 from core.api.views import BaseController, DetailPath, GenericController
+from core.constants import NotificationAudience
 
 
 class NotificationListView(GenericController):
@@ -19,7 +20,10 @@ class NotificationListView(GenericController):
     output_schema = NotificationOutput
 
     def get_queryset(self):
-        return Notification.objects.filter(recipient=self.request.user)
+        return Notification.objects.filter(
+            recipient=self.request.user,
+            audience__in=(NotificationAudience.ERP, NotificationAudience.BOTH),
+        )
 
     def get(
         self, parsed_query: Query[NotificationFilterQuery]
@@ -32,8 +36,14 @@ class NotificationListView(GenericController):
 
 class NotificationUnreadCountView(BaseController):
     def get(self) -> UnreadCountOutput:
-        count = Notification.objects.filter(recipient=self.request.user, is_read=False).count()
+        count = self._queryset().filter(is_read=False).count()
         return self.ok(UnreadCountOutput(unread_count=count).model_dump(mode="json"))
+
+    def _queryset(self):
+        return Notification.objects.filter(
+            recipient=self.request.user,
+            audience__in=(NotificationAudience.ERP, NotificationAudience.BOTH),
+        )
 
 
 class NotificationReadView(GenericController):
@@ -54,9 +64,11 @@ class NotificationReadView(GenericController):
 
 class NotificationReadAllView(BaseController):
     def post(self) -> dict:
-        updated = Notification.objects.filter(recipient=self.request.user, is_read=False).update(
-            is_read=True, read_at=timezone.now()
-        )
+        updated = Notification.objects.filter(
+            recipient=self.request.user,
+            audience__in=(NotificationAudience.ERP, NotificationAudience.BOTH),
+            is_read=False,
+        ).update(is_read=True, read_at=timezone.now())
         return self.ok(
             {"updated": updated, "message": str(_("All notifications marked as read"))},
             status_code=HTTPStatus.OK,
