@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 from contract.models import Lease, LeaseRenewal, OwnerAgreement
 from django.db.utils import IntegrityError
@@ -8,6 +10,17 @@ from tests.factories import LeaseFactory, LeaseRenewalFactory, OwnerAgreementFac
 
 @pytest.mark.django_db
 class TestOwnerAgreementModel:
+    def test_create_coerces_string_decimal_fields(self, owner, property_obj):
+        agreement = OwnerAgreementFactory(
+            owner=owner,
+            property=property_obj,
+            commission_rate="10.00",
+            gross_floor_amount="1000.00",
+        )
+
+        assert agreement.commission_rate == Decimal("10.00")
+        assert agreement.gross_floor_amount == Decimal("1000.00")
+
     def test_create_owner_agreement(self, owner, property_obj):
         ag = OwnerAgreementFactory(owner=owner, property=property_obj)
         assert ag.status == OwnerAgreementStatus.ACTIVE

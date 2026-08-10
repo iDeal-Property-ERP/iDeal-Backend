@@ -36,7 +36,7 @@ class OwnerAgreementCreateInput(pydantic.BaseModel):
     status: str = "active"
     terms: str | None = None
     commission_rate: Decimal
-    gross_floor_amount: Decimal
+    gross_floor_amount: Decimal = Decimal("0.00")
     currency: str = "USD"
     payout_day: int = pydantic.Field(default=25, ge=1, le=31)
 

@@ -40,6 +40,7 @@ class NotificationPreferenceAdmin(BaseSoftDeleteModelAdmin):
         "bookings_enabled",
         "maintenance_enabled",
         "leases_enabled",
+        "messages_enabled",
         "general_enabled",
         "is_deleted",
     )
@@ -49,6 +50,7 @@ class NotificationPreferenceAdmin(BaseSoftDeleteModelAdmin):
         "bookings_enabled",
         "maintenance_enabled",
         "leases_enabled",
+        "messages_enabled",
         "general_enabled",
     )
     search_fields = ("user__first_name", "user__last_name", "user__username")
@@ -63,6 +65,7 @@ class NotificationPreferenceAdmin(BaseSoftDeleteModelAdmin):
                     "bookings_enabled",
                     "maintenance_enabled",
                     "leases_enabled",
+                    "messages_enabled",
                     "general_enabled",
                 )
             },

@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from notification.models import DeviceToken
+from notification.models import DeviceToken, NotificationPreference
 
 from core.constants import NotificationAudience, NotificationCategory, NotificationType
 from tests.factories import DeviceTokenFactory, NotificationFactory, TenantFactory
@@ -143,6 +143,7 @@ class TestMobileNotificationSettingsAPI:
             "bookings_enabled": True,
             "maintenance_enabled": True,
             "leases_enabled": True,
+            "messages_enabled": True,
             "general_enabled": True,
         }
 
@@ -156,3 +157,33 @@ class TestMobileNotificationSettingsAPI:
         assert response.json()["data"]["push_enabled"] is False
         assert response.json()["data"]["payments_enabled"] is False
         assert not DeviceToken.objects.filter(user=user).exists()
+
+    def test_messages_preference_can_be_updated_and_round_trips(self, api_client):
+        user = TenantFactory()
+
+        response = _patch(api_client, self.url, {"messages_enabled": False}, **_make_jwt(user))
+
+        assert response.status_code == 200
+        assert response.json()["data"]["messages_enabled"] is False
+        preference = NotificationPreference.objects.get(user=user)
+        assert preference.messages_enabled is False
+
+        round_trip = api_client.get(self.url, **_make_jwt(user))
+
+        assert round_trip.status_code == 200
+        assert round_trip.json()["data"]["messages_enabled"] is False
+
+    def test_messages_preference_gates_chat_notifications(self):
+        user = TenantFactory()
+        preference = NotificationPreference.objects.create(user=user)
+
+        assert preference.messages_enabled is True
+        assert preference.allows_category(NotificationCategory.MESSAGES) is True
+
+        preference.messages_enabled = False
+        preference.save(update_fields=["messages_enabled", "updated_at"])
+        assert preference.allows_category(NotificationCategory.MESSAGES) is False
+
+        preference.push_enabled = False
+        preference.save(update_fields=["push_enabled", "updated_at"])
+        assert preference.allows_category(NotificationCategory.MESSAGES) is False

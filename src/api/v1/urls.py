@@ -19,4 +19,5 @@ urlpatterns = [
     path("notifications/", include("api.v1.notification.urls", namespace="notification")),
     path("inventory/", include("api.v1.inventory.urls", namespace="inventory")),
     path("vas/", include("api.v1.vas.urls", namespace="vas")),
+    path("chat/", include("api.v1.chat.urls", namespace="chat")),
 ]

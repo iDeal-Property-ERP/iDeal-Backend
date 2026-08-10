@@ -93,3 +93,5 @@ class MobileListingDetail(pydantic.BaseModel):
     photos: list[MobileListingPhoto]
     amenities: list[MobileListingAmenity]
     verification: MobileListingVerification
+    can_message: bool
+    contact_phone: str | None

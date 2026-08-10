@@ -95,6 +95,7 @@ NOTIFICATION_CATEGORY_PREFERENCE_FIELDS = {
     NotificationCategory.BOOKINGS: "bookings_enabled",
     NotificationCategory.MAINTENANCE: "maintenance_enabled",
     NotificationCategory.LEASES: "leases_enabled",
+    NotificationCategory.MESSAGES: "messages_enabled",
     NotificationCategory.GENERAL: "general_enabled",
 }
 
@@ -111,6 +112,7 @@ class NotificationPreference(TimestampedModel, SoftDeleteModel):
     bookings_enabled = models.BooleanField(default=True, verbose_name=_("Bookings Enabled"))
     maintenance_enabled = models.BooleanField(default=True, verbose_name=_("Maintenance Enabled"))
     leases_enabled = models.BooleanField(default=True, verbose_name=_("Leases Enabled"))
+    messages_enabled = models.BooleanField(default=True, verbose_name=_("Messages Enabled"))
     general_enabled = models.BooleanField(default=True, verbose_name=_("General Enabled"))
 
     class Meta:

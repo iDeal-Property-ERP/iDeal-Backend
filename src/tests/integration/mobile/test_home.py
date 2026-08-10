@@ -1,10 +1,11 @@
 from urllib.parse import urlparse
 
 import pytest
+from django.test import override_settings
 from marketplace.models import Listing
 from property.models import Amenity, PropertyPhoto
 
-from core.constants import FurnishingType, ListingStatus, PropertyStatus, TariffChoices
+from core.constants import FurnishingType, ListingStatus, PropertyEngagementType, PropertyStatus, TariffChoices
 from tests.factories import DistrictFactory, ListingFactory, PropertyFactory, PropertyPhotoFactory
 
 pytestmark = pytest.mark.django_db
@@ -264,6 +265,8 @@ class TestMobileHomeListingDetail:
             "photos",
             "amenities",
             "verification",
+            "can_message",
+            "contact_phone",
         }
         assert data["price"] == 850.0
         assert isinstance(data["price"], float)
@@ -271,6 +274,7 @@ class TestMobileHomeListingDetail:
         assert isinstance(data["deposit_amount"], (float, type(None)))
         assert data["deposit_amount"] == 300.0
         assert data["description"] == listing.property.description
+        assert data["can_message"] is True
 
     def test_detail_photos_are_primary_first_and_have_absolute_urls(self, api_client):
         listing = _make_vacant_listing()
@@ -338,12 +342,22 @@ class TestMobileHomeListingDetail:
         verification = response.json()["data"]["verification"]
         assert verification == {"is_verified": False, "checklist": []}
 
-    def test_detail_returns_404_for_unpublished_listing(self, api_client):
+    def test_detail_marks_unpublished_listing_as_not_messageable(self, api_client):
         listing = _make_vacant_listing(status=ListingStatus.DRAFT)
 
         response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
 
-        assert response.status_code == 404
+        assert response.status_code == 200
+        assert response.json()["data"]["can_message"] is False
+
+    def test_detail_marks_soft_deleted_listing_as_not_messageable(self, api_client):
+        listing = _make_vacant_listing()
+        listing.delete()
+
+        response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 200
+        assert response.json()["data"]["can_message"] is False
 
     def test_detail_returns_404_for_unknown_listing(self, api_client):
         response = api_client.get(f"{LISTING_DETAIL_URL}999999999/")
@@ -357,6 +371,30 @@ class TestMobileHomeListingDetail:
         response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
 
         assert response.status_code == 200
+
+    def test_detail_allows_message_for_one_off_listing_without_owner(self, api_client):
+        prop = PropertyFactory(engagement_type=PropertyEngagementType.ONE_OFF, owner=None)
+        listing = prop.listing
+        listing.status = ListingStatus.PUBLISHED
+        listing.save(update_fields=["status", "updated_at"])
+
+        response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 200
+        assert response.json()["data"]["can_message"] is True
+
+    def test_detail_contact_phone_follows_platform_setting(self, api_client):
+        listing = _make_vacant_listing()
+
+        with override_settings(PLATFORM_CONTACT_PHONE=""):
+            empty_response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+        with override_settings(PLATFORM_CONTACT_PHONE="+998 71 200 00 00"):
+            configured_response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert empty_response.status_code == 200
+        assert empty_response.json()["data"]["contact_phone"] is None
+        assert configured_response.status_code == 200
+        assert configured_response.json()["data"]["contact_phone"] == "+998 71 200 00 00"
 
 
 class TestMobileHomeFilters:
@@ -382,9 +420,7 @@ class TestMobileHomeFilters:
         assert set(data) == {"districts", "tariffs", "furnishings", "price", "rooms"}
         assert any(district["name"] == "Filters District" for district in data["districts"])
         assert data["tariffs"] == [{"value": value, "label": str(label)} for value, label in TariffChoices.CHOICES]
-        assert data["furnishings"] == [
-            {"value": value, "label": str(label)} for value, label in FurnishingType.CHOICES
-        ]
+        assert data["furnishings"] == [{"value": value, "label": str(label)} for value, label in FurnishingType.CHOICES]
         assert data["price"] == {"min": 200.0, "max": 2000.0}
         assert data["rooms"] == {"min": 1, "max": 5}
 

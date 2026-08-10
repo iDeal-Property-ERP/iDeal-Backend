@@ -1,5 +1,6 @@
 from .account import AgentFactory, OwnerFactory, TenantFactory, UserFactory
 from .agent import AgentDealFactory, AgentProfileFactory
+from .chat import ConversationFactory, ConversationReportFactory, MessageFactory
 from .contract import (
     LeaseFactory,
     LeaseRenewalFactory,
@@ -40,6 +41,9 @@ __all__ = [
     "ListingFactory",
     "ViewingRequestFactory",
     "BookingFactory",
+    "ConversationFactory",
+    "MessageFactory",
+    "ConversationReportFactory",
     "DeviceTokenFactory",
     "NotificationFactory",
     "NotificationPreferenceFactory",

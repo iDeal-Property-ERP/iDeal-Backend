@@ -90,7 +90,7 @@ class TestOwnerSettlement:
         adjustment = settlement.payouts.get(kind=PayoutKind.UPSIDE_ADJUSTMENT)
 
         assert adjustment.amount == Decimal("160.00")
-        assert adjustment.scheduled_date.month == 7
+        assert adjustment.scheduled_date == date(2026, 7, 25)
 
     def test_prorates_first_month_and_is_idempotent(self):
         agreement = OwnerAgreementFactory(

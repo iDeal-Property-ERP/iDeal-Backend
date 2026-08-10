@@ -1,7 +1,9 @@
+from django.conf import settings
 from django.db.models import Max, Min
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Path, Query
+from marketplace.models import Listing
 from marketplace.services.listings import (
     ListingFilters,
     apply_listing_filters,
@@ -22,7 +24,7 @@ from api.v1.mobile.home.schemas import (
     MobileVerificationItem,
 )
 from core.api.views import BaseController, DetailPath
-from core.constants import FurnishingType, TariffChoices
+from core.constants import FurnishingType, ListingStatus, TariffChoices
 from core.utils.pagination import build_paginated_response_from_queryset
 
 
@@ -116,6 +118,8 @@ def serialize_mobile_listing_detail(listing, request) -> dict:
                 for item in _verification_checklist(prop)
             ],
         ),
+        can_message=listing.status == ListingStatus.PUBLISHED and listing.deleted_at is None,
+        contact_phone=getattr(settings, "PLATFORM_CONTACT_PHONE", "") or None,
     ).model_dump(mode="json")
 
 
@@ -138,7 +142,12 @@ class MobileHomeListingDetailView(BaseController):
     auth = ()
 
     def get(self, parsed_path: Path[DetailPath]) -> dict:
-        listing = get_object_or_404(published_listings_queryset(), pk=parsed_path.pk)
+        listing = get_object_or_404(
+            Listing.global_objects.select_related("property__district").prefetch_related(
+                "property__photos", "property__amenities"
+            ),
+            pk=parsed_path.pk,
+        )
         return self.ok(serialize_mobile_listing_detail(listing, self.request))
 
 

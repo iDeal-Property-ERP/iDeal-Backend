@@ -43,6 +43,11 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
     def clean(self):
         if self.property_id and self.property.engagement_type != PropertyEngagementType.MANAGED:
             raise ValidationError(_("One-off brokerage properties cannot have owner agreements."))
+        for field_name in ("commission_rate", "gross_floor_amount"):
+            value = getattr(self, field_name)
+            if value is not None:
+                field = self._meta.get_field(field_name)
+                setattr(self, field_name, field.to_python(value))
         if self.commission_rate is not None and not Decimal("0") <= self.commission_rate <= Decimal("100"):
             raise ValidationError(_("Commission rate must be between 0 and 100."))
         if self.payout_day and not 1 <= self.payout_day <= 31:

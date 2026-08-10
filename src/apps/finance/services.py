@@ -26,10 +26,17 @@ def _payout_date(period_start: date, payout_day: int) -> date:
     return period_start.replace(day=min(payout_day, calendar.monthrange(period_start.year, period_start.month)[1]))
 
 
+def _next_payout_date(from_date: date, payout_day: int) -> date:
+    candidate = _payout_date(from_date, payout_day)
+    if candidate >= from_date:
+        return candidate
+    next_month = (from_date.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return _payout_date(next_month, payout_day)
+
+
 def next_payout_run_date(from_date: date | None = None) -> date:
     """Compatibility helper for operational dashboards."""
-    today = from_date or date.today()
-    return today.replace(day=min(25, calendar.monthrange(today.year, today.month)[1]))
+    return _next_payout_date(from_date or date.today(), payout_day=25)
 
 
 def _calculation(settlement: OwnerSettlement) -> dict[str, Decimal]:
@@ -48,7 +55,7 @@ def _calculation(settlement: OwnerSettlement) -> dict[str, Decimal]:
 
 
 @transaction.atomic
-def recalculate_settlement(settlement: OwnerSettlement) -> OwnerSettlement:
+def recalculate_settlement(settlement: OwnerSettlement, adjustment_from_date: date | None = None) -> OwnerSettlement:
     """Refresh a settlement and create late-rent upside adjustments when needed."""
     settlement = OwnerSettlement.objects.select_for_update().get(pk=settlement.pk)
     old_owner_payout = settlement.owner_payout_amount
@@ -78,7 +85,9 @@ def recalculate_settlement(settlement: OwnerSettlement) -> OwnerSettlement:
             kind=PayoutKind.UPSIDE_ADJUSTMENT,
             amount=_money(settlement.owner_payout_amount - old_owner_payout),
             currency=settlement.currency,
-            scheduled_date=next_payout_run_date(date.today()),
+            scheduled_date=_next_payout_date(
+                adjustment_from_date or date.today(), settlement.owner_agreement.payout_day
+            ),
         )
     return settlement
 
@@ -138,4 +147,4 @@ def allocate_paid_rent(payment) -> OwnerSettlement | None:
     remaining = _money(Decimal(str(payment.amount)) - allocated)
     if remaining > 0:
         RentReceiptAllocation.objects.create(payment=payment, settlement=settlement, amount=remaining)
-    return recalculate_settlement(settlement)
+    return recalculate_settlement(settlement, adjustment_from_date=payment.payment_date)

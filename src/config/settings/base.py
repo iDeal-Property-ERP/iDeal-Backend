@@ -60,6 +60,7 @@ LOCAL_APPS = [
     "notification",
     "inventory",
     "vas",
+    "chat",
 ]
 
 INSTALLED_APPS = UNFOLD_APPS + DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -158,6 +159,9 @@ TELEGRAM_GATEWAY_TOKEN = config("TELEGRAM_GATEWAY_TOKEN", default="")
 FCM_ENABLED = config("FCM_ENABLED", default=False, cast=bool)
 FCM_CREDENTIALS_PATH = config("FCM_CREDENTIALS_PATH", default="")
 FCM_PROJECT_ID = config("FCM_PROJECT_ID", default="")
+
+CHAT_MAX_IMAGE_BYTES = config("CHAT_MAX_IMAGE_BYTES", default=5 * 1024 * 1024, cast=int)
+PLATFORM_CONTACT_PHONE = config("PLATFORM_CONTACT_PHONE", default="")
 
 CACHES = {
     "default": {

@@ -373,6 +373,37 @@ class ListingStatus(ConstantChoices):
     ]
 
 
+class ChatMessageKind(ConstantChoices):
+    TEXT = "text"
+    IMAGE = "image"
+    CHOICES = [
+        (TEXT, _("Text")),
+        (IMAGE, _("Image")),
+    ]
+
+
+class ChatSenderSide(ConstantChoices):
+    USER = "user"
+    STAFF = "staff"
+    CHOICES = [
+        (USER, _("User")),
+        (STAFF, _("Staff")),
+    ]
+
+
+class ChatReportReason(ConstantChoices):
+    SPAM = "spam"
+    ABUSE = "abuse"
+    SCAM = "scam"
+    OTHER = "other"
+    CHOICES = [
+        (SPAM, _("Spam")),
+        (ABUSE, _("Abuse")),
+        (SCAM, _("Scam")),
+        (OTHER, _("Other")),
+    ]
+
+
 class ContactInquiryStatus(ConstantChoices):
     NEW = "new"
     HANDLED = "handled"
@@ -488,6 +519,7 @@ class NotificationType(ConstantChoices):
     LEASE_RENEWAL = "lease_renewal"
     OWNER_ONBOARDING = "owner_onboarding"
     SERVICE_ORDER_STATUS = "service_order_status"
+    CHAT_MESSAGE = "chat_message"
     GENERAL = "general"
     CHOICES = [
         (PAYMENT_DUE, _("Payment Due")),
@@ -498,6 +530,7 @@ class NotificationType(ConstantChoices):
         (LEASE_RENEWAL, _("Lease Renewal")),
         (OWNER_ONBOARDING, _("Owner Onboarding")),
         (SERVICE_ORDER_STATUS, _("Service Order Status")),
+        (CHAT_MESSAGE, _("Chat Message")),
         (GENERAL, _("General")),
     ]
 
@@ -518,12 +551,14 @@ class NotificationCategory(ConstantChoices):
     BOOKINGS = "bookings"
     MAINTENANCE = "maintenance"
     LEASES = "leases"
+    MESSAGES = "messages"
     GENERAL = "general"
     CHOICES = [
         (PAYMENTS, _("Payments")),
         (BOOKINGS, _("Bookings")),
         (MAINTENANCE, _("Maintenance")),
         (LEASES, _("Leases")),
+        (MESSAGES, _("Messages")),
         (GENERAL, _("General")),
     ]
 
@@ -546,6 +581,7 @@ NOTIFICATION_TYPE_CATEGORY = {
     NotificationType.SERVICE_ORDER_STATUS: NotificationCategory.MAINTENANCE,
     NotificationType.LEASE_RENEWAL: NotificationCategory.LEASES,
     NotificationType.OWNER_ONBOARDING: NotificationCategory.GENERAL,
+    NotificationType.CHAT_MESSAGE: NotificationCategory.MESSAGES,
     NotificationType.GENERAL: NotificationCategory.GENERAL,
 }
 
