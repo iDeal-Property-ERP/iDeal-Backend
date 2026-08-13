@@ -1,3 +1,5 @@
+import uuid
+
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
@@ -7,6 +9,8 @@ from core.constants import (
     ContactInquiryStatus,
     ListingStatus,
     MinimumStay,
+    PaymentCheckoutStatus,
+    PaymentProvider,
     ViewingRequestStatus,
     ViewingTimeSlot,
 )
@@ -141,7 +145,7 @@ class Booking(TimestampedModel, SoftDeleteModel):
         max_digits=12, decimal_places=2, null=True, blank=True, verbose_name=_("Monthly Rent Offer")
     )
     status = models.CharField(
-        max_length=20,
+        max_length=32,
         choices=BookingStatus.choices,
         default=BookingStatus.REQUESTED,
         verbose_name=_("Status"),
@@ -276,3 +280,78 @@ class Booking(TimestampedModel, SoftDeleteModel):
             related_object_id=self.id,
         )
         return lease
+
+
+class BookingQuote(TimestampedModel, SoftDeleteModel):
+    listing = models.ForeignKey(Listing, on_delete=models.PROTECT, related_name="booking_quotes")
+    tenant = models.ForeignKey("account.User", on_delete=models.PROTECT, related_name="booking_quotes")
+    start_date = models.DateField()
+    end_date = models.DateField()
+    currency = models.CharField(max_length=3)
+    monthly_rent = models.DecimalField(max_digits=12, decimal_places=2)
+    deposit_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    first_period_rent = models.DecimalField(max_digits=12, decimal_places=2)
+    full_stay_rent = models.DecimalField(max_digits=12, decimal_places=2)
+    first_month_total = models.DecimalField(max_digits=12, decimal_places=2)
+    full_stay_total = models.DecimalField(max_digits=12, decimal_places=2)
+    periods = models.JSONField(default=list)
+    agreement_ids = models.JSONField(default=list)
+    fx_rate = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = _("Booking Quote")
+        verbose_name_plural = _("Booking Quotes")
+        ordering = ["-created_at"]
+        db_table = "booking_quotes"
+        indexes = [models.Index(fields=["listing", "expires_at"]), models.Index(fields=["tenant", "expires_at"])]
+
+
+class PaymentCheckout(TimestampedModel, SoftDeleteModel):
+    quote = models.ForeignKey(BookingQuote, on_delete=models.PROTECT, related_name="checkouts")
+    booking = models.OneToOneField(Booking, on_delete=models.PROTECT, related_name="payment_checkout")
+    tenant = models.ForeignKey("account.User", on_delete=models.PROTECT, related_name="payment_checkouts")
+    public_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    idempotency_key = models.CharField(max_length=128)
+    provider = models.CharField(max_length=20, choices=PaymentProvider.choices)
+    status = models.CharField(
+        max_length=32, choices=PaymentCheckoutStatus.choices, default=PaymentCheckoutStatus.PENDING
+    )
+    pay_full_stay = models.BooleanField(default=False)
+    original_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    original_currency = models.CharField(max_length=3)
+    provider_amount = models.DecimalField(max_digits=18, decimal_places=2)
+    provider_currency = models.CharField(max_length=3)
+    fx_rate = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    checkout_url = models.URLField(max_length=1000)
+    external_id = models.CharField(max_length=255, null=True, blank=True)
+    expires_at = models.DateTimeField()
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Payment Checkout")
+        verbose_name_plural = _("Payment Checkouts")
+        ordering = ["-created_at"]
+        db_table = "payment_checkouts"
+        constraints = [
+            models.UniqueConstraint(fields=["tenant", "idempotency_key"], name="unique_tenant_checkout_key")
+        ]
+        indexes = [models.Index(fields=["status", "expires_at"]), models.Index(fields=["provider", "external_id"])]
+
+
+class ProviderEvent(TimestampedModel, SoftDeleteModel):
+    checkout = models.ForeignKey(PaymentCheckout, on_delete=models.PROTECT, related_name="provider_events")
+    provider = models.CharField(max_length=20, choices=PaymentProvider.choices)
+    external_event_id = models.CharField(max_length=255)
+    event_type = models.CharField(max_length=100)
+    payload = models.JSONField(default=dict)
+    result = models.JSONField(default=dict)
+
+    class Meta:
+        verbose_name = _("Provider Event")
+        verbose_name_plural = _("Provider Events")
+        ordering = ["created_at"]
+        db_table = "provider_events"
+        constraints = [
+            models.UniqueConstraint(fields=["provider", "external_event_id"], name="unique_provider_event")
+        ]

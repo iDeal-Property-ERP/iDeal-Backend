@@ -134,6 +134,32 @@ def allocate_paid_rent(payment) -> OwnerSettlement | None:
     """Allocate a paid rent receipt to its rental month; deposits are excluded."""
     if payment.status != PaymentStatus.PAID or payment.kind != PaymentKind.RENT:
         return None
+    coverage = list(payment.coverage_allocations.select_related("owner_agreement").order_by("start_date"))
+    if coverage:
+        last_settlement = None
+        for item in coverage:
+            period_start, _ = _month_bounds(item.start_date)
+            ensure_monthly_settlements(period_start)
+            settlement = OwnerSettlement.objects.filter(
+                owner_agreement=item.owner_agreement, period_start=period_start
+            ).first()
+            if settlement is None:
+                continue
+            if payment.currency != settlement.currency:
+                raise ValueError("Rent payment currency must match its settlement currency.")
+            allocation, created = RentReceiptAllocation.objects.get_or_create(
+                payment=payment, settlement=settlement, defaults={"amount": item.amount}
+            )
+            if not created:
+                expected = sum(
+                    (row.amount for row in coverage if row.owner_agreement_id == item.owner_agreement_id and row.start_date.replace(day=1) == period_start),
+                    Decimal("0"),
+                )
+                if allocation.amount != expected:
+                    allocation.amount = expected
+                    allocation.save(update_fields=["amount", "updated_at"])
+            last_settlement = recalculate_settlement(settlement, adjustment_from_date=payment.payment_date)
+        return last_settlement
     period_start, _ = _month_bounds(payment.rental_period or payment.due_date)
     ensure_monthly_settlements(period_start)
     settlement = OwnerSettlement.objects.filter(

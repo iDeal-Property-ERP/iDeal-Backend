@@ -163,6 +163,21 @@ FCM_PROJECT_ID = config("FCM_PROJECT_ID", default="")
 CHAT_MAX_IMAGE_BYTES = config("CHAT_MAX_IMAGE_BYTES", default=5 * 1024 * 1024, cast=int)
 PLATFORM_CONTACT_PHONE = config("PLATFORM_CONTACT_PHONE", default="")
 
+# Hosted booking payments. Providers stay hidden until both their deployment
+# configuration and enable flag are present.
+PAYME_ENABLED = config("PAYME_ENABLED", default=False, cast=bool)
+PAYME_MERCHANT_ID = config("PAYME_MERCHANT_ID", default="")
+PAYME_KEY = config("PAYME_KEY", default="")
+PAYME_CHECKOUT_URL = config("PAYME_CHECKOUT_URL", default="https://checkout.paycom.uz")
+CLICK_ENABLED = config("CLICK_ENABLED", default=False, cast=bool)
+CLICK_SERVICE_ID = config("CLICK_SERVICE_ID", default="")
+CLICK_MERCHANT_ID = config("CLICK_MERCHANT_ID", default="")
+CLICK_SECRET_KEY = config("CLICK_SECRET_KEY", default="")
+CLICK_CHECKOUT_URL = config("CLICK_CHECKOUT_URL", default="https://my.click.uz/services/pay")
+STRIPE_ENABLED = config("STRIPE_ENABLED", default=False, cast=bool)
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", default="")
+STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET", default="")
+
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -285,6 +300,7 @@ Q_CLUSTER = {
     "queue_limit": 500,
     "label": "Django Q",
     "redis": config("REDIS_URL", default="redis://localhost:6379/0"),
+    "catch_up": False,
 }
 
 UNFOLD = {

@@ -6,6 +6,7 @@ import pytest
 from chat.models import Conversation, Message
 from chat.services import mark_read
 from django.core.files.uploadedfile import SimpleUploadedFile
+from property.models import PropertyPhoto
 
 from core.constants import ChatSenderSide, ListingStatus
 from tests.factories import ConversationFactory, ListingFactory, MessageFactory, TenantFactory
@@ -84,6 +85,29 @@ class TestMobileChatOpenAndListAPI:
 
         assert rejected.status_code == 400
         assert anonymous.status_code == 401
+
+    def test_listing_variants_are_backward_compatible_absolute_urls(self, api_client):
+        user = TenantFactory()
+        listing = _published_listing()
+        photo = PropertyPhoto.objects.create(
+            property=listing.property,
+            image="properties/photos/original.jpg",
+            is_primary=True,
+        )
+        PropertyPhoto.objects.filter(pk=photo.pk).update(
+            preview_image="properties/photos/variants/preview.webp",
+            display_image="properties/photos/variants/display.webp",
+        )
+        conversation = ConversationFactory(user=user, listing=listing)
+
+        response = api_client.get(f"{self.base_url}conversations/", **_make_jwt(user))
+
+        listing_data = next(
+            item["listing"] for item in response.json()["data"]["page"]["object_list"] if item["id"] == conversation.id
+        )
+        assert listing_data["cover_image_url"].startswith(("http://", "https://"))
+        assert listing_data["cover_preview_url"].endswith("variants/preview.webp")
+        assert listing_data["cover_display_url"].endswith("variants/display.webp")
 
     def test_list_is_scoped_and_archived_filter_round_trips(self, api_client):
         user = TenantFactory()

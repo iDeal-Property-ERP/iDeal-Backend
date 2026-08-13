@@ -7,6 +7,14 @@ from core.models import SoftDeleteModel, TimestampedModel
 
 
 class Payment(TimestampedModel, SoftDeleteModel):
+    checkout = models.ForeignKey(
+        "marketplace.PaymentCheckout",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="payments",
+        verbose_name=_("Payment Checkout"),
+    )
     lease = models.ForeignKey("contract.Lease", on_delete=models.PROTECT, related_name="payments")
     tenant = models.ForeignKey("account.User", on_delete=models.PROTECT, related_name="payments")
     paid_by = models.ForeignKey(
@@ -194,4 +202,25 @@ class RentReceiptAllocation(TimestampedModel):
         db_table = "rent_receipt_allocations"
         constraints = [
             models.UniqueConstraint(fields=["payment", "settlement"], name="unique_payment_settlement_allocation")
+        ]
+
+
+class RentCoverageAllocation(TimestampedModel):
+    """Agreement/date allocation for one anniversary-period rent payment."""
+
+    payment = models.ForeignKey(Payment, on_delete=models.PROTECT, related_name="coverage_allocations")
+    owner_agreement = models.ForeignKey(
+        "contract.OwnerAgreement", on_delete=models.PROTECT, related_name="rent_coverage_allocations"
+    )
+    start_date = models.DateField()
+    end_date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        db_table = "rent_coverage_allocations"
+        ordering = ["start_date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["payment", "owner_agreement", "start_date"], name="unique_payment_agreement_coverage"
+            )
         ]

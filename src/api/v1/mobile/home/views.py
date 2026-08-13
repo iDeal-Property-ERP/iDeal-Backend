@@ -4,11 +4,13 @@ from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Path, Query
 from marketplace.models import Listing
+from marketplace.services.booking import BookingService
 from marketplace.services.listings import (
     ListingFilters,
     apply_listing_filters,
     ordered_photos,
     photo_url,
+    photo_variant_url,
     published_listings_queryset,
 )
 from property.models import District
@@ -32,6 +34,7 @@ def serialize_mobile_listing_card(listing, request) -> dict:
     prop = listing.property
     monthly_price = listing.monthly_price if listing.monthly_price is not None else listing.listed_price
     photos = ordered_photos(prop)
+    cover_photo = photos[0] if photos else None
     return MobileListingCard(
         id=listing.id,
         property_id=listing.property_id,
@@ -51,7 +54,9 @@ def serialize_mobile_listing_card(listing, request) -> dict:
         is_featured=listing.is_featured,
         score=float(prop.score),
         review_count=prop.review_count,
-        cover_image_url=photo_url(photos[0], request) if photos else None,
+        cover_image_url=photo_url(cover_photo, request) if cover_photo else None,
+        cover_preview_url=photo_variant_url(cover_photo, "preview_image", request) if cover_photo else None,
+        cover_display_url=photo_variant_url(cover_photo, "display_image", request) if cover_photo else None,
         map_lat=float(prop.map_lat) if prop.map_lat is not None else None,
         map_lon=float(prop.map_lon) if prop.map_lon is not None else None,
     ).model_dump(mode="json")
@@ -97,6 +102,8 @@ def serialize_mobile_listing_detail(listing, request) -> dict:
             MobileListingPhoto(
                 id=photo.id,
                 image_url=photo_url(photo, request),
+                preview_url=photo_variant_url(photo, "preview_image", request),
+                display_url=photo_variant_url(photo, "display_image", request),
                 caption=photo.caption or None,
                 is_primary=photo.is_primary,
                 sort_order=photo.sort_order,
@@ -120,6 +127,7 @@ def serialize_mobile_listing_detail(listing, request) -> dict:
         ),
         can_message=listing.status == ListingStatus.PUBLISHED and listing.deleted_at is None,
         contact_phone=getattr(settings, "PLATFORM_CONTACT_PHONE", "") or None,
+        booking=BookingService.eligibility(listing),
     ).model_dump(mode="json")
 
 
@@ -128,7 +136,7 @@ class MobileHomeListingsView(BaseController):
 
     def get(self, parsed_query: Query[MobileHomeFeedQuery]) -> dict:
         filters = ListingFilters(**parsed_query.model_dump())
-        qs = apply_listing_filters(published_listings_queryset(), filters)
+        qs = apply_listing_filters(published_listings_queryset(), filters, include_future_managed=True)
         paginated = build_paginated_response_from_queryset(
             qs,
             parsed_query.page,
@@ -149,6 +157,17 @@ class MobileHomeListingDetailView(BaseController):
             pk=parsed_path.pk,
         )
         return self.ok(serialize_mobile_listing_detail(listing, self.request))
+
+
+class MobileHomeBookingOptionsView(BaseController):
+    auth = ()
+
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        listing = get_object_or_404(
+            Listing.objects.select_related("property", "owner_agreement"),
+            pk=parsed_path.pk,
+        )
+        return self.ok(BookingService.booking_options(listing))
 
 
 class MobileHomeFiltersView(BaseController):

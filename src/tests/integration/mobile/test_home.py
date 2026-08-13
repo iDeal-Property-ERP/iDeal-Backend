@@ -84,6 +84,8 @@ class TestMobileHomeListings:
             "score",
             "review_count",
             "cover_image_url",
+            "cover_preview_url",
+            "cover_display_url",
             "map_lat",
             "map_lon",
         }
@@ -94,6 +96,28 @@ class TestMobileHomeListings:
         assert isinstance(card["score"], float)
         assert card["cover_image_url"].startswith(("http://", "https://"))
         assert urlparse(card["cover_image_url"]).path.endswith("cover.jpg")
+        assert card["cover_preview_url"] is None
+        assert card["cover_display_url"] is None
+
+    def test_cover_variant_urls_are_absolute_when_present(self, api_client):
+        listing = _make_vacant_listing()
+        photo = PropertyPhoto.objects.create(
+            property=listing.property,
+            image="properties/photos/original.jpg",
+            is_primary=True,
+        )
+        PropertyPhoto.objects.filter(pk=photo.pk).update(
+            preview_image="properties/photos/variants/preview.webp",
+            display_image="properties/photos/variants/display.webp",
+        )
+
+        response = api_client.get(LISTINGS_URL)
+
+        card = next(item for item in _items(response.json()) if item["id"] == listing.id)
+        assert urlparse(card["cover_preview_url"]).path.endswith("variants/preview.webp")
+        assert urlparse(card["cover_display_url"]).path.endswith("variants/display.webp")
+        assert card["cover_preview_url"].startswith(("http://", "https://"))
+        assert card["cover_display_url"].startswith(("http://", "https://"))
 
     def test_published_and_vacancy_gates(self, api_client):
         visible = _make_vacant_listing()
@@ -267,6 +291,7 @@ class TestMobileHomeListingDetail:
             "verification",
             "can_message",
             "contact_phone",
+            "booking",
         }
         assert data["price"] == 850.0
         assert isinstance(data["price"], float)
@@ -275,6 +300,7 @@ class TestMobileHomeListingDetail:
         assert data["deposit_amount"] == 300.0
         assert data["description"] == listing.property.description
         assert data["can_message"] is True
+        assert data["booking"]["eligible"] is False
 
     def test_detail_photos_are_primary_first_and_have_absolute_urls(self, api_client):
         listing = _make_vacant_listing()
@@ -301,8 +327,12 @@ class TestMobileHomeListingDetail:
         assert response.status_code == 200
         photos = response.json()["data"]["photos"]
         assert [photo["id"] for photo in photos] == [primary.id, early.id, late.id]
-        assert all(set(photo) == {"id", "image_url", "caption", "is_primary", "sort_order"} for photo in photos)
+        assert all(
+            set(photo) == {"id", "image_url", "preview_url", "display_url", "caption", "is_primary", "sort_order"}
+            for photo in photos
+        )
         assert all(photo["image_url"].startswith(("http://", "https://")) for photo in photos)
+        assert all(photo["preview_url"] is None and photo["display_url"] is None for photo in photos)
         assert photos[0]["caption"] is None
         assert urlparse(photos[0]["image_url"]).path.endswith("primary.jpg")
 

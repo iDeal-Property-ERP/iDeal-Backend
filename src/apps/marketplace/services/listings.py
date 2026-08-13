@@ -5,9 +5,17 @@ import datetime
 import pydantic
 from contract.models import Lease
 from django.db import models
-from marketplace.models import Listing
+from marketplace.models import Booking, Listing
 
-from core.constants import LeaseStatus, ListingStatus, OwnerAgreementStatus, PropertyStatus
+from core.constants import (
+    BookingStatus,
+    LeaseStatus,
+    ListingStatus,
+    OwnerAgreementStatus,
+    PaymentCheckoutStatus,
+    PropertyEngagementType,
+    PropertyStatus,
+)
 
 
 class ListingFilters(pydantic.BaseModel):
@@ -53,7 +61,7 @@ def published_listings_queryset():
     )
 
 
-def apply_listing_filters(qs, filters: ListingFilters):
+def apply_listing_filters(qs, filters: ListingFilters, *, include_future_managed: bool = False):
     q = filters
 
     if q.start_date and q.end_date:
@@ -62,9 +70,19 @@ def apply_listing_filters(qs, filters: ListingFilters):
         earliest_acceptable_end = q.end_date - datetime.timedelta(days=flex)
 
         overlapping_leases = Lease.objects.filter(
-            status=LeaseStatus.ACTIVE,
+            status__in=[LeaseStatus.PENDING_SIGNATURE, LeaseStatus.SCHEDULED, LeaseStatus.ACTIVE],
             start_date__lte=earliest_acceptable_end,
             end_date__gte=latest_acceptable_start,
+        )
+        overlapping_bookings = Booking.objects.filter(
+            models.Q(status=BookingStatus.CONFIRMED)
+            | models.Q(
+                status=BookingStatus.PAYMENT_PENDING,
+                payment_checkout__status=PaymentCheckoutStatus.PENDING,
+                payment_checkout__expires_at__gt=datetime.datetime.now(datetime.UTC),
+            ),
+            requested_start_date__lte=earliest_acceptable_end,
+            requested_end_date__gte=latest_acceptable_start,
         )
 
         qs = qs.filter(
@@ -73,9 +91,22 @@ def apply_listing_filters(qs, filters: ListingFilters):
             property__owner_agreements__end_date__gte=earliest_acceptable_end,
         ).exclude(
             property__leases__in=overlapping_leases
+        ).exclude(
+            property__bookings__in=overlapping_bookings
         ).distinct()
     else:
-        qs = qs.filter(property__status=PropertyStatus.VACANT)
+        future_managed = models.Q(pk__in=[])
+        if include_future_managed:
+            from marketplace.services.booking import BookingService
+
+            if BookingService.enabled_providers():
+                future_managed = models.Q(
+                    property__engagement_type=PropertyEngagementType.MANAGED,
+                    property__is_verified=True,
+                    property__owner_agreements__status=OwnerAgreementStatus.ACTIVE,
+                    property__owner_agreements__end_date__gte=datetime.date.today(),
+                )
+        qs = qs.filter(models.Q(property__status=PropertyStatus.VACANT) | future_managed).distinct()
 
     if q.district_id is not None:
         qs = qs.filter(property__district_id=q.district_id)
@@ -137,6 +168,17 @@ def apply_listing_filters(qs, filters: ListingFilters):
 def photo_url(photo, request):
     """Build an absolute URL for a property photo, falling back to the relative media URL."""
     url = photo.image.url
+    if request is not None:
+        return request.build_absolute_uri(url)
+    return url
+
+
+def photo_variant_url(photo, field_name, request):
+    """Build an absolute URL for an optional photo variant, or None for legacy rows."""
+    variant = getattr(photo, field_name, None)
+    if not variant or not getattr(variant, "name", None):
+        return None
+    url = variant.url
     if request is not None:
         return request.build_absolute_uri(url)
     return url

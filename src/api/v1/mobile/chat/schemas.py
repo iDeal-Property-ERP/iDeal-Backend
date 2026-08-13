@@ -10,6 +10,8 @@ class ChatListingRefOutput(pydantic.BaseModel):
     id: int
     title: str
     cover_image_url: str | None
+    cover_preview_url: str | None
+    cover_display_url: str | None
     price: float | None
     currency: str
     is_available: bool

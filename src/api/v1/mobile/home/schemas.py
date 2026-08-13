@@ -35,6 +35,8 @@ class MobileListingCard(pydantic.BaseModel):
     score: float
     review_count: int
     cover_image_url: str | None
+    cover_preview_url: str | None
+    cover_display_url: str | None
     map_lat: float | None
     map_lon: float | None
 
@@ -42,6 +44,8 @@ class MobileListingCard(pydantic.BaseModel):
 class MobileListingPhoto(pydantic.BaseModel):
     id: int
     image_url: str
+    preview_url: str | None
+    display_url: str | None
     caption: str | None
     is_primary: bool
     sort_order: int
@@ -95,3 +99,4 @@ class MobileListingDetail(pydantic.BaseModel):
     verification: MobileListingVerification
     can_message: bool
     contact_phone: str | None
+    booking: dict

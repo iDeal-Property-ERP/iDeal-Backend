@@ -11,6 +11,14 @@ from core.models import SoftDeleteModel, TimestampedModel
 
 
 class OwnerAgreement(TimestampedModel, SoftDeleteModel):
+    previous_agreement = models.OneToOneField(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="renewed_agreement",
+        verbose_name=_("Previous Agreement"),
+    )
     owner = models.ForeignKey("account.User", on_delete=models.PROTECT, related_name="owner_agreements")
     property = models.ForeignKey("property.Property", on_delete=models.PROTECT, related_name="owner_agreements")
     agreement_number = models.CharField(max_length=50, unique=True)
@@ -73,6 +81,7 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
                 n = OwnerAgreement.objects.filter(agreement_number__startswith=f"{self.agreement_number}-R").count() + 1
                 agreement_number = f"{self.agreement_number}-R{n}"
             new_agreement = OwnerAgreement.objects.create(
+                previous_agreement=self,
                 owner=self.owner,
                 property=self.property,
                 agreement_number=agreement_number,
@@ -129,10 +138,20 @@ class Lease(TimestampedModel, SoftDeleteModel):
         is_new = self.pk is None
         old_instance = type(self).objects.filter(pk=self.pk).first() if not is_new else None
 
+        # Existing management/signing clients mark a lease active. A signed
+        # future lease is scheduled rather than occupying inventory today.
+        if (
+            old_instance
+            and old_instance.status == LeaseStatus.PENDING_SIGNATURE
+            and self.status == LeaseStatus.ACTIVE
+            and self.start_date > date.today()
+        ):
+            self.status = LeaseStatus.SCHEDULED
+
         with transaction.atomic():
             super().save(*args, **kwargs)
 
-            if is_new and self.status == LeaseStatus.ACTIVE:
+            if self.status == LeaseStatus.ACTIVE and (is_new or old_instance.status != LeaseStatus.ACTIVE):
                 self.property.status = PropertyStatus.RENTED
                 self.property.vacant_since = None
                 self.property.vacant_days = 0
@@ -177,6 +196,29 @@ class Lease(TimestampedModel, SoftDeleteModel):
                 new_monthly_rent=new_monthly_rent,
             )
             return new_lease
+
+
+class LeaseAgreementSegment(TimestampedModel, SoftDeleteModel):
+    lease = models.ForeignKey(Lease, on_delete=models.PROTECT, related_name="agreement_segments")
+    owner_agreement = models.ForeignKey(
+        OwnerAgreement, on_delete=models.PROTECT, related_name="lease_segments"
+    )
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    class Meta:
+        verbose_name = _("Lease Agreement Segment")
+        verbose_name_plural = _("Lease Agreement Segments")
+        ordering = ["start_date"]
+        db_table = "lease_agreement_segments"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["lease", "owner_agreement", "start_date"], name="unique_lease_agreement_segment"
+            )
+        ]
+
+    def __str__(self):
+        return f"Lease #{self.lease_id} · Agreement #{self.owner_agreement_id}"
 
 
 class PublicOffer(TimestampedModel, SoftDeleteModel):

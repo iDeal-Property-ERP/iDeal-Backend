@@ -30,6 +30,7 @@ dependencies = [
     "redis>=5.2.1",
     "pillow>=12.2.0",
     "firebase-admin>=7.5.0",
+    "stripe>=13.0.0",
 ]
 
 [dependency-groups]

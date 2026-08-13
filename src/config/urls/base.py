@@ -6,6 +6,7 @@ from django.urls import include, path
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("api.url_router"), name="url_router"),
+    path("api/v1/payment-webhooks/", include("api.v1.payment_providers.urls")),
 ]
 
 if settings.DEBUG:

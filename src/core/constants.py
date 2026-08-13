@@ -191,11 +191,15 @@ class OwnerAgreementStatus(ConstantChoices):
 
 
 class LeaseStatus(ConstantChoices):
+    PENDING_SIGNATURE = "pending_signature"
+    SCHEDULED = "scheduled"
     ACTIVE = "active"
     EXPIRED = "expired"
     RENEWED = "renewed"
     TERMINATED = "terminated"
     CHOICES = [
+        (PENDING_SIGNATURE, _("Pending Signature")),
+        (SCHEDULED, _("Scheduled")),
         (ACTIVE, _("Active")),
         (EXPIRED, _("Expired")),
         (RENEWED, _("Renewed")),
@@ -222,6 +226,7 @@ class PaymentMethod(ConstantChoices):
     ONLINE = "online"
     CLICK = "click"
     PAYME = "payme"
+    STRIPE = "stripe"
     UZUM = "uzum"
     CHOICES = [
         (CASH, _("Cash")),
@@ -229,6 +234,7 @@ class PaymentMethod(ConstantChoices):
         (ONLINE, _("Online")),
         (CLICK, _("Click")),
         (PAYME, _("Payme")),
+        (STRIPE, _("Stripe")),
         (UZUM, _("Uzum")),
     ]
 
@@ -501,12 +507,48 @@ class BookingStatus(ConstantChoices):
     REJECTED = "rejected"
     CONVERTED = "converted"
     CANCELLED = "cancelled"
+    PAYMENT_PENDING = "payment_pending"
+    CONFIRMED = "confirmed"
+    PAYMENT_FAILED = "payment_failed"
+    PAYMENT_EXPIRED = "payment_expired"
+    RECONCILIATION_REQUIRED = "reconciliation_required"
     CHOICES = [
         (REQUESTED, _("Requested")),
         (APPROVED, _("Approved")),
         (REJECTED, _("Rejected")),
         (CONVERTED, _("Converted")),
         (CANCELLED, _("Cancelled")),
+        (PAYMENT_PENDING, _("Payment Pending")),
+        (CONFIRMED, _("Confirmed")),
+        (PAYMENT_FAILED, _("Payment Failed")),
+        (PAYMENT_EXPIRED, _("Payment Expired")),
+        (RECONCILIATION_REQUIRED, _("Reconciliation Required")),
+    ]
+
+
+class PaymentProvider(ConstantChoices):
+    PAYME = "payme"
+    CLICK = "click"
+    STRIPE = "stripe"
+    CHOICES = [
+        (PAYME, _("Payme")),
+        (CLICK, _("Click")),
+        (STRIPE, _("Stripe")),
+    ]
+
+
+class PaymentCheckoutStatus(ConstantChoices):
+    PENDING = "pending"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    EXPIRED = "expired"
+    RECONCILIATION_REQUIRED = "reconciliation_required"
+    CHOICES = [
+        (PENDING, _("Pending")),
+        (SUCCEEDED, _("Succeeded")),
+        (FAILED, _("Failed")),
+        (EXPIRED, _("Expired")),
+        (RECONCILIATION_REQUIRED, _("Reconciliation Required")),
     ]
 
 

@@ -21,7 +21,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 from marketplace.models import Listing
-from marketplace.services.listings import ordered_photos, photo_url
+from marketplace.services.listings import ordered_photos, photo_url, photo_variant_url
 
 from api.v1.mobile.chat.schemas import (
     ChatListingRefOutput,
@@ -48,19 +48,21 @@ def _listing_is_available(listing) -> bool:
     return listing.status == ListingStatus.PUBLISHED and listing.deleted_at is None
 
 
-def _listing_cover_image_url(listing, request) -> str | None:
+def _listing_cover_photo(listing):
     photos = ordered_photos(listing.property)
-    photo = next((item for item in photos if item.image), None)
-    return photo_url(photo, request) if photo is not None else None
+    return next((item for item in photos if item.image), None)
 
 
 def _serialize_listing(listing, request) -> dict:
     property_obj = listing.property
     price = listing.monthly_price if listing.monthly_price is not None else listing.listed_price
+    cover_photo = _listing_cover_photo(listing)
     return ChatListingRefOutput(
         id=listing.id,
         title=property_obj.name,
-        cover_image_url=_listing_cover_image_url(listing, request),
+        cover_image_url=photo_url(cover_photo, request) if cover_photo else None,
+        cover_preview_url=photo_variant_url(cover_photo, "preview_image", request) if cover_photo else None,
+        cover_display_url=photo_variant_url(cover_photo, "display_image", request) if cover_photo else None,
         price=float(price) if price is not None else None,
         currency=listing.currency or property_obj.ask_currency or "",
         is_available=_listing_is_available(listing),

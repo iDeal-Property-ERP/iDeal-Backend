@@ -18,7 +18,9 @@ from core.constants import (
 
 
 def _conversation_queryset():
-    return Conversation.objects.select_related("listing__property__district", "user", "last_message")
+    return Conversation.objects.select_related("listing__property__district", "user", "last_message").prefetch_related(
+        "listing__property__photos"
+    )
 
 
 def visible_for_user(user):

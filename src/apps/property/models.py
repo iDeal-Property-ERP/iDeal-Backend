@@ -1,8 +1,13 @@
+import logging
 from decimal import Decimal
+from io import BytesIO
+from uuid import uuid4
 
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
+from PIL import Image, ImageFilter, ImageOps
 
 from core.constants import (
     BrokerageCommissionType,
@@ -18,6 +23,8 @@ from core.constants import (
     VerificationVisitStatus,
 )
 from core.models import SoftDeleteModel, TimestampedModel
+
+logger = logging.getLogger(__name__)
 
 
 class District(TimestampedModel, SoftDeleteModel):
@@ -417,6 +424,8 @@ class OneOffCommissionReceiptAttachment(TimestampedModel):
 class PropertyPhoto(TimestampedModel):
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="photos")
     image = models.ImageField(upload_to="properties/photos/")
+    preview_image = models.ImageField(upload_to="properties/photos/", blank=True, null=True)
+    display_image = models.ImageField(upload_to="properties/photos/", blank=True, null=True)
     caption = models.CharField(_("Caption"), max_length=120, blank=True, default="")
     is_primary = models.BooleanField(default=False)
     sort_order = models.PositiveSmallIntegerField(default=0)
@@ -429,6 +438,84 @@ class PropertyPhoto(TimestampedModel):
 
     def __str__(self):
         return f"Photo {self.id} for {self.property.name}"
+
+    def save(self, *args, **kwargs):
+        """Persist the original first, then derive variants only for new image content.
+
+        The variants are intentionally best-effort: an unavailable image processor or
+        storage error must never reject an otherwise valid original upload.
+        """
+        update_fields = kwargs.get("update_fields")
+        image_is_in_save = update_fields is None or "image" in update_fields
+        # A path string loaded from a fixture/import has an already-committed
+        # FieldFile. Only an assigned upload is uncommitted and needs variants.
+        should_generate_variants = bool(self.image) and image_is_in_save and not self.image._committed
+        previous_variant_names = (self.preview_image.name, self.display_image.name)
+
+        result = super().save(*args, **kwargs)
+        if should_generate_variants:
+            self._generate_variants(previous_variant_names)
+        return result
+
+    def _generate_variants(self, previous_variant_names):
+        created_files = []
+        try:
+            preview_content, display_content = self._variant_contents()
+            self.preview_image.save(f"variants/{uuid4().hex}-preview.webp", preview_content, save=False)
+            created_files.append((self.preview_image.storage, self.preview_image.name))
+            self.display_image.save(f"variants/{uuid4().hex}-display.webp", display_content, save=False)
+            created_files.append((self.display_image.storage, self.display_image.name))
+            type(self).objects.filter(pk=self.pk).update(
+                preview_image=self.preview_image.name,
+                display_image=self.display_image.name,
+            )
+            self._delete_variant_files(previous_variant_names)
+        except Exception:
+            for storage, name in created_files:
+                try:
+                    storage.delete(name)
+                except Exception:
+                    logger.warning("Could not remove incomplete property photo variant %s", name, exc_info=True)
+            self.preview_image = None
+            self.display_image = None
+            type(self).objects.filter(pk=self.pk).update(preview_image=None, display_image=None)
+            self._delete_variant_files(previous_variant_names)
+            logger.exception("Could not generate property photo variants for photo %s", self.pk)
+
+    def _delete_variant_files(self, names):
+        for name in names:
+            if not name:
+                continue
+            try:
+                self.image.storage.delete(name)
+            except Exception:
+                logger.warning("Could not remove stale property photo variant %s", name, exc_info=True)
+
+    def _variant_contents(self) -> tuple[ContentFile, ContentFile]:
+        with self.image.open("rb") as image_file:
+            source = Image.open(image_file)
+            source.load()
+            source = ImageOps.exif_transpose(source)
+
+        return (
+            self._encode_variant(source, max_width=64, quality=45, blurred=True),
+            self._encode_variant(source, max_width=1280, quality=80, blurred=False),
+        )
+
+    @staticmethod
+    def _encode_variant(source, *, max_width: int, quality: int, blurred: bool) -> ContentFile:
+        image = source.copy()
+        if image.width > max_width:
+            height = round(image.height * max_width / image.width)
+            image = image.resize((max_width, height), Image.Resampling.LANCZOS)
+        if blurred:
+            image = image.filter(ImageFilter.GaussianBlur(radius=8))
+        if image.mode not in {"RGB", "RGBA"}:
+            image = image.convert("RGBA" if "transparency" in image.info else "RGB")
+
+        output = BytesIO()
+        image.save(output, format="WEBP", quality=quality, method=6)
+        return ContentFile(output.getvalue())
 
 
 class VerificationVisit(TimestampedModel):
