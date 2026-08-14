@@ -1,0 +1,7 @@
+interface:
+  display_name: "iDeal Bruno"
+  short_description: "Maintain iDeal's complete Bruno API collection"
+  default_prompt: "Use $ideal-bruno to audit and update the iDeal Bruno API collection."
+
+policy:
+  allow_implicit_invocation: true
