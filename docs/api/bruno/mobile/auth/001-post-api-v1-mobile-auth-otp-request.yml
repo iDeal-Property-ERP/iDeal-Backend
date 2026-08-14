@@ -1,0 +1,105 @@
+info:
+  name: Create request mobile auth
+  type: http
+  seq: 1
+http:
+  method: POST
+  url: '{{base_url}}/api/v1/mobile/auth/otp/request/'
+  auth:
+    type: none
+  body:
+    type: json
+    data: "{\n  \"phone\": \"+998901234567\",\n  \"channel\": \"telegram\"\n}"
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# POST /api/v1/mobile/auth/otp/request/
+
+
+  Authentication: **none**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Body field | Required | Nullable | Notes |
+
+  |---|---:|---:|---|
+
+  | `phone` | yes | no | fixture value; replace fixture values with domain-valid data
+  before runtime execution. |
+
+  | `channel` | no | no | default=''telegram''; enum=sms, telegram; replace fixture
+  values with domain-valid data before runtime execution. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/auth/otp/request/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"phone\": \"+998901234567\",\n  \"channel\": \"telegram\"\n}"
+  response:
+    status: 201
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/mobile/auth/otp/request/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"phone\": \"+998901234567\",\n  \"channel\": \"telegram\"\n}"
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/mobile/auth/otp/request/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"phone\": \"+998901234567\",\n  \"channel\": \"telegram\"\n}"
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

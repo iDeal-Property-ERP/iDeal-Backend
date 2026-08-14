@@ -1,0 +1,322 @@
+info:
+  name: List listings
+  type: http
+  seq: 5
+http:
+  method: GET
+  url: '{{base_url}}/api/v1/marketplace/listings/'
+  auth:
+    type: none
+  params:
+  - name: page
+    value: '1'
+    type: query
+  - name: per_page
+    value: '20'
+    type: query
+  - name: district_id
+    value: '1'
+    type: query
+  - name: start_date
+    value: '2026-01-01T00:00:00Z'
+    type: query
+  - name: end_date
+    value: '2026-01-01T00:00:00Z'
+    type: query
+  - name: flexibility_days
+    value: '1'
+    type: query
+  - name: price_min
+    value: '1'
+    type: query
+  - name: price_max
+    value: '1'
+    type: query
+  - name: rooms
+    value: '1'
+    type: query
+  - name: rooms_min
+    value: '1'
+    type: query
+  - name: rooms_max
+    value: '1'
+    type: query
+  - name: area_min
+    value: '1'
+    type: query
+  - name: area_max
+    value: '1'
+    type: query
+  - name: verified
+    value: 'True'
+    type: query
+  - name: furnishing
+    value: unfurnished
+    type: query
+  - name: tariff
+    value: standard
+    type: query
+  - name: property_type
+    value: apartment
+    type: query
+  - name: amenities
+    value: fixture-value
+    type: query
+  - name: sort
+    value: fixture-value
+    type: query
+  - name: q
+    value: fixture-value
+    type: query
+  - name: bbox
+    value: fixture-value
+    type: query
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# GET /api/v1/marketplace/listings/
+
+
+  Authentication: **none**.
+
+
+  ## Request field notes
+
+
+  | Field | Location | Required | Example | Notes |
+
+  |---|---|---:|---|---|
+
+  | `page` | query | no | `fixture-value` | non-nullable; fixture value; replace with
+  a real ID when running. |
+
+  | `per_page` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `district_id` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `start_date` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `end_date` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `flexibility_days` | query | no | `fixture-value` | non-nullable; fixture value;
+  replace with a real ID when running. |
+
+  | `price_min` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `price_max` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `rooms` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `rooms_min` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `rooms_max` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `area_min` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `area_max` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `verified` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `furnishing` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `tariff` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `property_type` | query | no | `fixture-value` | non-nullable; fixture value;
+  replace with a real ID when running. |
+
+  | `amenities` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `sort` | query | no | `fixture-value` | non-nullable; fixture value; replace with
+  a real ID when running. |
+
+  | `q` | query | no | `fixture-value` | non-nullable; fixture value; replace with
+  a real ID when running. |
+
+  | `bbox` | query | no | `fixture-value` | non-nullable; fixture value; replace with
+  a real ID when running. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/marketplace/listings/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+    params:
+    - name: page
+      value: '1'
+      type: query
+    - name: per_page
+      value: '1'
+      type: query
+    - name: district_id
+      value: '1'
+      type: query
+    - name: start_date
+      value: '1'
+      type: query
+    - name: end_date
+      value: '1'
+      type: query
+    - name: flexibility_days
+      value: '1'
+      type: query
+    - name: price_min
+      value: '1'
+      type: query
+    - name: price_max
+      value: '1'
+      type: query
+    - name: rooms
+      value: '1'
+      type: query
+    - name: rooms_min
+      value: '1'
+      type: query
+    - name: rooms_max
+      value: '1'
+      type: query
+    - name: area_min
+      value: '1'
+      type: query
+    - name: area_max
+      value: '1'
+      type: query
+    - name: verified
+      value: '1'
+      type: query
+    - name: furnishing
+      value: '1'
+      type: query
+    - name: tariff
+      value: '1'
+      type: query
+    - name: property_type
+      value: '1'
+      type: query
+    - name: amenities
+      value: '1'
+      type: query
+    - name: sort
+      value: '1'
+      type: query
+    - name: q
+      value: '1'
+      type: query
+    - name: bbox
+      value: '1'
+      type: query
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/marketplace/listings/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+    params:
+    - name: page
+      value: '1'
+      type: query
+    - name: per_page
+      value: '1'
+      type: query
+    - name: district_id
+      value: '1'
+      type: query
+    - name: start_date
+      value: '1'
+      type: query
+    - name: end_date
+      value: '1'
+      type: query
+    - name: flexibility_days
+      value: '1'
+      type: query
+    - name: price_min
+      value: '1'
+      type: query
+    - name: price_max
+      value: '1'
+      type: query
+    - name: rooms
+      value: '1'
+      type: query
+    - name: rooms_min
+      value: '1'
+      type: query
+    - name: rooms_max
+      value: '1'
+      type: query
+    - name: area_min
+      value: '1'
+      type: query
+    - name: area_max
+      value: '1'
+      type: query
+    - name: verified
+      value: '1'
+      type: query
+    - name: furnishing
+      value: '1'
+      type: query
+    - name: tariff
+      value: '1'
+      type: query
+    - name: property_type
+      value: '1'
+      type: query
+    - name: amenities
+      value: '1'
+      type: query
+    - name: sort
+      value: '1'
+      type: query
+    - name: q
+      value: '1'
+      type: query
+    - name: bbox
+      value: '1'
+      type: query
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"

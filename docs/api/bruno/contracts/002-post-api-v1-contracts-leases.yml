@@ -1,0 +1,162 @@
+info:
+  name: Create lease
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: '{{base_url}}/api/v1/contracts/leases/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+  body:
+    type: json
+    data: "{\n  \"property_id\": 1,\n  \"owner_agreement_id\": 1,\n  \"tenant_id\"\
+      : 1,\n  \"start_date\": \"2026-01-01T00:00:00Z\",\n  \"end_date\": \"2026-01-01T00:00:00Z\"\
+      ,\n  \"monthly_rent\": 1,\n  \"deposit\": 1,\n  \"status\": \"active\"\n}"
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# POST /api/v1/contracts/leases/
+
+
+  Authentication: **bearer**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Body field | Required | Nullable | Notes |
+
+  |---|---:|---:|---|
+
+  | `property_id` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `owner_agreement_id` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `tenant_id` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `start_date` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `end_date` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `monthly_rent` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `deposit` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `status` | no | no | default=''active''; replace fixture values with domain-valid
+  data before runtime execution. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/contracts/leases/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"property_id\": 1,\n  \"owner_agreement_id\": 1,\n  \"tenant_id\"\
+        : 1,\n  \"start_date\": \"2026-01-01T00:00:00Z\",\n  \"end_date\": \"2026-01-01T00:00:00Z\"\
+        ,\n  \"monthly_rent\": 1,\n  \"deposit\": 1,\n  \"status\": \"active\"\n}"
+  response:
+    status: 201
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/contracts/leases/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"property_id\": 1,\n  \"owner_agreement_id\": 1,\n  \"tenant_id\"\
+        : 1,\n  \"start_date\": \"2026-01-01T00:00:00Z\",\n  \"end_date\": \"2026-01-01T00:00:00Z\"\
+        ,\n  \"monthly_rent\": 1,\n  \"deposit\": 1,\n  \"status\": \"active\"\n}"
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/contracts/leases/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"property_id\": 1,\n  \"owner_agreement_id\": 1,\n  \"tenant_id\"\
+        : 1,\n  \"start_date\": \"2026-01-01T00:00:00Z\",\n  \"end_date\": \"2026-01-01T00:00:00Z\"\
+        ,\n  \"monthly_rent\": 1,\n  \"deposit\": 1,\n  \"status\": \"active\"\n}"
+  response:
+    status: 401
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Authentication required\"\
+        ,\n  \"error\": \"unauthorized\"\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/contracts/leases/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"property_id\": 1,\n  \"owner_agreement_id\": 1,\n  \"tenant_id\"\
+        : 1,\n  \"start_date\": \"2026-01-01T00:00:00Z\",\n  \"end_date\": \"2026-01-01T00:00:00Z\"\
+        ,\n  \"monthly_rent\": 1,\n  \"deposit\": 1,\n  \"status\": \"active\"\n}"
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

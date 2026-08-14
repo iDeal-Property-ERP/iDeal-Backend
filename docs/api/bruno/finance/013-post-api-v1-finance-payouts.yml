@@ -1,0 +1,153 @@
+info:
+  name: Create payout
+  type: http
+  seq: 13
+http:
+  method: POST
+  url: '{{base_url}}/api/v1/finance/payouts/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+  body:
+    type: json
+    data: "{\n  \"owner_agreement_id\": 1,\n  \"amount\": 1,\n  \"currency\": \"USD\"\
+      ,\n  \"scheduled_date\": \"2026-01-01T00:00:00Z\",\n  \"method\": \"bank_transfer\"\
+      \n}"
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# POST /api/v1/finance/payouts/
+
+
+  Authentication: **bearer**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Body field | Required | Nullable | Notes |
+
+  |---|---:|---:|---|
+
+  | `owner_agreement_id` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `amount` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `currency` | no | no | default=''USD''; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `scheduled_date` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `method` | no | no | default=''bank_transfer''; replace fixture values with domain-valid
+  data before runtime execution. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/finance/payouts/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"owner_agreement_id\": 1,\n  \"amount\": 1,\n  \"currency\": \"\
+        USD\",\n  \"scheduled_date\": \"2026-01-01T00:00:00Z\",\n  \"method\": \"\
+        bank_transfer\"\n}"
+  response:
+    status: 201
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/finance/payouts/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"owner_agreement_id\": 1,\n  \"amount\": 1,\n  \"currency\": \"\
+        USD\",\n  \"scheduled_date\": \"2026-01-01T00:00:00Z\",\n  \"method\": \"\
+        bank_transfer\"\n}"
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/finance/payouts/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"owner_agreement_id\": 1,\n  \"amount\": 1,\n  \"currency\": \"\
+        USD\",\n  \"scheduled_date\": \"2026-01-01T00:00:00Z\",\n  \"method\": \"\
+        bank_transfer\"\n}"
+  response:
+    status: 401
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Authentication required\"\
+        ,\n  \"error\": \"unauthorized\"\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/finance/payouts/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"owner_agreement_id\": 1,\n  \"amount\": 1,\n  \"currency\": \"\
+        USD\",\n  \"scheduled_date\": \"2026-01-01T00:00:00Z\",\n  \"method\": \"\
+        bank_transfer\"\n}"
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

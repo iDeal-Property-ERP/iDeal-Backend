@@ -1,0 +1,13 @@
+opencollection: 1.0.0
+info:
+  name: iDeal
+  version: 1.0.0
+  description: Source-backed iDeal Backend API collection. Use Local/Dev/Prod environments;
+    Dev and Prod hosts are placeholders until deployment URLs are supplied.
+bundled: false
+extensions:
+  bruno:
+    ignore:
+    - node_modules
+    - .git
+    - .env*

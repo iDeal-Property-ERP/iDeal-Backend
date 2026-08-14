@@ -1,0 +1,181 @@
+info:
+  name: Submit listing
+  type: http
+  seq: 9
+http:
+  method: POST
+  url: '{{base_url}}/api/v1/marketplace/listings/submit/'
+  auth:
+    type: none
+  body:
+    type: multipart-form
+    data: &id001
+    - name: payload
+      type: text
+      value: '{"contact": {"first_name": "fixture-value", "last_name": "fixture-value",
+        "email": "fixture@example.com", "phone": "+998901234567"}, "property_type":
+        "apartment", "engagement_type": "managed", "name": "fixture-value", "district_id":
+        1, "rooms": 1, "area_sqm": 1, "floor": 0, "total_floors": 1, "furnishing":
+        "unfurnished", "description": "fixture-value", "amenities": ["fixture-value"],
+        "monthly_price": 1, "deposit_amount": 1, "currency": "USD", "minimum_stay":
+        6, "price_includes": ["utilities"]}'
+    - name: images[]
+      type: file
+      path: '{{sample_image}}'
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# POST /api/v1/marketplace/listings/submit/
+
+
+  Authentication: **none**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Body field | Required | Nullable | Notes |
+
+  |---|---:|---:|---|
+
+  | `contact` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `contact.first_name` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `contact.last_name` | no | yes | default=None; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `contact.email` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `contact.phone` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `property_type` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `engagement_type` | no | no | default=''managed''; replace fixture values with
+  domain-valid data before runtime execution. |
+
+  | `name` | yes | no | fixture value; replace fixture values with domain-valid data
+  before runtime execution. |
+
+  | `district_id` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `rooms` | yes | no | min=1; replace fixture values with domain-valid data before
+  runtime execution. |
+
+  | `area_sqm` | yes | no | min=0; replace fixture values with domain-valid data before
+  runtime execution. |
+
+  | `floor` | no | no | default=0; min=0; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `total_floors` | no | yes | default=None; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `furnishing` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `description` | no | yes | default=None; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `amenities` | no | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `monthly_price` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `deposit_amount` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `currency` | no | no | default=''USD''; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `minimum_stay` | no | no | default=6; min=0; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `price_includes` | no | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+
+  | Multipart field | Type | Required | Notes |
+
+  |---|---|---:|---|
+
+  | `payload` | text | yes | Fixture value; replace the file or provider payload before
+  runtime execution. |
+
+  | `images[]` | file | yes | Fixture value; replace the file or provider payload
+  before runtime execution. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/marketplace/listings/submit/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body: &id002
+      type: multipart-form
+      data: *id001
+  response:
+    status: 201
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/marketplace/listings/submit/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body: *id002
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/marketplace/listings/submit/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body: *id002
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

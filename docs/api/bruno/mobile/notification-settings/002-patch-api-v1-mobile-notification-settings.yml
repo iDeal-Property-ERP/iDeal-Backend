@@ -1,0 +1,159 @@
+info:
+  name: Update notification setting
+  type: http
+  seq: 2
+http:
+  method: PATCH
+  url: '{{base_url}}/api/v1/mobile/notification-settings/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+  body:
+    type: json
+    data: "{\n  \"push_enabled\": true,\n  \"payments_enabled\": true,\n  \"bookings_enabled\"\
+      : true,\n  \"maintenance_enabled\": true,\n  \"leases_enabled\": true,\n  \"\
+      messages_enabled\": true,\n  \"general_enabled\": true\n}"
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# PATCH /api/v1/mobile/notification-settings/
+
+
+  Authentication: **bearer**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Body field | Required | Nullable | Notes |
+
+  |---|---:|---:|---|
+
+  | `push_enabled` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `payments_enabled` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `bookings_enabled` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `maintenance_enabled` | no | yes | fixture value; replace fixture values with
+  domain-valid data before runtime execution. |
+
+  | `leases_enabled` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `messages_enabled` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `general_enabled` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/notification-settings/'
+    method: PATCH
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"push_enabled\": true,\n  \"payments_enabled\": true,\n  \"bookings_enabled\"\
+        : true,\n  \"maintenance_enabled\": true,\n  \"leases_enabled\": true,\n \
+        \ \"messages_enabled\": true,\n  \"general_enabled\": true\n}"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/mobile/notification-settings/'
+    method: PATCH
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"push_enabled\": true,\n  \"payments_enabled\": true,\n  \"bookings_enabled\"\
+        : true,\n  \"maintenance_enabled\": true,\n  \"leases_enabled\": true,\n \
+        \ \"messages_enabled\": true,\n  \"general_enabled\": true\n}"
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/mobile/notification-settings/'
+    method: PATCH
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"push_enabled\": true,\n  \"payments_enabled\": true,\n  \"bookings_enabled\"\
+        : true,\n  \"maintenance_enabled\": true,\n  \"leases_enabled\": true,\n \
+        \ \"messages_enabled\": true,\n  \"general_enabled\": true\n}"
+  response:
+    status: 401
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Authentication required\"\
+        ,\n  \"error\": \"unauthorized\"\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/mobile/notification-settings/'
+    method: PATCH
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"push_enabled\": true,\n  \"payments_enabled\": true,\n  \"bookings_enabled\"\
+        : true,\n  \"maintenance_enabled\": true,\n  \"leases_enabled\": true,\n \
+        \ \"messages_enabled\": true,\n  \"general_enabled\": true\n}"
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

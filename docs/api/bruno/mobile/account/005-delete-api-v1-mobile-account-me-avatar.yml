@@ -1,0 +1,116 @@
+info:
+  name: Update avatar
+  type: http
+  seq: 5
+http:
+  method: DELETE
+  url: '{{base_url}}/api/v1/mobile/account/me/avatar/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# DELETE /api/v1/mobile/account/me/avatar/
+
+
+  Authentication: **bearer**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Multipart field | Type | Required | Notes |
+
+  |---|---|---:|---|
+
+  | `image` | file | yes | Fixture value; replace the file or provider payload before
+  runtime execution. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/me/avatar/'
+    method: DELETE
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/me/avatar/'
+    method: DELETE
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/me/avatar/'
+    method: DELETE
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+  response:
+    status: 401
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Authentication required\"\
+        ,\n  \"error\": \"unauthorized\"\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/me/avatar/'
+    method: DELETE
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

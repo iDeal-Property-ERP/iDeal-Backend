@@ -1,0 +1,143 @@
+info:
+  name: Handle Stripe webhook
+  type: http
+  seq: 1
+http:
+  method: POST
+  url: '{{base_url}}/api/v1/payment-webhooks/stripe/'
+  auth:
+    type: none
+  body:
+    type: json
+    data: "{\n  \"id\": \"evt_fixture\",\n  \"type\": \"checkout.session.completed\"\
+      ,\n  \"data\": {\n    \"object\": {\n      \"id\": \"{{stripe_session_id}}\"\
+      ,\n      \"client_reference_id\": \"{{checkout_public_token}}\",\n      \"amount_total\"\
+      : 100000,\n      \"currency\": \"usd\",\n      \"metadata\": {\n        \"public_token\"\
+      : \"{{checkout_public_token}}\"\n      }\n    }\n  }\n}"
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# POST /api/v1/payment-webhooks/stripe/
+
+
+  Authentication: **none**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  Provider transport is unauthenticated at the Django route but provider verification
+  is required: Payme uses Basic `Paycom` plus the webhook key, Click uses its signed
+  form fields, and Stripe uses `Stripe-Signature`.
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/payment-webhooks/stripe/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: Stripe-Signature
+      value: '{{stripe_signature}}'
+    body: &id001
+      type: json
+      data: "{\n  \"id\": \"evt_fixture\",\n  \"type\": \"checkout.session.completed\"\
+        ,\n  \"data\": {\n    \"object\": {\n      \"id\": \"{{stripe_session_id}}\"\
+        ,\n      \"client_reference_id\": \"{{checkout_public_token}}\",\n      \"\
+        amount_total\": 100000,\n      \"currency\": \"usd\",\n      \"metadata\"\
+        : {\n        \"public_token\": \"{{checkout_public_token}}\"\n      }\n  \
+        \  }\n  }\n}"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"received\": true\n}"
+- name: provider error
+  request:
+    url: '{{base_url}}/api/v1/payment-webhooks/stripe/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: Stripe-Signature
+      value: '{{stripe_signature}}'
+    body: *id001
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"error\": \"invalid_signature\"\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/payment-webhooks/stripe/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: Stripe-Signature
+      value: '{{stripe_signature}}'
+    body:
+      type: json
+      data: "{\n  \"id\": \"evt_fixture\",\n  \"type\": \"checkout.session.completed\"\
+        ,\n  \"data\": {\n    \"object\": {\n      \"id\": \"{{stripe_session_id}}\"\
+        ,\n      \"client_reference_id\": \"{{checkout_public_token}}\",\n      \"\
+        amount_total\": 100000,\n      \"currency\": \"usd\",\n      \"metadata\"\
+        : {\n        \"public_token\": \"{{checkout_public_token}}\"\n      }\n  \
+        \  }\n  }\n}"
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/payment-webhooks/stripe/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: Stripe-Signature
+      value: '{{stripe_signature}}'
+    body:
+      type: json
+      data: "{\n  \"id\": \"evt_fixture\",\n  \"type\": \"checkout.session.completed\"\
+        ,\n  \"data\": {\n    \"object\": {\n      \"id\": \"{{stripe_session_id}}\"\
+        ,\n      \"client_reference_id\": \"{{checkout_public_token}}\",\n      \"\
+        amount_total\": 100000,\n      \"currency\": \"usd\",\n      \"metadata\"\
+        : {\n        \"public_token\": \"{{checkout_public_token}}\"\n      }\n  \
+        \  }\n  }\n}"
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

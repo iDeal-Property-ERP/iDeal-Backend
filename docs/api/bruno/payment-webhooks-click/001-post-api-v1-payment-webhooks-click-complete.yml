@@ -1,0 +1,163 @@
+info:
+  name: Handle Complete webhook
+  type: http
+  seq: 1
+http:
+  method: POST
+  url: '{{base_url}}/api/v1/payment-webhooks/click/complete/'
+  auth:
+    type: none
+  body:
+    type: form-urlencoded
+    data: &id001
+    - name: click_trans_id
+      type: text
+      value: '{{click_transaction_id}}'
+    - name: service_id
+      type: text
+      value: '{{click_service_id}}'
+    - name: merchant_trans_id
+      type: text
+      value: '{{checkout_public_token}}'
+    - name: amount
+      type: text
+      value: '100000'
+    - name: action
+      type: text
+      value: '2'
+    - name: sign_time
+      type: text
+      value: '2026-01-01 00:00:00'
+    - name: sign_string
+      type: text
+      value: '{{click_signature}}'
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# POST /api/v1/payment-webhooks/click/complete/
+
+
+  Authentication: **none**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Multipart field | Type | Required | Notes |
+
+  |---|---|---:|---|
+
+  | `click_trans_id` | text | yes | Fixture value; replace the file or provider payload
+  before runtime execution. |
+
+  | `service_id` | text | yes | Fixture value; replace the file or provider payload
+  before runtime execution. |
+
+  | `merchant_trans_id` | text | yes | Fixture value; replace the file or provider
+  payload before runtime execution. |
+
+  | `amount` | text | yes | Fixture value; replace the file or provider payload before
+  runtime execution. |
+
+  | `action` | text | yes | Fixture value; replace the file or provider payload before
+  runtime execution. |
+
+  | `sign_time` | text | yes | Fixture value; replace the file or provider payload
+  before runtime execution. |
+
+  | `sign_string` | text | yes | Fixture value; replace the file or provider payload
+  before runtime execution. |
+
+
+  Provider transport is unauthenticated at the Django route but provider verification
+  is required: Payme uses Basic `Paycom` plus the webhook key, Click uses its signed
+  form fields, and Stripe uses `Stripe-Signature`.
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/payment-webhooks/click/complete/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body: &id002
+      type: form-urlencoded
+      data: *id001
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"click_trans_id\": \"{{click_transaction_id}}\",\n  \"merchant_trans_id\"\
+        : \"{{checkout_public_token}}\",\n  \"error\": 0,\n  \"error_note\": \"Success\"\
+        \n}"
+- name: provider error
+  request:
+    url: '{{base_url}}/api/v1/payment-webhooks/click/complete/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body: *id002
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"click_trans_id\": \"{{click_transaction_id}}\",\n  \"merchant_trans_id\"\
+        : \"{{checkout_public_token}}\",\n  \"error\": -5,\n  \"error_note\": \"USER\
+        \ DOES NOT EXIST\"\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/payment-webhooks/click/complete/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body: *id002
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/payment-webhooks/click/complete/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body: *id002
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

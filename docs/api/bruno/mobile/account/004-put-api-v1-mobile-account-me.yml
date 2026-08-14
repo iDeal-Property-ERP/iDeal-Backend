@@ -1,0 +1,153 @@
+info:
+  name: Get my profile mobile account
+  type: http
+  seq: 4
+http:
+  method: PUT
+  url: '{{base_url}}/api/v1/mobile/account/me/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+  body:
+    type: json
+    data: "{\n  \"first_name\": \"fixture-value\",\n  \"last_name\": \"fixture-value\"\
+      ,\n  \"patronymic\": \"fixture-value\",\n  \"email\": \"fixture@example.com\"\
+      ,\n  \"nationality\": \"fixture-value\"\n}"
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# PUT /api/v1/mobile/account/me/
+
+
+  Authentication: **bearer**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Body field | Required | Nullable | Notes |
+
+  |---|---:|---:|---|
+
+  | `first_name` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `last_name` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `patronymic` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `email` | yes | no | fixture value; replace fixture values with domain-valid data
+  before runtime execution. |
+
+  | `nationality` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/me/'
+    method: PUT
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"first_name\": \"fixture-value\",\n  \"last_name\": \"fixture-value\"\
+        ,\n  \"patronymic\": \"fixture-value\",\n  \"email\": \"fixture@example.com\"\
+        ,\n  \"nationality\": \"fixture-value\"\n}"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/me/'
+    method: PUT
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"first_name\": \"fixture-value\",\n  \"last_name\": \"fixture-value\"\
+        ,\n  \"patronymic\": \"fixture-value\",\n  \"email\": \"fixture@example.com\"\
+        ,\n  \"nationality\": \"fixture-value\"\n}"
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/me/'
+    method: PUT
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"first_name\": \"fixture-value\",\n  \"last_name\": \"fixture-value\"\
+        ,\n  \"patronymic\": \"fixture-value\",\n  \"email\": \"fixture@example.com\"\
+        ,\n  \"nationality\": \"fixture-value\"\n}"
+  response:
+    status: 401
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Authentication required\"\
+        ,\n  \"error\": \"unauthorized\"\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/me/'
+    method: PUT
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: "{\n  \"first_name\": \"fixture-value\",\n  \"last_name\": \"fixture-value\"\
+        ,\n  \"patronymic\": \"fixture-value\",\n  \"email\": \"fixture@example.com\"\
+        ,\n  \"nationality\": \"fixture-value\"\n}"
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

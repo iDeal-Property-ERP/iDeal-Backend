@@ -1,0 +1,75 @@
+info:
+  name: Unfavorite listing
+  type: http
+  seq: 3
+http:
+  method: DELETE
+  url: '{{base_url}}/api/v1/mobile/favorites/:listing_id/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+  params:
+  - name: listing_id
+    value: '{{listing_id}}'
+    type: path
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# DELETE /api/v1/mobile/favorites/{listing_id}/
+
+
+  Authentication: **bearer**.
+
+
+  ## Request field notes
+
+
+  | Field | Location | Required | Example | Notes |
+
+  |---|---|---:|---|---|
+
+  | `listing_id` | path | yes | `{{listing_id}}` | Repeated DELETEs are idempotent and keep returning `is_favorite=false`. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/favorites/:listing_id/'
+    method: DELETE
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"id\": 101,\n    \"is_favorite\": false\n  }\n}"
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/mobile/favorites/:listing_id/'
+    method: DELETE
+    headers:
+    - name: accept
+      value: application/json
+  response:
+    status: 401
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Not authenticated\",\n  \"error\": \"Not authenticated\"\n}"

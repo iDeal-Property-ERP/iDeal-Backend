@@ -1,0 +1,97 @@
+info:
+  name: Favorite listing
+  type: http
+  seq: 2
+http:
+  method: PUT
+  url: '{{base_url}}/api/v1/mobile/favorites/:listing_id/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+  params:
+  - name: listing_id
+    value: '{{listing_id}}'
+    type: path
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# PUT /api/v1/mobile/favorites/{listing_id}/
+
+
+  Authentication: **bearer**.
+
+
+  ## Request field notes
+
+
+  | Field | Location | Required | Example | Notes |
+
+  |---|---|---:|---|---|
+
+  | `listing_id` | path | yes | `{{listing_id}}` | Must point to a Home-eligible listing. Repeated PUTs are idempotent. |
+
+
+  Favorites the listing for the authenticated user and returns the same mobile
+  card schema as Home with `is_favorite=true`.
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/favorites/:listing_id/'
+    method: PUT
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"id\": 101,\n    \"property_id\": 201,\n    \"title\": \"Sample listing\",\n    \"district\": \"Yunusobod\",\n    \"address\": \"12 Sample Street\",\n    \"property_type\": \"apartment\",\n    \"rooms\": 2,\n    \"area_sqm\": 70,\n    \"floor\": 5,\n    \"total_floors\": 9,\n    \"furnishing\": \"furnished\",\n    \"price\": 850.0,\n    \"currency\": \"USD\",\n    \"tariff\": \"standard\",\n    \"is_verified\": true,\n    \"is_featured\": false,\n    \"score\": 4.8,\n    \"review_count\": 12,\n    \"cover_image_url\": \"http://127.0.0.1:8000/media/properties/photos/cover.jpg\",\n    \"cover_preview_url\": null,\n    \"cover_display_url\": null,\n    \"map_lat\": 41.31,\n    \"map_lon\": 69.28,\n    \"is_favorite\": true\n  }\n}"
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/mobile/favorites/:listing_id/'
+    method: PUT
+    headers:
+    - name: accept
+      value: application/json
+  response:
+    status: 401
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Not authenticated\",\n  \"error\": \"Not authenticated\"\n}"
+- name: unavailable listing
+  request:
+    url: '{{base_url}}/api/v1/mobile/favorites/:listing_id/'
+    method: PUT
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+  response:
+    status: 404
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"NOT OK\",\n  \"error\": \"listing_unavailable\"\n}"
