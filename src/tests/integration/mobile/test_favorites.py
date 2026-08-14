@@ -1,9 +1,13 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from threading import Barrier
 
 import pytest
 from django.conf import settings
+from django.db import close_old_connections, connection
 from django.utils import timezone
 from marketplace.models import FavoriteListing
+from marketplace.services.favorites import FavoriteListingService
 
 from core.constants import ListingStatus, PropertyEngagementType, PropertyStatus
 from tests.factories import (
@@ -51,6 +55,11 @@ class TestMobileFavoritesList:
         response = getattr(api_client, method)(path, **extra_kwargs)
 
         assert response.status_code == 401
+        assert response.json() == {
+            "success": False,
+            "message": "Not authenticated",
+            "error": "Not authenticated",
+        }
 
     def test_list_isolated_to_authenticated_user(self, api_client):
         tenant = TenantFactory()
@@ -192,6 +201,59 @@ class TestMobileFavoriteToggle:
         assert first.json()["data"]["id"] == listing.id
         assert first.json()["data"]["is_favorite"] is True
         assert second.json()["data"]["is_favorite"] is True
+
+    @pytest.mark.django_db(transaction=True)
+    @pytest.mark.skipif(connection.vendor != "postgresql", reason="requires PostgreSQL conditional uniqueness")
+    def test_concurrent_puts_create_one_active_favorite(self, mocker):
+        tenant = TenantFactory()
+        listing = _visible_listing()
+        barrier = Barrier(2)
+        original_create = FavoriteListing.objects.create
+
+        def synchronized_create(*args, **kwargs):
+            barrier.wait(timeout=10)
+            return original_create(*args, **kwargs)
+
+        mocker.patch.object(FavoriteListing.objects, "create", side_effect=synchronized_create)
+
+        def favorite_in_thread():
+            close_old_connections()
+            try:
+                return FavoriteListingService.favorite(tenant, listing).pk
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            favorite_ids = list(executor.map(lambda _: favorite_in_thread(), range(2)))
+
+        assert len(set(favorite_ids)) == 1
+        assert FavoriteListing.objects.filter(user=tenant, listing=listing).count() == 1
+
+    @pytest.mark.django_db(transaction=True)
+    @pytest.mark.skipif(connection.vendor != "postgresql", reason="requires PostgreSQL row locking")
+    def test_concurrent_puts_restore_one_soft_deleted_favorite(self):
+        tenant = TenantFactory()
+        listing = _visible_listing()
+        favorite = FavoriteListingFactory(user=tenant, listing=listing)
+        favorite.delete()
+        barrier = Barrier(2)
+
+        def favorite_in_thread():
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                return FavoriteListingService.favorite(tenant, listing).pk
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            favorite_ids = list(executor.map(lambda _: favorite_in_thread(), range(2)))
+
+        assert len(set(favorite_ids)) == 1
+        assert FavoriteListing.objects.filter(user=tenant, listing=listing).count() == 1
+        assert (
+            FavoriteListing.global_objects.filter(user=tenant, listing=listing, deleted_at__isnull=False).count() == 0
+        )
 
     def test_put_restores_soft_deleted_favorite(self, api_client):
         tenant = TenantFactory()

@@ -1,11 +1,10 @@
-import jwt
-from account.models import TokenBlacklist, User
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import Max, Min
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Path, Query
+from dmr.exceptions import NotAuthenticatedError
 from dmr.pagination import Page, Paginated
 from marketplace.models import Listing
 from marketplace.services.booking import BookingService
@@ -46,28 +45,17 @@ def get_optional_authenticated_user(request):
     if not raw_token:
         return None
 
-    _, _, encoded = raw_token.partition(" ")
-    if not encoded:
+    parts = raw_token.split(" ")
+    if len(parts) != 2 or parts[0].casefold() != _OPTIONAL_AUTH.auth_scheme.casefold():
         return None
 
     try:
-        payload = jwt.decode(
-            encoded,
-            settings.SECRET_KEY,
-            algorithms=[settings.JWT_SETTINGS["ALGORITHM"]],
-            options={"verify_aud": False},
-        )
-    except jwt.InvalidTokenError:
+        token = _OPTIONAL_AUTH.decode_token(parts[1])
+        user = _OPTIONAL_AUTH.get_user(token)
+        _OPTIONAL_AUTH.check_auth(user, token)
+    except NotAuthenticatedError:
         return None
-
-    jti = payload.get("jti")
-    if jti and TokenBlacklist.objects.filter(jti=jti).exists():
-        return None
-
-    subject = payload.get("sub")
-    if not subject:
-        return None
-    return User.objects.filter(pk=subject, is_active=True).first()
+    return user
 
 
 def build_mobile_listing_paginated_response(qs, page: int, per_page: int, request, user=None) -> Paginated:

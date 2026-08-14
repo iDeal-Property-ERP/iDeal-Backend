@@ -174,6 +174,13 @@ The iDeal frontend lives at `/home/mehroj/WebstormProjects/iDeal-Frontend`.
 ## Bruno API collection
 
 The API collection is maintained and Git-tracked in Bruno at `docs/api/bruno`.
+Generate browser documentation with
+`.agents/skills/ideal-bruno/scripts/build_web_docs.py`; the output is the
+standalone site at `docs/api/bruno/index.html`. Do not create separate
+frontend or mobile copies. Install the dev dependencies and enable the tracked
+pre-commit hook with `uv run pre-commit install`; it regenerates and stages the
+HTML on each commit. Configure GitHub Pages to deploy the `production` branch's
+`/docs` folder, so no CI build is needed.
 The backend URL resolver is authoritative for mounted routes and supported
 methods; view annotations, Pydantic schemas, and tests are authoritative for
 parameters, bodies, authentication, status codes, and response shapes. The
@@ -215,6 +222,7 @@ Run static inventory and collection checks from the Backend checkout:
 ```bash
 uv run python .agents/skills/ideal-bruno/scripts/bruno_tool.py inventory
 uv run python .agents/skills/ideal-bruno/scripts/bruno_tool.py validate
+python3 .agents/skills/ideal-bruno/scripts/build_web_docs.py
 ```
 
 When the Bruno CLI and local services/fixtures are available, run the

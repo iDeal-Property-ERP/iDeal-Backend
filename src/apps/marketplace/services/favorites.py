@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db import IntegrityError, transaction
 from django.db.models import Subquery
 from django.utils import timezone
 from marketplace.models import FavoriteListing, Listing
@@ -29,10 +30,31 @@ class FavoriteListingService:
         )
 
     @staticmethod
+    @transaction.atomic
     def favorite(user, listing: Listing) -> FavoriteListing:
-        favorite = FavoriteListing.global_objects.filter(user=user, listing=listing).order_by("-created_at", "-id").first()
+        favorite = (
+            FavoriteListing.global_objects.select_for_update()
+            .filter(user=user, listing=listing)
+            .order_by("-created_at", "-id")
+            .first()
+        )
         if favorite is None:
-            return FavoriteListing.objects.create(user=user, listing=listing)
+            try:
+                with transaction.atomic():
+                    return FavoriteListing.objects.create(user=user, listing=listing)
+            except IntegrityError:
+                # Another request may have inserted the active row after the
+                # initial lookup. The savepoint keeps this transaction usable
+                # while the conditional unique constraint serializes the
+                # competing insert.
+                favorite = (
+                    FavoriteListing.global_objects.select_for_update()
+                    .filter(user=user, listing=listing, deleted_at__isnull=True)
+                    .order_by("-created_at", "-id")
+                    .first()
+                )
+                if favorite is None:
+                    raise
         if favorite.deleted_at is not None:
             favorite.deleted_at = None
             favorite.restored_at = timezone.now()

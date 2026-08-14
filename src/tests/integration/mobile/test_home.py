@@ -163,6 +163,25 @@ class TestMobileHomeListings:
         card = next(item for item in _items(response.json()) if item["id"] == listing.id)
         assert card["is_favorite"] is False
 
+    def test_expired_optional_auth_keeps_is_favorite_false(self, api_client, tenant):
+        from datetime import UTC, datetime, timedelta
+
+        from tests.factories import FavoriteListingFactory
+
+        listing = _make_vacant_listing()
+        FavoriteListingFactory(user=tenant, listing=listing)
+        headers = _make_jwt(
+            tenant,
+            exp=datetime.now(UTC) - timedelta(minutes=1),
+            jti="expired-home-token",
+        )
+
+        response = api_client.get(LISTINGS_URL, **headers)
+
+        assert response.status_code == 200
+        card = next(item for item in _items(response.json()) if item["id"] == listing.id)
+        assert card["is_favorite"] is False
+
     def test_valid_optional_auth_personalizes_is_favorite(self, api_client, tenant):
         from tests.factories import FavoriteListingFactory
 
@@ -176,6 +195,46 @@ class TestMobileHomeListings:
         cards = {item["id"]: item for item in _items(response.json()) if item["id"] in {favorite_listing.id, other_listing.id}}
         assert cards[favorite_listing.id]["is_favorite"] is True
         assert cards[other_listing.id]["is_favorite"] is False
+
+    def test_case_insensitive_bearer_scheme_personalizes_is_favorite(self, api_client, tenant):
+        from tests.factories import FavoriteListingFactory
+
+        listing = _make_vacant_listing()
+        FavoriteListingFactory(user=tenant, listing=listing)
+        token = _make_jwt(tenant, jti="case-insensitive-bearer-token")["HTTP_AUTHORIZATION"].split(" ", 1)[1]
+
+        response = api_client.get(LISTINGS_URL, HTTP_AUTHORIZATION=f"bEaReR {token}")
+
+        assert response.status_code == 200
+        card = next(item for item in _items(response.json()) if item["id"] == listing.id)
+        assert card["is_favorite"] is True
+
+    @pytest.mark.parametrize("scheme", ["Basic", "Token", "Digest"])
+    def test_non_bearer_scheme_does_not_personalize(self, api_client, tenant, scheme):
+        from tests.factories import FavoriteListingFactory
+
+        listing = _make_vacant_listing()
+        FavoriteListingFactory(user=tenant, listing=listing)
+        token = _make_jwt(tenant, jti=f"non-bearer-{scheme}")["HTTP_AUTHORIZATION"].split(" ", 1)[1]
+
+        response = api_client.get(LISTINGS_URL, HTTP_AUTHORIZATION=f"{scheme} {token}")
+
+        assert response.status_code == 200
+        card = next(item for item in _items(response.json()) if item["id"] == listing.id)
+        assert card["is_favorite"] is False
+
+    @pytest.mark.parametrize("authorization", ["Bearer", "Bearer ", "Bearer token extra", "Basic"])
+    def test_malformed_optional_auth_header_keeps_anonymous_fallback(self, api_client, tenant, authorization):
+        from tests.factories import FavoriteListingFactory
+
+        listing = _make_vacant_listing()
+        FavoriteListingFactory(user=tenant, listing=listing)
+
+        response = api_client.get(LISTINGS_URL, HTTP_AUTHORIZATION=authorization)
+
+        assert response.status_code == 200
+        card = next(item for item in _items(response.json()) if item["id"] == listing.id)
+        assert card["is_favorite"] is False
 
     def test_cover_variant_urls_are_absolute_when_present(self, api_client):
         listing = _make_vacant_listing()
