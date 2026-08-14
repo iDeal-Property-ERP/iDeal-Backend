@@ -171,25 +171,53 @@ The iDeal frontend lives at `/home/mehroj/WebstormProjects/iDeal-Frontend`.
 
 **Breaking API changes** (schema changes, URL changes, response format changes, new required fields, removed fields, renamed keys, changed status codes) **must** be adjusted in the frontend as well. After making backend API changes, check and update the corresponding frontend code.
 
-## Postman
-iDeal API collection: `47796254-67fe0405-7142-4fc5-8a5d-ccccd8807359`
-Workspace: My Workspace (`a41d1a8d-6bd0-44b7-8323-8c345f25e7a4`)
+## Bruno API collection
 
-Use the `postman_getCollection` tool to fetch the collection, `postman_createCollectionRequest` to add endpoints, etc.
+The API collection is maintained and Git-tracked in Bruno at `docs/api/bruno`.
+The backend URL resolver is authoritative for mounted routes and supported
+methods; view annotations, Pydantic schemas, and tests are authoritative for
+parameters, bodies, authentication, status codes, and response shapes. The
+collection is documentation and executable request fixtures, not a replacement
+for backend source or tests.
 
-### Syncing endpoints
+Use the repository skill at
+`.agents/skills/ideal-bruno/` for route inventory, request generation,
+completeness validation, response examples, environment switching, collection
+runs, and stale-endpoint or secret detection.
 
-Whenever you create, update, or delete an API endpoint, you **must** keep the Postman collection in sync:
+### Collection maintenance rules
 
-- **New endpoint** → `postman_createCollectionRequest` + `postman_createCollectionResponse` (at least 1 saved response; add a failure variant for POST/PATCH)
-- **Changed schema** → update the request's `rawModeData` body and replace / add saved responses with the new field shape
-- **Deleted endpoint** → `postman_deleteCollectionRequest`
-- **Changed URL** → `postman_updateCollectionRequest` with the new `url`
+Whenever an API endpoint or its contract changes, update the corresponding
+Bruno request and saved examples. Keep one request for every application
+method (GET, POST, PUT, PATCH, and DELETE); framework-generated OPTIONS and
+transport behavior are not separate entries.
 
-**Request conventions (match existing collection style):**
-- URL: `{{BASE_URL}}/api/v1/<resource>/` — use `{{BASE_URL}}` variable
-- Auth: omit `auth` to inherit collection-level Bearer `{{TOKEN}}` (only override to `noauth` for public endpoints)
-- Body: `dataMode: "raw"`, `dataOptions: {"raw": {"language": "json"}}`
-- Comments: inline `//` hints on body fields — `// FK`, `// optional`, `// default = "value"`, `// default: null`
-- Responses: saved under the `response` array with a descriptive `name` (e.g. `"success"`, `"validation error"`, `"already paid (fail)"`)
-- Folder organization: group by resource sub-folder (e.g. `Finance/Payments/`, `Contracts/leases/`)
+- Include every path and query parameter and every applicable body field with a
+  valid executable value. Put required, nullable, default, enum, and
+  destructive-operation notes in the request `docs` block; do not put comments
+  inside JSON bodies.
+- Save the expected success response and applicable empty, validation,
+  authentication/permission, not-found, conflict/state-transition, and
+  provider/webhook failure examples. Mark static contract fixtures separately
+  from responses captured by a running service.
+- Use `Local`, `Dev`, and `Prod` environments with identical variable names.
+  Switch environments without editing requests. Local uses
+  `http://127.0.0.1:8000`; Dev and Prod retain clearly marked host placeholders
+  until deployment URLs are supplied.
+- Keep access tokens, webhook secrets, credentials, and local fixture paths in
+  secret environment values or ignored `.env` files. Never commit real secrets
+  to the collection, docs, examples, or source.
+
+### Validation
+
+Run static inventory and collection checks from the Backend checkout:
+
+```bash
+uv run python .agents/skills/ideal-bruno/scripts/bruno_tool.py inventory
+uv run python .agents/skills/ideal-bruno/scripts/bruno_tool.py validate
+```
+
+When the Bruno CLI and local services/fixtures are available, run the
+executable collection with `bru run --env Local`; report runtime checks
+separately from static checks. Dev and Prod checks are read-only smoke checks
+and require deployment-owned hosts and credentials.

@@ -5,6 +5,7 @@ app_name = "mobile"
 urlpatterns = [
     path("auth/", include("api.v1.mobile.auth.urls")),
     path("account/", include("api.v1.mobile.account.urls", namespace="account")),
+    path("favorites/", include("api.v1.mobile.favorites.urls", namespace="favorites")),
     path("home/", include("api.v1.mobile.home.urls", namespace="home")),
     path("bookings/", include("api.v1.mobile.bookings.urls", namespace="bookings")),
     path("notifications/", include("api.v1.mobile.notifications.urls", namespace="notifications")),

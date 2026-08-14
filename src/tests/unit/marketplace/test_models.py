@@ -1,11 +1,14 @@
 import pytest
-from marketplace.models import Listing, ViewingRequest
+from django.db import IntegrityError, models
+from marketplace.models import FavoriteListing, Listing, ViewingRequest
 
 from core.constants import PropertyStatus, ViewingRequestStatus
 from tests.factories import (
     DistrictFactory,
+    FavoriteListingFactory,
     OwnerFactory,
     PropertyFactory,
+    TenantFactory,
     ViewingRequestFactory,
 )
 
@@ -105,6 +108,48 @@ class TestViewingRequestModel:
 
         vr2 = ViewingRequestFactory(listing=listing, message="I want to see the apartment")
         assert vr2.message == "I want to see the apartment"
+
+
+@pytest.mark.django_db
+class TestFavoriteListingModel:
+    def test_active_constraint_and_indexes_match_account_listing_semantics(self):
+        constraint = next(
+            constraint
+            for constraint in FavoriteListing._meta.constraints
+            if constraint.name == "unique_active_favorite_listing"
+        )
+
+        assert constraint.fields == ("user", "listing")
+        assert constraint.condition == models.Q(deleted_at__isnull=True)
+        assert {tuple(index.fields) for index in FavoriteListing._meta.indexes} == {
+            ("user", "created_at"),
+            ("listing", "created_at"),
+        }
+
+    def test_active_uniqueness_is_enforced_per_user_and_listing(self):
+        favorite = FavoriteListingFactory()
+
+        with pytest.raises(IntegrityError):
+            FavoriteListingFactory(user=favorite.user, listing=favorite.listing)
+
+    def test_user_isolation_allows_the_same_listing_for_other_users(self):
+        listing = _make_vacant_listing()
+        first_user = TenantFactory()
+        second_user = TenantFactory()
+
+        first = FavoriteListingFactory(user=first_user, listing=listing)
+        second = FavoriteListingFactory(user=second_user, listing=listing)
+
+        assert first.listing_id == listing.id
+        assert second.listing_id == listing.id
+
+    def test_soft_deleted_favorite_can_be_recreated(self):
+        favorite = FavoriteListingFactory()
+        favorite.delete()
+
+        recreated = FavoriteListingFactory(user=favorite.user, listing=favorite.listing)
+
+        assert recreated.id != favorite.id
 
 
 @pytest.mark.django_db

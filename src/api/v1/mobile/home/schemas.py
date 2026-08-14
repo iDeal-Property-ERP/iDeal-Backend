@@ -1,4 +1,30 @@
+import math
+
 import pydantic
+
+
+def parse_bbox(value: str) -> tuple[float, float, float, float]:
+    parts = value.split(",")
+    if len(parts) != 4:
+        raise ValueError("bbox must contain exactly four comma-separated numbers")
+
+    try:
+        min_lon, min_lat, max_lon, max_lat = (float(part) for part in parts)
+    except ValueError as exc:
+        raise ValueError("bbox must contain exactly four comma-separated numbers") from exc
+
+    coordinates = (min_lon, min_lat, max_lon, max_lat)
+    if not all(math.isfinite(coordinate) for coordinate in coordinates):
+        raise ValueError("bbox coordinates must be finite")
+    if not (-180 <= min_lon <= 180 and -180 <= max_lon <= 180):
+        raise ValueError("bbox longitude must be between -180 and 180")
+    if not (-90 <= min_lat <= 90 and -90 <= max_lat <= 90):
+        raise ValueError("bbox latitude must be between -90 and 90")
+    if min_lon >= max_lon:
+        raise ValueError("bbox minimum longitude must be less than maximum longitude")
+    if min_lat >= max_lat:
+        raise ValueError("bbox minimum latitude must be less than maximum latitude")
+    return coordinates
 
 
 class MobileHomeFeedQuery(pydantic.BaseModel):
@@ -13,6 +39,27 @@ class MobileHomeFeedQuery(pydantic.BaseModel):
     verified: bool | None = None
     furnishing: str | None = None
     tariff: str | None = None
+    property_type: str | None = None
+
+
+class MobileHomeMapQuery(pydantic.BaseModel):
+    bbox: str
+    q: str | None = None
+    district_id: int | None = None
+    property_type: str | None = None
+    price_min: float | None = None
+    price_max: float | None = None
+    rooms_min: int | None = None
+    rooms_max: int | None = None
+    verified: bool | None = None
+    furnishing: str | None = None
+    tariff: str | None = None
+
+    @pydantic.field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, value: str) -> str:
+        parse_bbox(value)
+        return value
 
 
 class MobileListingCard(pydantic.BaseModel):
@@ -39,6 +86,19 @@ class MobileListingCard(pydantic.BaseModel):
     cover_display_url: str | None
     map_lat: float | None
     map_lon: float | None
+    is_favorite: bool = False
+
+
+class MobileListingMapItem(MobileListingCard):
+    map_lat: float
+    map_lon: float
+    contact_phone: str | None
+
+
+class MobileListingMapResponse(pydantic.BaseModel):
+    items: list[MobileListingMapItem]
+    count: int
+    truncated: bool
 
 
 class MobileListingPhoto(pydantic.BaseModel):

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from marketplace.models import Booking, ContactInquiry, FaqItem, Listing, ViewingRequest
+from marketplace.models import Booking, ContactInquiry, FaqItem, FavoriteListing, Listing, ViewingRequest
 
 from core.admin import BaseModelAdmin, BaseSoftDeleteModelAdmin
 
@@ -51,4 +51,12 @@ class BookingAdmin(BaseSoftDeleteModelAdmin):
     list_display = ("id", "property", "tenant", "status", "requested_start_date", "created_at", "is_deleted")
     list_filter = ("status",)
     search_fields = ("property__name", "tenant__first_name", "tenant__last_name")
+    ordering = ("-created_at",)
+
+
+@admin.register(FavoriteListing)
+class FavoriteListingAdmin(BaseSoftDeleteModelAdmin):
+    list_display = ("id", "user", "listing", "created_at", "is_deleted")
+    list_filter = ("created_at",)
+    search_fields = ("user__first_name", "user__last_name", "user__phone", "listing__property__name")
     ordering = ("-created_at",)

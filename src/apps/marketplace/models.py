@@ -282,6 +282,31 @@ class Booking(TimestampedModel, SoftDeleteModel):
         return lease
 
 
+class FavoriteListing(TimestampedModel, SoftDeleteModel):
+    user = models.ForeignKey("account.User", on_delete=models.CASCADE, related_name="favorite_listings")
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="favorite_listings")
+
+    class Meta:
+        verbose_name = _("Favorite Listing")
+        verbose_name_plural = _("Favorite Listings")
+        ordering = ["-created_at", "-id"]
+        db_table = "favorite_listings"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "listing"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_active_favorite_listing",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["listing", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Favorite #{self.id} — user={self.user_id} listing={self.listing_id}"
+
+
 class BookingQuote(TimestampedModel, SoftDeleteModel):
     listing = models.ForeignKey(Listing, on_delete=models.PROTECT, related_name="booking_quotes")
     tenant = models.ForeignKey("account.User", on_delete=models.PROTECT, related_name="booking_quotes")

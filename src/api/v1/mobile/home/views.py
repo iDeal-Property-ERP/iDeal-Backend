@@ -1,10 +1,15 @@
+import jwt
+from account.models import TokenBlacklist, User
 from django.conf import settings
+from django.core.paginator import Paginator
 from django.db.models import Max, Min
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Path, Query
+from dmr.pagination import Page, Paginated
 from marketplace.models import Listing
 from marketplace.services.booking import BookingService
+from marketplace.services.favorites import FavoriteListingService
 from marketplace.services.listings import (
     ListingFilters,
     apply_listing_filters,
@@ -18,19 +23,72 @@ from property.models import District
 from api.v1.marketplace.views import RESPONSE_TIME, _verification_checklist
 from api.v1.mobile.home.schemas import (
     MobileHomeFeedQuery,
+    MobileHomeMapQuery,
     MobileListingAmenity,
     MobileListingCard,
     MobileListingDetail,
+    MobileListingMapItem,
+    MobileListingMapResponse,
     MobileListingPhoto,
     MobileListingVerification,
     MobileVerificationItem,
+    parse_bbox,
 )
+from core.api.permissions import BlacklistAwareJWTSyncAuth
 from core.api.views import BaseController, DetailPath
-from core.constants import FurnishingType, ListingStatus, TariffChoices
-from core.utils.pagination import build_paginated_response_from_queryset
+from core.constants import FurnishingType, ListingStatus, PropertyType, TariffChoices
+
+_OPTIONAL_AUTH = BlacklistAwareJWTSyncAuth()
 
 
-def serialize_mobile_listing_card(listing, request) -> dict:
+def get_optional_authenticated_user(request):
+    raw_token = _OPTIONAL_AUTH.get_token_from_request(request)
+    if not raw_token:
+        return None
+
+    _, _, encoded = raw_token.partition(" ")
+    if not encoded:
+        return None
+
+    try:
+        payload = jwt.decode(
+            encoded,
+            settings.SECRET_KEY,
+            algorithms=[settings.JWT_SETTINGS["ALGORITHM"]],
+            options={"verify_aud": False},
+        )
+    except jwt.InvalidTokenError:
+        return None
+
+    jti = payload.get("jti")
+    if jti and TokenBlacklist.objects.filter(jti=jti).exists():
+        return None
+
+    subject = payload.get("sub")
+    if not subject:
+        return None
+    return User.objects.filter(pk=subject, is_active=True).first()
+
+
+def build_mobile_listing_paginated_response(qs, page: int, per_page: int, request, user=None) -> Paginated:
+    paginator = Paginator(qs, per_page)
+    django_page = paginator.get_page(page)
+    listings = list(django_page.object_list)
+    favorite_ids = FavoriteListingService.favorite_ids_for_listings(user, [listing.id for listing in listings])
+    return Paginated(
+        count=paginator.count,
+        num_pages=paginator.num_pages,
+        per_page=paginator.per_page,
+        page=Page(
+            number=django_page.number,
+            object_list=[
+                serialize_mobile_listing_card(listing, request, favorite_ids=favorite_ids) for listing in listings
+            ],
+        ),
+    )
+
+
+def serialize_mobile_listing_card(listing, request, *, favorite_ids: set[int] | None = None) -> dict:
     prop = listing.property
     monthly_price = listing.monthly_price if listing.monthly_price is not None else listing.listed_price
     photos = ordered_photos(prop)
@@ -59,6 +117,7 @@ def serialize_mobile_listing_card(listing, request) -> dict:
         cover_display_url=photo_variant_url(cover_photo, "display_image", request) if cover_photo else None,
         map_lat=float(prop.map_lat) if prop.map_lat is not None else None,
         map_lon=float(prop.map_lon) if prop.map_lon is not None else None,
+        is_favorite=listing.id in (favorite_ids or set()),
     ).model_dump(mode="json")
 
 
@@ -131,19 +190,59 @@ def serialize_mobile_listing_detail(listing, request) -> dict:
     ).model_dump(mode="json")
 
 
+def serialize_mobile_listing_map_item(listing, request, *, favorite_ids: set[int] | None = None) -> dict:
+    card = serialize_mobile_listing_card(listing, request, favorite_ids=favorite_ids)
+    return MobileListingMapItem(
+        **card,
+        contact_phone=getattr(settings, "PLATFORM_CONTACT_PHONE", "") or None,
+    ).model_dump(mode="json")
+
+
 class MobileHomeListingsView(BaseController):
     auth = ()
 
     def get(self, parsed_query: Query[MobileHomeFeedQuery]) -> dict:
+        user = get_optional_authenticated_user(self.request)
         filters = ListingFilters(**parsed_query.model_dump())
         qs = apply_listing_filters(published_listings_queryset(), filters, include_future_managed=True)
-        paginated = build_paginated_response_from_queryset(
-            qs,
-            parsed_query.page,
-            parsed_query.per_page,
-            lambda listing: serialize_mobile_listing_card(listing, self.request),
+        paginated = build_mobile_listing_paginated_response(
+            qs, parsed_query.page, parsed_query.per_page, self.request, user=user
         )
         return self.ok(paginated)
+
+
+class MobileHomeListingMapView(BaseController):
+    auth = ()
+    MAX_ITEMS = 500
+
+    def get(self, parsed_query: Query[MobileHomeMapQuery]) -> dict:
+        user = get_optional_authenticated_user(self.request)
+        min_lon, min_lat, max_lon, max_lat = parse_bbox(parsed_query.bbox)
+        filters = ListingFilters(**parsed_query.model_dump(exclude={"bbox"}))
+        qs = apply_listing_filters(published_listings_queryset(), filters, include_future_managed=True)
+        qs = (
+            qs.filter(
+                property__map_lat__gte=min_lat,
+                property__map_lat__lte=max_lat,
+                property__map_lon__gte=min_lon,
+                property__map_lon__lte=max_lon,
+            )
+            .exclude(property__map_lat__isnull=True)
+            .exclude(property__map_lon__isnull=True)
+            .order_by("-is_featured", "-created_at", "-id")
+        )
+        count = qs.count()
+        listings = list(qs[: self.MAX_ITEMS])
+        favorite_ids = FavoriteListingService.favorite_ids_for_listings(user, [listing.id for listing in listings])
+        items = [
+            serialize_mobile_listing_map_item(listing, self.request, favorite_ids=favorite_ids) for listing in listings
+        ]
+        data = MobileListingMapResponse(
+            items=items,
+            count=count,
+            truncated=count > self.MAX_ITEMS,
+        )
+        return self.ok(data.model_dump(mode="json"))
 
 
 class MobileHomeListingDetailView(BaseController):
@@ -181,6 +280,7 @@ class MobileHomeFiltersView(BaseController):
         districts = [{"id": district.id, "name": district.name} for district in District.objects.order_by("name")]
         tariffs = [{"value": value, "label": str(_(label))} for value, label in TariffChoices.CHOICES]
         furnishings = [{"value": value, "label": str(_(label))} for value, label in FurnishingType.CHOICES]
+        property_types = [{"value": value, "label": str(_(label))} for value, label in PropertyType.CHOICES]
         price = {
             "min": float(price_bounds["min"]) if price_bounds["min"] is not None else None,
             "max": float(price_bounds["max"]) if price_bounds["max"] is not None else None,
@@ -194,6 +294,7 @@ class MobileHomeFiltersView(BaseController):
                 "districts": districts,
                 "tariffs": tariffs,
                 "furnishings": furnishings,
+                "property_types": property_types,
                 "price": price,
                 "rooms": rooms,
             }

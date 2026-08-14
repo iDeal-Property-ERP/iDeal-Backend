@@ -11,7 +11,7 @@ from .contract import (
 from .finance import ExchangeRateFactory, PaymentFactory, PayoutScheduleFactory
 from .inventory import InventoryActFactory, InventoryActItemFactory, InventoryActPhotoFactory
 from .maintenance import ServiceRequestCommentFactory, ServiceRequestFactory, ServiceRequestPhotoFactory
-from .marketplace import BookingFactory, ListingFactory, ViewingRequestFactory
+from .marketplace import BookingFactory, FavoriteListingFactory, ListingFactory, ViewingRequestFactory
 from .notification import DeviceTokenFactory, NotificationFactory, NotificationPreferenceFactory
 from .property import DistrictFactory, PropertyFactory, PropertyPhotoFactory, VerificationVisitFactory
 from .vas import ServiceCatalogItemFactory, ServiceOrderFactory
@@ -39,6 +39,7 @@ __all__ = [
     "ServiceRequestFactory",
     "ServiceRequestPhotoFactory",
     "ListingFactory",
+    "FavoriteListingFactory",
     "ViewingRequestFactory",
     "BookingFactory",
     "ConversationFactory",

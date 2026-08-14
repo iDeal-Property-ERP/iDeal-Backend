@@ -1,5 +1,5 @@
 import factory
-from marketplace.models import Booking, Listing, ViewingRequest
+from marketplace.models import Booking, FavoriteListing, Listing, ViewingRequest
 
 from core.constants import BookingStatus, ViewingRequestStatus
 
@@ -45,3 +45,11 @@ class BookingFactory(factory.django.DjangoModelFactory):
     monthly_rent_offer = 550.00
     status = BookingStatus.REQUESTED
     message = factory.Faker("text", max_nb_chars=120)
+
+
+class FavoriteListingFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = FavoriteListing
+
+    user = factory.SubFactory(TenantFactory)
+    listing = factory.SubFactory(ListingFactory)
