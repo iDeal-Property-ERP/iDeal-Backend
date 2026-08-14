@@ -275,6 +275,7 @@ class BookViewingView(GenericController):
 class ContactInquiryView(BaseController):
     auth = ()
 
+    @rate_limit(requests=3, window_seconds=3600)
     def post(self, parsed_body: Body[ContactInquiryCreateInput]) -> dict:
         from account.models import User
         from notification.services import notify

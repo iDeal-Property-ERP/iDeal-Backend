@@ -1,4 +1,3 @@
-import re
 import uuid
 from http import HTTPStatus
 
@@ -19,25 +18,15 @@ from api.v1.mobile.auth.schemas import OTPRequestInput, OTPVerifyInput
 from core.api.mixins import JWTMixin
 from core.api.views import BaseController
 from core.constants import UserRole
+from core.utils.phone import normalize_uzbekistan_phone
 from core.utils.rate_limit import rate_limit
 
-PHONE_PATTERN = re.compile(r"\+998\d{9}\Z")
 otp_service = OTPService()
 
 
 def normalize_phone(phone: str) -> str:
-    if not isinstance(phone, str):
-        raise ValueError("phone must be a string")
-
-    normalized = re.sub(r"[\s\-()]", "", phone.strip())
-    if normalized.startswith("00"):
-        normalized = f"+{normalized[2:]}"
-    elif not normalized.startswith("+"):
-        normalized = f"+{normalized}"
-
-    if not PHONE_PATTERN.fullmatch(normalized):
-        raise ValueError("invalid phone number")
-    return normalized
+    """Backward-compatible mobile auth alias for the shared phone validator."""
+    return normalize_uzbekistan_phone(phone)
 
 
 def _invalid_phone(controller: BaseController):

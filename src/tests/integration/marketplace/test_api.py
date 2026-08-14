@@ -310,7 +310,13 @@ class TestMarketplaceLookups:
         assert "question" in body["data"][0]
 
     def test_create_inquiry(self, api_client):
+        from notification.models import Notification
+
+        from core.constants import UserRole
+        from tests.factories import UserFactory
+
         listing = _make_vacant_listing()
+        manager = UserFactory(role=UserRole.MANAGEMENT)
         payload = json.dumps(
             {
                 "listing_id": listing.id,
@@ -333,3 +339,34 @@ class TestMarketplaceLookups:
         from marketplace.models import ContactInquiry
 
         assert ContactInquiry.objects.filter(full_name="Curious Renter").exists()
+        assert Notification.objects.filter(
+            recipient=manager,
+            related_object_type="contact_inquiry",
+            related_object_id=body["data"]["id"],
+        ).exists()
+
+    def test_inquiry_normalizes_phone_and_is_rate_limited(self, api_client):
+        from django.core.cache import cache
+
+        cache.clear()
+        payload = {
+            "full_name": "Curious Renter",
+            "phone": "998 90 111-22-33",
+            "message": "Please contact me.",
+        }
+        for _ in range(3):
+            response = api_client.post(
+                "/api/v1/marketplace/inquiries/",
+                json.dumps(payload),
+                content_type="application/json",
+            )
+            assert response.status_code == 201
+            assert response.json()["data"]["phone"] == "+998901112233"
+
+        limited = api_client.post(
+            "/api/v1/marketplace/inquiries/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert limited.status_code == 429
+        assert limited.json()["error"] == "rate_limit_exceeded"

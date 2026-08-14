@@ -40,34 +40,34 @@ class OTPService:
         return f"{secrets.randbelow(1_000_000):06d}"
 
     @staticmethod
-    def _otp_cache_key(phone: str) -> str:
-        return f"otp:code:{phone}"
+    def _otp_cache_key(phone: str, purpose: str) -> str:
+        return f"otp:code:{purpose}:{phone}"
 
     @staticmethod
-    def _otp_attempts_cache_key(phone: str) -> str:
-        return f"otp_attempts:{phone}"
+    def _otp_attempts_cache_key(phone: str, purpose: str) -> str:
+        return f"otp_attempts:{purpose}:{phone}"
 
-    def set_otp(self, phone: str, code: str, ttl: int = OTP_TTL) -> None:
-        self.cache.set(self._otp_cache_key(phone), code, timeout=ttl)
+    def set_otp(self, phone: str, code: str, ttl: int = OTP_TTL, *, purpose: str = "login") -> None:
+        self.cache.set(self._otp_cache_key(phone, purpose), code, timeout=ttl)
 
-    def get_otp(self, phone: str) -> str | None:
-        return self.cache.get(self._otp_cache_key(phone))
+    def get_otp(self, phone: str, *, purpose: str = "login") -> str | None:
+        return self.cache.get(self._otp_cache_key(phone, purpose))
 
-    def pop_otp(self, phone: str) -> str | None:
-        code = self.get_otp(phone)
-        self.cache.delete(self._otp_cache_key(phone))
+    def pop_otp(self, phone: str, *, purpose: str = "login") -> str | None:
+        code = self.get_otp(phone, purpose=purpose)
+        self.cache.delete(self._otp_cache_key(phone, purpose))
         return code
 
-    def get_otp_attempts(self, phone: str) -> int:
-        return int(self.cache.get(self._otp_attempts_cache_key(phone), 0) or 0)
+    def get_otp_attempts(self, phone: str, *, purpose: str = "login") -> int:
+        return int(self.cache.get(self._otp_attempts_cache_key(phone, purpose), 0) or 0)
 
-    def increment_otp_attempts(self, phone: str, ttl: int = OTP_TTL) -> int:
-        attempts = min(self.get_otp_attempts(phone) + 1, OTP_ATTEMPT_LIMIT)
-        self.cache.set(self._otp_attempts_cache_key(phone), attempts, timeout=ttl)
+    def increment_otp_attempts(self, phone: str, ttl: int = OTP_TTL, *, purpose: str = "login") -> int:
+        attempts = min(self.get_otp_attempts(phone, purpose=purpose) + 1, OTP_ATTEMPT_LIMIT)
+        self.cache.set(self._otp_attempts_cache_key(phone, purpose), attempts, timeout=ttl)
         return attempts
 
-    def clear_otp_attempts(self, phone: str) -> None:
-        self.cache.delete(self._otp_attempts_cache_key(phone))
+    def clear_otp_attempts(self, phone: str, *, purpose: str = "login") -> None:
+        self.cache.delete(self._otp_attempts_cache_key(phone, purpose))
 
     def dispatch(self, phone: str, code: str, channel: str) -> None:
         if settings.OTP_DEV_BYPASS_CODE:

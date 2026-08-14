@@ -41,5 +41,8 @@ def rate_limit(requests: int, window_seconds: int):
 
             return func(self, *args, **kwargs)
 
+        # DMR resolves postponed Body/Query annotations against the decorated
+        # method globals. Keep those controller imports available on wrapper.
+        wrapper.__globals__.update(func.__globals__)
         return wrapper
     return decorator

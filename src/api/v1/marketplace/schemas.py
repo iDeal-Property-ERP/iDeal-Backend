@@ -111,10 +111,19 @@ class ViewingRequestOutput(pydantic.BaseModel):
 
 class ContactInquiryCreateInput(pydantic.BaseModel):
     listing_id: int | None = None
-    full_name: str
+    full_name: str = pydantic.Field(min_length=1, max_length=150)
     phone: str
     email: str | None = None
-    message: str
+    message: str = pydantic.Field(min_length=1, max_length=2000)
+
+    model_config = pydantic.ConfigDict(str_strip_whitespace=True)
+
+    @pydantic.field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, value: str) -> str:
+        from core.utils.phone import normalize_uzbekistan_phone
+
+        return normalize_uzbekistan_phone(value)
 
 
 class ContactInquiryOutput(pydantic.BaseModel):

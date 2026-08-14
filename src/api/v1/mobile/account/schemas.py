@@ -1,3 +1,5 @@
+from typing import Literal
+
 import pydantic
 
 
@@ -27,3 +29,13 @@ class MobileUserMeUpdateInput(pydantic.BaseModel):
     @classmethod
     def blank_optional_fields_are_null(cls, value: str | None) -> str | None:
         return value or None
+
+
+class AccountDeletionOTPRequestInput(pydantic.BaseModel):
+    channel: Literal["sms", "telegram"] = "telegram"
+
+
+class AccountDeletionConfirmInput(pydantic.BaseModel):
+    code: str = pydantic.Field(min_length=6, max_length=6)
+
+    model_config = pydantic.ConfigDict(str_strip_whitespace=True)
