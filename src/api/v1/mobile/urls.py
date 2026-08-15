@@ -1,3 +1,4 @@
+# pi-lens-ignore: reportMissingImports
 from django.urls import include, path
 
 app_name = "mobile"
@@ -14,4 +15,5 @@ urlpatterns = [
     path(
         "notification-settings/", include("api.v1.mobile.notification_settings.urls", namespace="notification-settings")
     ),
+    path("support/", include("api.v1.mobile.support.urls", namespace="support")),
 ]

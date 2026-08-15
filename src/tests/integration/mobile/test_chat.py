@@ -6,6 +6,7 @@ import pytest
 from chat.models import Conversation, Message
 from chat.services import mark_read
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from property.models import PropertyPhoto
 
 from core.constants import ChatSenderSide, ListingStatus
@@ -140,6 +141,51 @@ class TestMobileChatOpenAndListAPI:
         assert active_ids == {active.id}
         assert archived_ids == {archived.id}
         assert other_conversation.id not in active_ids | archived_ids
+
+    def test_list_pagination_is_deterministic_and_separates_archived_rows(self, api_client):
+        user = TenantFactory()
+        active = [_conversation(user) for _ in range(5)]
+        archived = [_conversation(user) for _ in range(3)]
+        Conversation.objects.filter(id__in=[item.id for item in archived]).update(
+            user_archived_at=timezone.now(),
+        )
+
+        active_page_1 = api_client.get(
+            f"{self.base_url}conversations/",
+            {"page": 1, "per_page": 2},
+            **_make_jwt(user),
+        )
+        active_page_2 = api_client.get(
+            f"{self.base_url}conversations/",
+            {"page": 2, "per_page": 2},
+            **_make_jwt(user),
+        )
+        archived_page_1 = api_client.get(
+            f"{self.base_url}conversations/",
+            {"archived": "true", "page": 1, "per_page": 2},
+            **_make_jwt(user),
+        )
+
+        assert active_page_1.status_code == 200
+        assert active_page_2.status_code == 200
+        assert archived_page_1.status_code == 200
+
+        active_page_1_data = active_page_1.json()["data"]
+        active_page_2_data = active_page_2.json()["data"]
+        archived_page_1_data = archived_page_1.json()["data"]
+        active_page_1_ids = [item["id"] for item in active_page_1_data["page"]["object_list"]]
+        active_page_2_ids = [item["id"] for item in active_page_2_data["page"]["object_list"]]
+        archived_page_1_ids = [item["id"] for item in archived_page_1_data["page"]["object_list"]]
+
+        assert active_page_1_ids == sorted((item.id for item in active), reverse=True)[:2]
+        assert active_page_2_ids == sorted((item.id for item in active), reverse=True)[2:4]
+        assert len(active_page_1_ids + active_page_2_ids) == len(set(active_page_1_ids + active_page_2_ids))
+        assert set(active_page_1_ids + active_page_2_ids).isdisjoint(archived_page_1_ids)
+        assert archived_page_1_ids == sorted((item.id for item in archived), reverse=True)[:2]
+        assert active_page_1_data["page"]["number"] == 1
+        assert active_page_2_data["page"]["number"] == 2
+        assert active_page_1_data["num_pages"] == 3
+        assert archived_page_1_data["num_pages"] == 2
 
 
 @pytest.mark.django_db

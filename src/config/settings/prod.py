@@ -26,5 +26,5 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
-_cors_origins = config("CORS_ALLOWED_ORIGINS", default="")
+_cors_origins = str(config("CORS_ALLOWED_ORIGINS", default=""))
 CORS_ALLOWED_ORIGINS = [o for o in _cors_origins.split(",") if o]

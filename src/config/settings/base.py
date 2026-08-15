@@ -1,6 +1,7 @@
 from datetime import timedelta
 from pathlib import Path
 
+# pi-lens-ignore: reportMissingImports
 import dj_database_url
 from decouple import config
 from dmr.openapi.config import OpenAPIConfig
@@ -13,7 +14,7 @@ _secret_key = config("SECRET_KEY", default="django-insecure-change-me-in-product
 if not DEBUG and _secret_key == "django-insecure-change-me-in-production":
     raise RuntimeError("SECRET_KEY must be set to a secure value in production (DEBUG=False)")
 SECRET_KEY = _secret_key
-_allowed_hosts_raw = config("ALLOWED_HOSTS", default="localhost,127.0.0.1")
+_allowed_hosts_raw = str(config("ALLOWED_HOSTS", default="localhost,127.0.0.1"))
 ALLOWED_HOSTS = [h for h in _allowed_hosts_raw.split(",") if h]
 DATABASE_URL = f"postgres://{config('POSTGRES_USER')}:{config('POSTGRES_PASSWORD')}@{config('POSTGRES_HOST')}/{config('POSTGRES_DB')}"
 
@@ -162,6 +163,8 @@ FCM_PROJECT_ID = config("FCM_PROJECT_ID", default="")
 
 CHAT_MAX_IMAGE_BYTES = config("CHAT_MAX_IMAGE_BYTES", default=5 * 1024 * 1024, cast=int)
 PLATFORM_CONTACT_PHONE = config("PLATFORM_CONTACT_PHONE", default="")
+SUPPORT_TELEGRAM_URL = config("SUPPORT_TELEGRAM_URL", default="")
+SUPPORT_WHATSAPP_URL = config("SUPPORT_WHATSAPP_URL", default="")
 
 # Hosted booking payments. Providers stay hidden until both their deployment
 # configuration and enable flag are present.

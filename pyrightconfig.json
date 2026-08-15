@@ -1,0 +1,13 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": [
+    "src",
+    "src/apps",
+    ".venv/lib/python3.14/site-packages"
+  ],
+  "reportMissingImports": false,
+  "reportMissingModuleSource": false,
+  "reportMissingTypeStubs": false,
+  "reportReturnType": false
+}
