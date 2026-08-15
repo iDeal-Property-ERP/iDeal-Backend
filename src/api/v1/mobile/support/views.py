@@ -1,4 +1,3 @@
-# pi-lens-ignore: reportMissingImports
 from django.conf import settings
 
 from api.v1.mobile.support.schemas import MobileSupportLinksOutput

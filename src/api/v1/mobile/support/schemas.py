@@ -1,4 +1,3 @@
-# pi-lens-ignore: reportMissingImports
 import pydantic
 
 

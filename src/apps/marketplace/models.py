@@ -358,9 +358,7 @@ class PaymentCheckout(TimestampedModel, SoftDeleteModel):
         verbose_name_plural = _("Payment Checkouts")
         ordering = ["-created_at"]
         db_table = "payment_checkouts"
-        constraints = [
-            models.UniqueConstraint(fields=["tenant", "idempotency_key"], name="unique_tenant_checkout_key")
-        ]
+        constraints = [models.UniqueConstraint(fields=["tenant", "idempotency_key"], name="unique_tenant_checkout_key")]
         indexes = [models.Index(fields=["status", "expires_at"]), models.Index(fields=["provider", "external_id"])]
 
 
@@ -377,6 +375,4 @@ class ProviderEvent(TimestampedModel, SoftDeleteModel):
         verbose_name_plural = _("Provider Events")
         ordering = ["created_at"]
         db_table = "provider_events"
-        constraints = [
-            models.UniqueConstraint(fields=["provider", "external_event_id"], name="unique_provider_event")
-        ]
+        constraints = [models.UniqueConstraint(fields=["provider", "external_event_id"], name="unique_provider_event")]

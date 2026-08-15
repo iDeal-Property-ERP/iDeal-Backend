@@ -1,4 +1,3 @@
-# pi-lens-ignore: reportMissingImports
 import pytest
 from django.test import override_settings
 
