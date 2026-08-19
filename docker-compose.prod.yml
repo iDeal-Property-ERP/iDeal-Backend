@@ -32,6 +32,7 @@ services:
     command: python manage.py qcluster
     volumes:
       - app_data:/app/cdn
+      - ./.secrets:/app/.secrets:ro
     depends_on:
       - db
       - redis
@@ -48,6 +49,7 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings.prod
     volumes:
       - app_data:/app/cdn
+      - ./.secrets:/app/.secrets:ro
     ports:
         - "127.0.0.1:${APP_PORT}:8000"
     healthcheck:

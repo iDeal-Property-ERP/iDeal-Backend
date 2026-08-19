@@ -25,6 +25,7 @@ services:
     command: python manage.py qcluster
     volumes:
       - ./cdn:/cdn
+      - ./.secrets:/app/.secrets:ro
     depends_on:
       - db
       - redis
@@ -39,6 +40,7 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings.dev
     volumes:
       - ./cdn:/cdn
+      - ./.secrets:/app/.secrets:ro
     ports:
       - "8005:8000"
     depends_on:
