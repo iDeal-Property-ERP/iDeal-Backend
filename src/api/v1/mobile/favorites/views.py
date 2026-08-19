@@ -1,11 +1,14 @@
 from http import HTTPStatus
+from typing import Literal
 
 import pydantic
 from django.core.paginator import Paginator
 from dmr import Path, Query, modify
 from dmr.pagination import Page, Paginated
 from marketplace.services.favorites import FavoriteListingService
+from marketplace.services.listings import ListingFilters
 
+from api.v1.mobile.home.schemas import MobileHomeFeedQuery
 from api.v1.mobile.home.views import serialize_mobile_listing_card
 from core.api.views import BaseController
 
@@ -14,14 +17,16 @@ class FavoriteListingPath(pydantic.BaseModel):
     listing_id: int
 
 
-class FavoriteListingQuery(pydantic.BaseModel):
-    page: int = 1
-    per_page: int = 20
+class FavoriteListingQuery(MobileHomeFeedQuery):
+    sort: Literal["recent", "price_asc", "price_desc"] = "recent"
 
 
 class MobileFavoriteListView(BaseController):
     def get(self, parsed_query: Query[FavoriteListingQuery]) -> dict:
-        queryset = FavoriteListingService.paged_favorites_queryset(self.request.user)
+        filters = ListingFilters(**parsed_query.model_dump(exclude={"sort"}))
+        queryset = FavoriteListingService.paged_favorites_queryset(
+            self.request.user, filters, sort=parsed_query.sort
+        )
         paginator = Paginator(queryset, parsed_query.per_page)
         django_page = paginator.get_page(parsed_query.page)
         favorites = list(django_page.object_list)

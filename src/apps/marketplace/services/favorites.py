@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from django.db import IntegrityError, transaction
 from django.db.models import Subquery
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from marketplace.models import FavoriteListing, Listing
 from marketplace.services.listings import ListingFilters, apply_listing_filters, published_listings_queryset
 
 
 class FavoriteListingService:
+    @staticmethod
+    def favorite_listing_ids(user):
+        return FavoriteListing.objects.filter(user=user).values("listing_id")
+
     @staticmethod
     def favorite_ids_for_listings(user, listing_ids: list[int]) -> set[int]:
         if user is None or not listing_ids:
@@ -71,16 +76,22 @@ class FavoriteListingService:
         return True
 
     @staticmethod
-    def paged_favorites_queryset(user):
-        favorite_listing_ids = FavoriteListing.objects.filter(user=user).values("listing_id")
+    def paged_favorites_queryset(user, filters: ListingFilters | None = None, *, sort: str = "recent"):
+        filters = filters or ListingFilters()
         eligible_listing_ids = apply_listing_filters(
-            published_listings_queryset().filter(id__in=Subquery(favorite_listing_ids)),
-            ListingFilters(),
+            published_listings_queryset().filter(id__in=Subquery(FavoriteListingService.favorite_listing_ids(user))),
+            filters,
             include_future_managed=True,
         ).values("id")
-        return (
+        queryset = (
             FavoriteListing.objects.filter(user=user, listing_id__in=Subquery(eligible_listing_ids))
             .select_related("listing__property__district")
             .prefetch_related("listing__property__photos", "listing__property__amenities")
-            .order_by("-created_at", "-id")
         )
+        if sort in {"price_asc", "price_desc"}:
+            queryset = queryset.annotate(
+                _price=Coalesce("listing__monthly_price", "listing__listed_price")
+            ).order_by(("-" if sort == "price_desc" else "") + "_price", "-created_at", "-id")
+        else:
+            queryset = queryset.order_by("-created_at", "-id")
+        return queryset

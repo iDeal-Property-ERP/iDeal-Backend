@@ -15,6 +15,39 @@ http:
   - name: per_page
     value: '20'
     type: query
+  - name: q
+    value: loft
+    type: query
+  - name: district_id
+    value: '1'
+    type: query
+  - name: property_type
+    value: apartment
+    type: query
+  - name: price_min
+    value: '300'
+    type: query
+  - name: price_max
+    value: '800'
+    type: query
+  - name: rooms_min
+    value: '1'
+    type: query
+  - name: rooms_max
+    value: '3'
+    type: query
+  - name: verified
+    value: 'True'
+    type: query
+  - name: furnishing
+    value: furnished
+    type: query
+  - name: tariff
+    value: standard
+    type: query
+  - name: sort
+    value: recent
+    type: query
 settings:
   encodeUrl: true
   timeout: 0
@@ -37,10 +70,34 @@ docs: '# GET /api/v1/mobile/favorites/
 
   | `per_page` | query | no | `20` | Defaults to `20`. |
 
+  | `q` | query | no | `loft` | Case-insensitive match on title, address, or district. |
 
-  Returns the mobile home card schema ordered by favorite `created_at` descending.
-  Uses the same public availability rules as Home and silently omits favorites whose
-  listings are no longer eligible. Every returned card includes `is_favorite=true`.
+  | `district_id` | query | no | `1` | Filters by property district. |
+
+  | `property_type` | query | no | `apartment` | Filters by property type. |
+
+  | `price_min` | query | no | `300` | Lower bound on effective monthly price. |
+
+  | `price_max` | query | no | `800` | Upper bound on effective monthly price. |
+
+  | `rooms_min` | query | no | `1` | Lower bound on room count. |
+
+  | `rooms_max` | query | no | `3` | Upper bound on room count. |
+
+  | `verified` | query | no | `True` | Filters on property verification. |
+
+  | `furnishing` | query | no | `furnished` | Filters on furnishing type. |
+
+  | `tariff` | query | no | `standard` | Filters on tariff tier. |
+
+  | `sort` | query | no | `recent` | `recent` (default, favorite recency), `price_asc`, or `price_desc`. |
+
+
+  Returns the mobile home card schema ordered by the requested sort (favorite
+  `created_at` descending by default). Uses the same public availability rules as
+  Home and the same filter semantics as the mobile home feed; silently omits
+  favorites whose listings are no longer eligible. Every returned card includes
+  `is_favorite=true`.
 
 
   ## Saved examples

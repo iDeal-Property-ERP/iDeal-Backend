@@ -44,6 +44,7 @@ class MobileHomeFeedQuery(pydantic.BaseModel):
 
 class MobileHomeMapQuery(pydantic.BaseModel):
     bbox: str
+    favorites_only: bool = False
     q: str | None = None
     district_id: int | None = None
     property_type: str | None = None

@@ -11,6 +11,7 @@ from marketplace.services.favorites import FavoriteListingService
 
 from core.constants import ListingStatus, PropertyEngagementType, PropertyStatus
 from tests.factories import (
+    DistrictFactory,
     FavoriteListingFactory,
     ListingFactory,
     OwnerAgreementFactory,
@@ -21,6 +22,7 @@ from tests.factories import (
 pytestmark = pytest.mark.django_db
 
 FAVORITES_URL = "/api/v1/mobile/favorites/"
+MAP_URL = "/api/v1/mobile/home/listings/map/"
 
 
 def _make_jwt(user):
@@ -185,6 +187,178 @@ class TestMobileFavoritesList:
             ]
         ).count() == 4
         assert FavoriteListing.global_objects.filter(pk=soft_deleted_favorite.pk).exists()
+
+
+class TestMobileFavoritesListFilters:
+    @staticmethod
+    def _favorite_with_price(tenant, price):
+        # The auto-created listing gets monthly_price=ask_price, and every price
+        # filter/sort prefers monthly_price over listed_price.
+        listing = _visible_listing()
+        listing.monthly_price = price
+        listing.save(update_fields=["monthly_price", "updated_at"])
+        return FavoriteListingFactory(user=tenant, listing=listing)
+
+    @staticmethod
+    def _returned_ids(response):
+        return {item["id"] for item in response.json()["data"]["page"]["object_list"]}
+
+    @staticmethod
+    def _ordered_ids(response):
+        return [item["id"] for item in response.json()["data"]["page"]["object_list"]]
+
+    def test_search_matches_name_address_and_district(self, api_client):
+        tenant = TenantFactory()
+        district = DistrictFactory(name="Yunusabad")
+        by_name = FavoriteListingFactory(user=tenant, listing=_visible_listing(name="Fancy Loft"))
+        by_address = FavoriteListingFactory(user=tenant, listing=_visible_listing(name="Plain House", address="12 Amir Temur Street"))
+        by_district = FavoriteListingFactory(user=tenant, listing=_visible_listing(name="Plain Flat", address="9 Navoi Street", district=district))
+        FavoriteListingFactory(
+            user=tenant,
+            listing=_visible_listing(name="Basic Flat", address="5 Somewhere Road", district=DistrictFactory(name="Chilonzor")),
+        )
+
+        for query, expected in (
+            ("fancy", {by_name.listing_id}),
+            ("amir temur", {by_address.listing_id}),
+            ("yunusabad", {by_district.listing_id}),
+        ):
+            response = api_client.get(FAVORITES_URL, {"q": query}, **_make_jwt(tenant))
+
+            assert response.status_code == 200
+            assert self._returned_ids(response) == expected
+
+    def test_price_range_filters_favorites(self, api_client):
+        tenant = TenantFactory()
+        self._favorite_with_price(tenant, 400)
+        matching = self._favorite_with_price(tenant, 600)
+        self._favorite_with_price(tenant, 800)
+
+        response = api_client.get(FAVORITES_URL, {"price_min": 500, "price_max": 700}, **_make_jwt(tenant))
+
+        assert response.status_code == 200
+        assert self._returned_ids(response) == {matching.listing_id}
+
+    def test_district_and_verified_filters(self, api_client):
+        tenant = TenantFactory()
+        district = DistrictFactory(name="Filter District")
+        verified_in_district = FavoriteListingFactory(
+            user=tenant, listing=_visible_listing(district=district, is_verified=True)
+        )
+        unverified_elsewhere = FavoriteListingFactory(user=tenant, listing=_visible_listing())
+
+        district_response = api_client.get(FAVORITES_URL, {"district_id": district.id}, **_make_jwt(tenant))
+        verified_response = api_client.get(FAVORITES_URL, {"verified": "true"}, **_make_jwt(tenant))
+        unverified_response = api_client.get(FAVORITES_URL, {"verified": "false"}, **_make_jwt(tenant))
+
+        assert district_response.status_code == 200
+        assert self._returned_ids(district_response) == {verified_in_district.listing_id}
+        assert verified_response.status_code == 200
+        assert self._returned_ids(verified_response) == {verified_in_district.listing_id}
+        assert unverified_response.status_code == 200
+        assert self._returned_ids(unverified_response) == {unverified_elsewhere.listing_id}
+
+    def test_sort_by_price_ignores_like_recency(self, api_client):
+        tenant = TenantFactory()
+        # Favorited priciest-first so like-recency order differs from price order.
+        expensive = self._favorite_with_price(tenant, 800)
+        cheapest = self._favorite_with_price(tenant, 400)
+        middle = self._favorite_with_price(tenant, 600)
+
+        ascending = api_client.get(FAVORITES_URL, {"sort": "price_asc"}, **_make_jwt(tenant))
+        descending = api_client.get(FAVORITES_URL, {"sort": "price_desc"}, **_make_jwt(tenant))
+        recent = api_client.get(FAVORITES_URL, {"sort": "recent"}, **_make_jwt(tenant))
+
+        assert self._ordered_ids(ascending) == [cheapest.listing_id, middle.listing_id, expensive.listing_id]
+        assert self._ordered_ids(descending) == [expensive.listing_id, middle.listing_id, cheapest.listing_id]
+        assert self._ordered_ids(recent) == [middle.listing_id, cheapest.listing_id, expensive.listing_id]
+
+    def test_filter_combines_with_pagination(self, api_client):
+        tenant = TenantFactory()
+        self._favorite_with_price(tenant, 100)
+        mid = self._favorite_with_price(tenant, 200)
+        top = self._favorite_with_price(tenant, 300)
+        query = {"price_min": 200, "per_page": 1, "sort": "price_asc"}
+
+        first_page = api_client.get(FAVORITES_URL, {**query, "page": 1}, **_make_jwt(tenant))
+        second_page = api_client.get(FAVORITES_URL, {**query, "page": 2}, **_make_jwt(tenant))
+
+        assert first_page.status_code == 200
+        data = first_page.json()["data"]
+        assert data["count"] == 2
+        assert data["num_pages"] == 2
+        assert [item["id"] for item in data["page"]["object_list"]] == [mid.listing_id]
+        assert [item["id"] for item in second_page.json()["data"]["page"]["object_list"]] == [top.listing_id]
+
+    def test_filter_can_yield_empty_result(self, api_client):
+        tenant = TenantFactory()
+        self._favorite_with_price(tenant, 400)
+
+        response = api_client.get(FAVORITES_URL, {"price_max": 1}, **_make_jwt(tenant))
+
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["count"] == 0
+        assert data["page"]["object_list"] == []
+
+
+class TestMobileFavoritesMap:
+    BBOX = "69,41,70,42"
+
+    def _map_query(self, **extra):
+        return {"bbox": self.BBOX, "favorites_only": "true", **extra}
+
+    def test_favorites_only_requires_authentication(self, api_client):
+        response = api_client.get(MAP_URL, self._map_query())
+
+        assert response.status_code == 401
+        assert response.json() == {
+            "success": False,
+            "message": "Not authenticated",
+            "error": "Not authenticated",
+        }
+
+    def test_favorites_only_returns_only_favorites_inside_bbox(self, api_client):
+        tenant = TenantFactory()
+        inside_favorite = FavoriteListingFactory(
+            user=tenant, listing=_visible_listing(map_lat=41.31, map_lon=69.28)
+        )
+        FavoriteListingFactory(user=tenant, listing=_visible_listing(map_lat=40.5, map_lon=68.5))
+        _visible_listing(map_lat=41.32, map_lon=69.29)
+
+        response = api_client.get(MAP_URL, self._map_query(), **_make_jwt(tenant))
+
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert {item["id"] for item in data["items"]} == {inside_favorite.listing_id}
+        assert data["count"] == 1
+        assert all(item["is_favorite"] is True for item in data["items"])
+
+    def test_favorites_only_applies_search_filter(self, api_client):
+        tenant = TenantFactory()
+        match = FavoriteListingFactory(
+            user=tenant, listing=_visible_listing(name="Map Loft", map_lat=41.31, map_lon=69.28)
+        )
+        FavoriteListingFactory(
+            user=tenant, listing=_visible_listing(name="Other Flat", map_lat=41.32, map_lon=69.29)
+        )
+
+        response = api_client.get(MAP_URL, self._map_query(q="loft"), **_make_jwt(tenant))
+
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert {item["id"] for item in data["items"]} == {match.listing_id}
+
+    def test_map_without_favorites_only_keeps_public_behaviour(self, api_client):
+        tenant = TenantFactory()
+        FavoriteListingFactory(user=tenant, listing=_visible_listing(map_lat=41.31, map_lon=69.28))
+        unfavored = _visible_listing(map_lat=41.32, map_lon=69.29)
+
+        response = api_client.get(MAP_URL, {"bbox": self.BBOX}, **_make_jwt(tenant))
+
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert unfavored.id in {item["id"] for item in data["items"]}
 
 
 class TestMobileFavoriteToggle:

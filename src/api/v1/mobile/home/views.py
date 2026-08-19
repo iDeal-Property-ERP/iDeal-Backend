@@ -1,6 +1,8 @@
+from http import HTTPStatus
+
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db.models import Max, Min
+from django.db.models import Max, Min, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Path, Query
@@ -205,9 +207,17 @@ class MobileHomeListingMapView(BaseController):
 
     def get(self, parsed_query: Query[MobileHomeMapQuery]) -> dict:
         user = get_optional_authenticated_user(self.request)
+        if parsed_query.favorites_only and user is None:
+            return self.fail(
+                error="Not authenticated",
+                message="Not authenticated",
+                status_code=HTTPStatus.UNAUTHORIZED,
+            )
         min_lon, min_lat, max_lon, max_lat = parse_bbox(parsed_query.bbox)
-        filters = ListingFilters(**parsed_query.model_dump(exclude={"bbox"}))
+        filters = ListingFilters(**parsed_query.model_dump(exclude={"bbox", "favorites_only"}))
         qs = apply_listing_filters(published_listings_queryset(), filters, include_future_managed=True)
+        if parsed_query.favorites_only:
+            qs = qs.filter(pk__in=Subquery(FavoriteListingService.favorite_listing_ids(user)))
         qs = (
             qs.filter(
                 property__map_lat__gte=min_lat,

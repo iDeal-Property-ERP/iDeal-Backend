@@ -41,6 +41,9 @@ http:
   - name: tariff
     value: standard
     type: query
+  - name: favorites_only
+    value: 'False'
+    type: query
 settings:
   encodeUrl: true
   timeout: 0
@@ -49,7 +52,7 @@ settings:
 docs: '# GET /api/v1/mobile/home/listings/map/
 
 
-  Authentication: **none**.
+  Authentication: **none** (bearer required when `favorites_only=true`).
 
 
   ## Request field notes
@@ -91,6 +94,10 @@ docs: '# GET /api/v1/mobile/home/listings/map/
 
   | `tariff` | query | no | `fixture-value` | non-nullable; fixture value; replace
   with a real ID when running. |
+
+  | `favorites_only` | query | no | `False` | When `true`, requires authentication
+  and restricts results to the authenticated user''s eligible favorites; other
+  filters still apply. |
 
 
   ## Saved examples
