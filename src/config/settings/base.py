@@ -146,6 +146,8 @@ PROJECT_NAME = config("PROJECT_NAME", default="iDeal Backend")
 # OTP delivery
 OTP_DEV_BYPASS_CODE = config("OTP_DEV_BYPASS_CODE", default="")
 RATE_LIMIT_ENABLED = True
+OTP_TELEGRAM_ENABLED = config("OTP_TELEGRAM_ENABLED", default=True, cast=bool)
+OTP_SMS_ENABLED = config("OTP_SMS_ENABLED", default=True, cast=bool)
 
 ## Eskiz SMS
 ESKIZ_EMAIL = config("ESKIZ_EMAIL", default="")
@@ -180,6 +182,12 @@ CLICK_CHECKOUT_URL = config("CLICK_CHECKOUT_URL", default="https://my.click.uz/s
 STRIPE_ENABLED = config("STRIPE_ENABLED", default=False, cast=bool)
 STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", default="")
 STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET", default="")
+
+# Map Provider Configuration
+MAP_DEFAULT_PROVIDER = config("MAP_DEFAULT_PROVIDER", default="yandex")
+YANDEX_MAPKIT_API_KEY = config("YANDEX_MAPKIT_API_KEY", default="")
+GOOGLE_MAPS_API_KEY = config("GOOGLE_MAPS_API_KEY", default="")
+MAP_OBFUSCATION_SECRET = config("MAP_OBFUSCATION_SECRET", default="iDeal-Secret-Map-Seed-2025")
 
 CACHES = {
     "default": {

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 import pydantic
 
@@ -8,7 +8,7 @@ class MobileUserMeOutput(pydantic.BaseModel):
     first_name: str
     last_name: str | None
     patronymic: str | None
-    email: str
+    email: str | None = None
     phone: str | None
     nationality: str | None
     avatar_url: str | None
@@ -20,15 +20,18 @@ class MobileUserMeUpdateInput(pydantic.BaseModel):
     first_name: str = pydantic.Field(min_length=1, max_length=30)
     last_name: str | None = pydantic.Field(default=None, max_length=30)
     patronymic: str | None = pydantic.Field(default=None, max_length=100)
-    email: pydantic.EmailStr = pydantic.Field(max_length=254)
+    email: pydantic.EmailStr | None = pydantic.Field(default=None, max_length=254)
     nationality: str | None = pydantic.Field(default=None, max_length=50)
 
     model_config = pydantic.ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    @pydantic.field_validator("last_name", "patronymic", "nationality", mode="after")
+    @pydantic.field_validator("last_name", "patronymic", "email", "nationality", mode="before")
     @classmethod
-    def blank_optional_fields_are_null(cls, value: str | None) -> str | None:
-        return value or None
+    def blank_optional_fields_are_null(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            value = value.strip()
+            return value if value else None
+        return value
 
 
 class AccountDeletionOTPRequestInput(pydantic.BaseModel):

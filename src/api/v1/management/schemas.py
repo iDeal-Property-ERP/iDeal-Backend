@@ -29,7 +29,7 @@ class ManagementUserOutput(pydantic.BaseModel):
     patronymic: str | None
     username: str
     phone: str | None
-    email: str
+    email: str | None = None
     role: str
     is_active: bool
     is_verified: bool
@@ -86,9 +86,7 @@ class ManagementPropertyOutput(pydantic.BaseModel):
         photos = list(prop.photos.all())
         if not photos:
             return None
-        cover = next((p for p in photos if p.is_primary), None) or min(
-            photos, key=lambda p: (p.sort_order, p.id)
-        )
+        cover = next((p for p in photos if p.is_primary), None) or min(photos, key=lambda p: (p.sort_order, p.id))
         url = cover.image.url
         return request.build_absolute_uri(url) if request is not None else url
 

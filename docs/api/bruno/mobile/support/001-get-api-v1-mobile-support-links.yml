@@ -1,10 +1,10 @@
 info:
-  name: Get support links
+  name: List links
   type: http
   seq: 1
 http:
   method: GET
-  url: "{{base_url}}/api/v1/mobile/support/links/"
+  url: '{{base_url}}/api/v1/mobile/support/links/'
   auth:
     type: none
 settings:
@@ -12,7 +12,7 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-docs: "# GET /api/v1/mobile/support/links/
+docs: '# GET /api/v1/mobile/support/links/
 
 
   Authentication: **none**.
@@ -28,24 +28,21 @@ docs: "# GET /api/v1/mobile/support/links/
 
 
   Examples are static source-backed contract fixtures. Capture runtime responses with
-  the local environment when fixtures and providers are available."
+  the local environment when fixtures and providers are available.'
 examples:
-  - name: success
-    request:
-      url: "{{base_url}}/api/v1/mobile/support/links/"
-      method: GET
-      headers:
-        - name: accept
-          value: application/json
-    response:
-      status: 200
-      statusText: OK
-      headers:
-        - name: content-type
-          value: application/json
-      body:
-        type: json
-        data:
-          "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"\
-          telegram_url\": \"https://t.me/ideal_support\",\n    \"whatsapp_url\": \"\
-          https://wa.me/998901234567\"\n  }\n}"
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/support/links/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"

@@ -10,7 +10,7 @@ class UserMeOutput(pydantic.BaseModel):
     patronymic: str | None
     username: str
     phone: str | None
-    email: str
+    email: str | None = None
     role: str
     is_verified: bool
     must_change_password: bool

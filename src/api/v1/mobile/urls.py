@@ -16,4 +16,5 @@ urlpatterns = [
         "notification-settings/", include("api.v1.mobile.notification_settings.urls", namespace="notification-settings")
     ),
     path("support/", include("api.v1.mobile.support.urls", namespace="support")),
+    path("config/", include("api.v1.mobile.config.urls", namespace="config")),
 ]

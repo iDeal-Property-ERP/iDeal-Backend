@@ -10,7 +10,6 @@ from typing import Any
 
 import yaml
 
-
 DEFAULT_COLLECTION = Path(__file__).resolve().parents[4] / "docs" / "api" / "bruno"
 DEFAULT_OUTPUT = DEFAULT_COLLECTION / "index.html"
 BRUNO_DOCS_CDN = "https://cdn.opencollection.com"

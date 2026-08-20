@@ -4,6 +4,7 @@ from django.conf import settings
 
 class TelegramGateway(OTPProvider):
     provider_name = "telegram"
+    enabled_setting = "OTP_TELEGRAM_ENABLED"
 
     def send(self, message: OTPMessage) -> None:
         token = settings.TELEGRAM_GATEWAY_TOKEN
@@ -16,5 +17,5 @@ class TelegramGateway(OTPProvider):
             json={"phone_number": message.phone, "code": message.code},
         )
         payload = self._json_payload(response)
-        if response.status_code >= 400 or payload.get("ok") is not True:
+        if response.status_code >= 400 or not payload.get("ok"):
             raise self._provider_error(response)

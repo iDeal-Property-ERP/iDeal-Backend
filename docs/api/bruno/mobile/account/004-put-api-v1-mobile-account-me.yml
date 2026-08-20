@@ -43,7 +43,7 @@ docs: '# PUT /api/v1/mobile/account/me/
   | `patronymic` | no | yes | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
-  | `email` | yes | no | fixture value; replace fixture values with domain-valid data
+  | `email` | no | yes | fixture value; replace fixture values with domain-valid data
   before runtime execution. |
 
   | `nationality` | no | yes | fixture value; replace fixture values with domain-valid

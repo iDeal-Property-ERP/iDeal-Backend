@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 
 from api.v1.mobile.auth import views
@@ -74,6 +75,7 @@ def test_request_and_verify_provisions_user_and_returns_valid_jwt(api_client, mo
     assert tokens["refresh_token"]
 
     user = User.objects.get(phone="+998901234567")
+    assert user.email is None
     assert user.is_verified is True
     assert user.has_usable_password() is False
     assert user.role == UserRole.TENANT
@@ -89,6 +91,7 @@ def test_request_and_verify_provisions_user_and_returns_valid_jwt(api_client, mo
     )
     assert authenticated_response.status_code == 200
     assert authenticated_response.json()["data"]["phone"] == "+998901234567"
+    assert authenticated_response.json()["data"]["email"] is None
 
 
 def test_invalid_code_is_rejected(api_client, monkeypatch):
@@ -175,6 +178,41 @@ def test_existing_phone_user_is_reused_and_token_authenticates(api_client, monke
     )
     assert authenticated_response.status_code == 200
     assert authenticated_response.json()["data"]["id"] == user.pk
+
+
+def test_get_otp_methods_returns_active_channels(api_client):
+    with override_settings(OTP_TELEGRAM_ENABLED=True, OTP_SMS_ENABLED=True):
+        response = api_client.get("/api/v1/mobile/auth/methods/")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": True,
+        "message": "OK",
+        "data": {"channels": ["telegram", "sms"]},
+    }
+
+
+def test_get_otp_methods_reflects_dynamic_settings(api_client):
+    with override_settings(OTP_TELEGRAM_ENABLED=True, OTP_SMS_ENABLED=False):
+        response = api_client.get("/api/v1/mobile/auth/methods/")
+    assert response.status_code == 200
+    assert response.json()["data"] == {"channels": ["telegram"]}
+
+    with override_settings(OTP_TELEGRAM_ENABLED=False, OTP_SMS_ENABLED=True):
+        response = api_client.get("/api/v1/mobile/auth/methods/")
+    assert response.status_code == 200
+    assert response.json()["data"] == {"channels": ["sms"]}
+
+
+def test_request_otp_rejects_disabled_channel(api_client, monkeypatch):
+    monkeypatch.setattr(settings, "OTP_DEV_BYPASS_CODE", "123456")
+    with override_settings(OTP_TELEGRAM_ENABLED=False, OTP_SMS_ENABLED=True):
+        response = _request_otp(api_client, phone="+998901234567")
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["success"] is False
+    assert body["error"] == "Selected OTP channel is disabled or unavailable"
 
 
 @pytest.mark.django_db
@@ -297,6 +335,46 @@ class TestMobileUserMeAPI:
             "message": "Data conflict",
             "error": "This email is already in use",
         }
+
+    def test_put_allows_null_or_empty_email(self, api_client, jwt_header, user):
+        response = _put(
+            api_client,
+            self.path,
+            {
+                "first_name": "Aziz",
+                "last_name": None,
+                "patronymic": None,
+                "email": None,
+                "nationality": None,
+            },
+            **jwt_header,
+        )
+
+        assert response.status_code == 200
+        assert response.json()["data"]["email"] is None
+        user.refresh_from_db()
+        assert user.email is None
+
+    def test_multiple_users_with_null_email_do_not_conflict(self, api_client, jwt_header, user):
+        user.email = None
+        user.save(update_fields=["email"])
+        other_user = UserFactory(email=None)
+        assert other_user.email is None
+
+        response = _put(
+            api_client,
+            self.path,
+            {
+                "first_name": "Aziz",
+                "last_name": None,
+                "patronymic": None,
+                "email": None,
+                "nationality": None,
+            },
+            **jwt_header,
+        )
+        assert response.status_code == 200
+        assert response.json()["data"]["email"] is None
 
     def test_avatar_upload_replaces_previous_file_and_returns_profile(self, api_client, jwt_header, user):
         first_response = _put_avatar(

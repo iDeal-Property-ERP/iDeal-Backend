@@ -24,10 +24,10 @@ otp_service = OTPService()
 
 
 def serialize_mobile_user(request, user: User) -> dict:
-    avatar_url = request.build_absolute_uri(user.avatar.url) if user.avatar else None
+    avatar_url = request.build_absolute_uri(user.avatar.url) if user.avatar else None  # type: ignore[union-attr]
     return MobileUserMeOutput.model_validate(
         {
-            "id": user.id,
+            "id": getattr(user, "id", None) or getattr(user, "pk", None),
             "first_name": user.first_name,
             "last_name": user.last_name,
             "patronymic": user.patronymic,
@@ -41,13 +41,13 @@ def serialize_mobile_user(request, user: User) -> dict:
 
 class MobileUserMeView(BaseController):
     def get(self) -> dict:
-        return self.ok(serialize_mobile_user(self.request, self.request.user))
+        return self.ok(serialize_mobile_user(self.request, self.request.user))  # type: ignore[attr-defined]
 
     def put(self, parsed_body: Body[MobileUserMeUpdateInput]) -> dict:
-        user = self.request.user
+        user: User = self.request.user
         data = parsed_body.model_dump(mode="json")
 
-        if User.objects.filter(email=data["email"]).exclude(pk=user.pk).exists():
+        if data.get("email") and User.objects.filter(email=data["email"]).exclude(pk=user.pk).exists():
             return self.fail(
                 error=str(_("This email is already in use")),
                 message=str(_("Data conflict")),
@@ -62,8 +62,9 @@ class MobileUserMeView(BaseController):
 
 class MobileUserAvatarView(BaseController):
     def put(self) -> dict:
-        if self.request.content_type.startswith("multipart/"):
-            files = self.request.parse_file_upload(self.request.META, BytesIO(self.request.body))[1]
+        content_type = getattr(self.request, "content_type", "") or ""
+        if content_type.startswith("multipart/"):
+            files = self.request.parse_file_upload(self.request.META, BytesIO(self.request.body))[1]  # type: ignore[attr-defined]
             image = files.get("image")
         else:
             image = self.request.FILES.get("image")
@@ -75,7 +76,7 @@ class MobileUserAvatarView(BaseController):
         except UploadError as err:
             return self.fail(error=str(err), message=str(_("Upload failed")))
 
-        user = self.request.user
+        user: User = self.request.user
         previous_name = user.avatar.name if user.avatar else None
         previous_storage = user.avatar.storage if user.avatar else None
         user.avatar = image
@@ -85,7 +86,7 @@ class MobileUserAvatarView(BaseController):
         return self.ok(serialize_mobile_user(self.request, user))
 
     def delete(self) -> dict:
-        user = self.request.user
+        user: User = self.request.user
         previous_name = user.avatar.name if user.avatar else None
         previous_storage = user.avatar.storage if user.avatar else None
         user.avatar = None
@@ -127,7 +128,7 @@ class AccountDeletionOTPRequestView(BaseController):
 class AccountDeletionConfirmView(BaseController):
     @rate_limit(requests=10, window_seconds=3600)
     def post(self, parsed_body: Body[AccountDeletionConfirmInput]) -> dict:
-        user = self.request.user
+        user: User = self.request.user
         phone = user.phone
         if not phone:
             return self.fail(

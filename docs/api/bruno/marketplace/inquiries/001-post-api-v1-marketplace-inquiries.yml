@@ -1,0 +1,122 @@
+info:
+  name: Create inquiry
+  type: http
+  seq: 1
+http:
+  method: POST
+  url: '{{base_url}}/api/v1/marketplace/inquiries/'
+  auth:
+    type: none
+  body:
+    type: json
+    data: "{\n  \"listing_id\": 1,\n  \"full_name\": \"fixture-value\",\n  \"phone\"\
+      : \"+998901234567\",\n  \"email\": \"fixture@example.com\",\n  \"message\":\
+      \ \"fixture-value\"\n}"
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# POST /api/v1/marketplace/inquiries/
+
+
+  Authentication: **none**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Body field | Required | Nullable | Notes |
+
+  |---|---:|---:|---|
+
+  | `listing_id` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `full_name` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `phone` | yes | no | fixture value; replace fixture values with domain-valid data
+  before runtime execution. |
+
+  | `email` | no | yes | fixture value; replace fixture values with domain-valid data
+  before runtime execution. |
+
+  | `message` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/marketplace/inquiries/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"listing_id\": 1,\n  \"full_name\": \"fixture-value\",\n  \"phone\"\
+        : \"+998901234567\",\n  \"email\": \"fixture@example.com\",\n  \"message\"\
+        : \"fixture-value\"\n}"
+  response:
+    status: 201
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/marketplace/inquiries/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"listing_id\": 1,\n  \"full_name\": \"fixture-value\",\n  \"phone\"\
+        : \"+998901234567\",\n  \"email\": \"fixture@example.com\",\n  \"message\"\
+        : \"fixture-value\"\n}"
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/marketplace/inquiries/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"listing_id\": 1,\n  \"full_name\": \"fixture-value\",\n  \"phone\"\
+        : \"+998901234567\",\n  \"email\": \"fixture@example.com\",\n  \"message\"\
+        : \"fixture-value\"\n}"
+  response:
+    status: 409
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

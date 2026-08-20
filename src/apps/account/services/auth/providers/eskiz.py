@@ -10,6 +10,7 @@ ESKIZ_TOKEN_CACHE_KEY = "otp:eskiz:token"
 
 class EskizGateway(OTPProvider):
     provider_name = "eskiz"
+    enabled_setting = "OTP_SMS_ENABLED"
 
     def __init__(self, *, cache_backend=cache, http_client=requests):
         super().__init__(http_client=http_client)

@@ -13,7 +13,7 @@ class User(AbstractBaseUser, TimestampedModel, SoftDeleteModel):
 
     username = models.CharField(max_length=150, unique=True)
     phone = models.CharField(max_length=15, unique=True, null=True, blank=True)
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True, null=True, blank=True, default=None)
     avatar = models.ImageField(upload_to="users/avatars/", blank=True, null=True)
 
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.MANAGEMENT)
@@ -28,7 +28,7 @@ class User(AbstractBaseUser, TimestampedModel, SoftDeleteModel):
     must_change_password = models.BooleanField(default=False)
 
     USERNAME_FIELD = "username"
-    REQUIRED_FIELDS = ["first_name", "email"]
+    REQUIRED_FIELDS = ["first_name"]
 
     objects = managers.UserManager()
 
@@ -77,4 +77,4 @@ class TokenBlacklist(TimestampedModel):
         db_table = "token_blacklist"
 
     def __str__(self):
-        return self.jti
+        return str(self.jti)

@@ -54,9 +54,6 @@ docs: '# GET /api/v1/mobile/home/listings/
 
   Authentication: **none**.
 
-  Optional bearer auth is accepted to personalize the
-  returned `is_favorite` flag. Invalid or missing optional auth leaves `is_favorite=false`.
-
 
   ## Request field notes
 
@@ -160,7 +157,7 @@ examples:
       value: application/json
     body:
       type: json
-      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"count\": 1,\n    \"num_pages\": 1,\n    \"per_page\": 20,\n    \"page\": {\n      \"number\": 1,\n      \"object_list\": [\n        {\n          \"id\": 101,\n          \"property_id\": 201,\n          \"title\": \"Sample listing\",\n          \"district\": \"Yunusobod\",\n          \"address\": \"12 Sample Street\",\n          \"property_type\": \"apartment\",\n          \"rooms\": 2,\n          \"area_sqm\": 70,\n          \"floor\": 5,\n          \"total_floors\": 9,\n          \"furnishing\": \"furnished\",\n          \"price\": 850.0,\n          \"currency\": \"USD\",\n          \"tariff\": \"standard\",\n          \"is_verified\": true,\n          \"is_featured\": false,\n          \"score\": 4.8,\n          \"review_count\": 12,\n          \"cover_image_url\": \"http://127.0.0.1:8000/media/properties/photos/cover.jpg\",\n          \"cover_preview_url\": null,\n          \"cover_display_url\": null,\n          \"map_lat\": 41.31,\n          \"map_lon\": 69.28,\n          \"is_favorite\": false\n        }\n      ]\n    }\n  }\n}"
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
 - name: validation error
   request:
     url: '{{base_url}}/api/v1/mobile/home/listings/'

@@ -27,6 +27,8 @@ class UserManager(SoftDeleteManager, BaseUserManager):
         email = extra_fields.get("email")
         if email:
             extra_fields["email"] = self.normalize_email(email)
+        else:
+            extra_fields["email"] = None
 
         user = self.model(**{self.model.USERNAME_FIELD: username}, **extra_fields)
         user.set_password(password)

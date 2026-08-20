@@ -1,6 +1,7 @@
 import logging
 import secrets
 from collections.abc import Mapping
+from typing import Any
 
 import requests
 from account.services.auth.providers.base import OTPDeliveryError, OTPMessage, OTPProvider
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 OTP_TTL = 300
 OTP_ATTEMPT_LIMIT = 5
+DEFAULT_OTP_CHANNEL_ORDER = ("telegram", "sms")
 
 
 class OTPService:
@@ -21,8 +23,8 @@ class OTPService:
     def __init__(
         self,
         *,
-        cache_backend=cache,
-        http_client=requests,
+        cache_backend: Any = cache,
+        http_client: Any = requests,
         providers: Mapping[str, OTPProvider] | None = None,
     ):
         self.cache = cache_backend
@@ -34,6 +36,17 @@ class OTPService:
                 "telegram": TelegramGateway(http_client=http_client),
             }
         )
+
+    def get_available_channels(self) -> list[str]:
+        available: list[str] = []
+        for channel in DEFAULT_OTP_CHANNEL_ORDER:
+            provider = self.providers.get(channel)
+            if provider is not None and getattr(provider, "is_enabled", True):
+                available.append(channel)
+        for channel, provider in self.providers.items():
+            if channel not in DEFAULT_OTP_CHANNEL_ORDER and getattr(provider, "is_enabled", True):
+                available.append(channel)
+        return available
 
     @staticmethod
     def generate_otp() -> str:
@@ -59,7 +72,11 @@ class OTPService:
         return code
 
     def get_otp_attempts(self, phone: str, *, purpose: str = "login") -> int:
-        return int(self.cache.get(self._otp_attempts_cache_key(phone, purpose), 0) or 0)
+        val = self.cache.get(self._otp_attempts_cache_key(phone, purpose), 0)
+        try:
+            return int(val or 0)
+        except TypeError, ValueError:
+            return 0
 
     def increment_otp_attempts(self, phone: str, ttl: int = OTP_TTL, *, purpose: str = "login") -> int:
         attempts = min(self.get_otp_attempts(phone, purpose=purpose) + 1, OTP_ATTEMPT_LIMIT)
@@ -70,6 +87,9 @@ class OTPService:
         self.cache.delete(self._otp_attempts_cache_key(phone, purpose))
 
     def dispatch(self, phone: str, code: str, channel: str) -> None:
+        if channel not in self.get_available_channels():
+            raise OTPDeliveryError("Unsupported or disabled OTP channel")
+
         if settings.OTP_DEV_BYPASS_CODE:
             logger.info("OTP dev bypass enabled; generated code=%s", code)
             return

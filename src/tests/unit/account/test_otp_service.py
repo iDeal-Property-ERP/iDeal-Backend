@@ -34,14 +34,14 @@ class RecordingProvider(OTPProvider):
 
 def test_otp_provider_is_abstract():
     with pytest.raises(TypeError):
-        OTPProvider()
+        OTPProvider()  # type: ignore[abstract]
 
 
 def test_otp_message_is_immutable():
     message = OTPMessage(phone="+998901234567", code="123456")
 
     with pytest.raises(FrozenInstanceError):
-        message.code = "654321"
+        message.code = "654321"  # type: ignore[misc]
 
 
 def test_generate_otp_returns_six_digits():
@@ -60,6 +60,7 @@ def test_cache_lifecycle_and_attempts_are_bounded():
     assert service.pop_otp("+998901234567") == "123456"
     assert service.get_otp("+998901234567") is None
 
+    attempts = 0
     for _ in range(OTP_ATTEMPT_LIMIT + 2):
         attempts = service.increment_otp_attempts("+998901234567")
 
@@ -84,3 +85,29 @@ def test_dispatch_rejects_unknown_channel():
 
     with override_settings(OTP_DEV_BYPASS_CODE=""), pytest.raises(OTPDeliveryError):
         service.dispatch("+998901234567", "123456", "unknown")
+
+
+def test_get_available_channels_reflects_settings():
+    service = OTPService(cache_backend=FakeCache())
+
+    with override_settings(OTP_TELEGRAM_ENABLED=True, OTP_SMS_ENABLED=True):
+        assert service.get_available_channels() == ["telegram", "sms"]
+
+    with override_settings(OTP_TELEGRAM_ENABLED=True, OTP_SMS_ENABLED=False):
+        assert service.get_available_channels() == ["telegram"]
+
+    with override_settings(OTP_TELEGRAM_ENABLED=False, OTP_SMS_ENABLED=True):
+        assert service.get_available_channels() == ["sms"]
+
+    with override_settings(OTP_TELEGRAM_ENABLED=False, OTP_SMS_ENABLED=False):
+        assert service.get_available_channels() == []
+
+
+def test_dispatch_rejects_disabled_channel():
+    service = OTPService(cache_backend=FakeCache())
+
+    with (
+        override_settings(OTP_DEV_BYPASS_CODE="", OTP_TELEGRAM_ENABLED=False, OTP_SMS_ENABLED=True),
+        pytest.raises(OTPDeliveryError),
+    ):
+        service.dispatch("+998901234567", "123456", "telegram")

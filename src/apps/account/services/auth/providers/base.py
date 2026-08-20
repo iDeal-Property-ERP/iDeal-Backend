@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 import requests
 
@@ -23,9 +24,18 @@ class OTPProvider(ABC):
     """Normalized delivery interface shared by all OTP gateways."""
 
     provider_name = "otp"
+    enabled_setting: str = ""
 
-    def __init__(self, *, http_client=requests):
+    def __init__(self, *, http_client: Any = requests):
         self.http = http_client
+
+    @property
+    def is_enabled(self) -> bool:
+        if not self.enabled_setting:
+            return True
+        from django.conf import settings
+
+        return bool(getattr(settings, self.enabled_setting, False))
 
     @abstractmethod
     def send(self, message: OTPMessage) -> None:
@@ -69,8 +79,8 @@ class OTPProvider(ABC):
     def _payload_indicates_error(payload: dict) -> bool:
         status = payload.get("status")
         return (
-            payload.get("ok") is False
-            or payload.get("success") is False
-            or status is False
+            payload.get("ok") == False  # noqa: E712
+            or payload.get("success") == False  # noqa: E712
+            or status == False  # noqa: E712
             or str(status).lower() in {"error", "failed", "fail", "false"}
         )

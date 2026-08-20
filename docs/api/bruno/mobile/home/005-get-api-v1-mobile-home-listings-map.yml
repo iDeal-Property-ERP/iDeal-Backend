@@ -11,6 +11,9 @@ http:
   - name: bbox
     value: fixture-value
     type: query
+  - name: favorites_only
+    value: 'False'
+    type: query
   - name: q
     value: fixture-value
     type: query
@@ -41,9 +44,6 @@ http:
   - name: tariff
     value: standard
     type: query
-  - name: favorites_only
-    value: 'False'
-    type: query
 settings:
   encodeUrl: true
   timeout: 0
@@ -52,7 +52,7 @@ settings:
 docs: '# GET /api/v1/mobile/home/listings/map/
 
 
-  Authentication: **none** (bearer required when `favorites_only=true`).
+  Authentication: **none**.
 
 
   ## Request field notes
@@ -64,6 +64,9 @@ docs: '# GET /api/v1/mobile/home/listings/map/
 
   | `bbox` | query | yes | `fixture-value` | non-nullable; fixture value; replace
   with a real ID when running. |
+
+  | `favorites_only` | query | no | `fixture-value` | non-nullable; fixture value;
+  replace with a real ID when running. |
 
   | `q` | query | no | `fixture-value` | non-nullable; fixture value; replace with
   a real ID when running. |
@@ -95,10 +98,6 @@ docs: '# GET /api/v1/mobile/home/listings/map/
   | `tariff` | query | no | `fixture-value` | non-nullable; fixture value; replace
   with a real ID when running. |
 
-  | `favorites_only` | query | no | `False` | When `true`, requires authentication
-  and restricts results to the authenticated user''s eligible favorites; other
-  filters still apply. |
-
 
   ## Saved examples
 
@@ -115,6 +114,9 @@ examples:
       value: application/json
     params:
     - name: bbox
+      value: '1'
+      type: query
+    - name: favorites_only
       value: '1'
       type: query
     - name: q
@@ -165,6 +167,9 @@ examples:
       value: application/json
     params:
     - name: bbox
+      value: '1'
+      type: query
+    - name: favorites_only
       value: '1'
       type: query
     - name: q

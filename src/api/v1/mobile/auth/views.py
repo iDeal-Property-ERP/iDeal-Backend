@@ -14,7 +14,7 @@ from dmr import Body
 from dmr.security.jwt.auth import set_request_attrs
 from dmr.security.jwt.token import JWToken
 
-from api.v1.mobile.auth.schemas import OTPRequestInput, OTPVerifyInput
+from api.v1.mobile.auth.schemas import OTPMethodsOutput, OTPRequestInput, OTPVerifyInput
 from core.api.mixins import JWTMixin
 from core.api.views import BaseController
 from core.constants import UserRole
@@ -44,7 +44,7 @@ def _get_or_create_phone_user(phone: str) -> User:
 
     user = User.objects.create(
         username=uuid.uuid4().hex[:30],
-        email=f"{uuid.uuid4().hex}@phone.ideal.local",
+        email=None,
         first_name="",
         phone=phone,
         role=UserRole.TENANT,
@@ -53,6 +53,14 @@ def _get_or_create_phone_user(phone: str) -> User:
     user.set_unusable_password()
     user.save(update_fields=["password"])
     return user
+
+
+class OTPMethodsView(BaseController):
+    auth = ()
+
+    def get(self) -> dict:
+        channels = otp_service.get_available_channels()
+        return self.ok(OTPMethodsOutput(channels=channels).model_dump(mode="json"))
 
 
 class OTPRequestView(BaseController):
@@ -64,6 +72,13 @@ class OTPRequestView(BaseController):
             phone = normalize_phone(parsed_body.phone)
         except ValueError:
             return _invalid_phone(self)
+
+        if parsed_body.channel not in otp_service.get_available_channels():
+            return self.fail(
+                error=str(_("Selected OTP channel is disabled or unavailable")),
+                message=str(_("Validation error")),
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
 
         code = otp_service.generate_otp()
         otp_service.clear_otp_attempts(phone)

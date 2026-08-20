@@ -16,10 +16,9 @@ import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
-
 
 BACKEND = Path(__file__).resolve().parents[4]
 COLLECTION = Path(__file__).resolve().parents[4] / "docs" / "api" / "bruno"
@@ -48,7 +47,7 @@ def resolver_routes() -> list[dict[str, Any]]:
     def walk(patterns: list[Any], prefix: str = "") -> None:
         for item in patterns:
             if isinstance(item, URLResolver):
-                walk(item.url_patterns, prefix + route_text(item.pattern))
+                walk(cast(list[Any], getattr(item, "url_patterns", [])), prefix + route_text(item.pattern))
                 continue
             if not isinstance(item, URLPattern):
                 continue
@@ -74,7 +73,7 @@ def resolver_routes() -> list[dict[str, Any]]:
                 continue
             result.append({"path": "/" + path, "methods": sorted(set(methods)), "name": item.name or ""})
 
-    walk(get_resolver().url_patterns)
+    walk(cast(list[Any], getattr(get_resolver(), "url_patterns", [])))
     return result
 
 
@@ -90,6 +89,7 @@ def webhook_routes() -> list[dict[str, Any]]:
 def openapi_schema() -> dict[str, Any]:
     from dmr.openapi import build_schema
     from dmr.routing import Router
+
     from api.url_router import urlpatterns
 
     return build_schema(Router("api/", urlpatterns)).convert(skip_validation=True)
@@ -117,7 +117,12 @@ def operation_for(schema: dict[str, Any], path: str, method: str) -> dict[str, A
 def schema_for_request(operation: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None, str]:
     request = operation.get("requestBody", {}) or {}
     content = request.get("content", {}) or {}
-    for content_type in ("application/json", "application/*+json", "multipart/form-data", "application/x-www-form-urlencoded"):
+    for content_type in (
+        "application/json",
+        "application/*+json",
+        "multipart/form-data",
+        "application/x-www-form-urlencoded",
+    ):
         entry = content.get(content_type)
         if entry:
             schema = entry.get("schema") or {}
@@ -247,7 +252,13 @@ def operation_record(route: dict[str, Any], method: str, schema: dict[str, Any])
             p = dict(param)
             p["schema"] = deref(p.get("schema") or {}, components)
             params.append(p)
-    responses = sorted({int(code) for code in (operation.get("responses", {}) or {}) if str(code).isdigit()})
+    responses: list[int] = []
+    for code in operation.get("responses", {}) or {}:
+        try:
+            responses.append(int(code))
+        except ValueError, TypeError:
+            continue
+    responses = sorted(set(responses))
     if not responses:
         responses = [200]
     auth = "bearer" if operation.get("security") else "none"
@@ -257,10 +268,17 @@ def operation_record(route: dict[str, Any], method: str, schema: dict[str, Any])
         auth = "none"
         responses = [200, 400]
     return {
-        "path": route["path"], "method": method, "name": route.get("name", ""),
-        "operation": operation, "params": params, "request_schema": request_schema,
-        "request_ref": request_ref, "resolved_request": resolved_request,
-        "content_type": content_type, "responses": responses, "auth": auth,
+        "path": route["path"],
+        "method": method,
+        "name": route.get("name", ""),
+        "operation": operation,
+        "params": params,
+        "request_schema": request_schema,
+        "request_ref": request_ref,
+        "resolved_request": resolved_request,
+        "content_type": content_type,
+        "responses": responses,
+        "auth": auth,
         "components": components,
     }
 
@@ -271,13 +289,23 @@ def inventory() -> dict[str, Any]:
     routes_by_path: dict[str, dict[str, Any]] = {}
     for route in resolver_routes() + webhook_routes():
         if route["path"] in routes_by_path:
-            routes_by_path[route["path"]]["methods"] = sorted(set(routes_by_path[route["path"]]["methods"]) | set(route["methods"]))
+            routes_by_path[route["path"]]["methods"] = sorted(
+                set(routes_by_path[route["path"]]["methods"]) | set(route["methods"])
+            )
         else:
             routes_by_path[route["path"]] = dict(route)
-    records = [operation_record(route, method, schema) for route in routes_by_path.values() for method in route["methods"]]
-    return {"routes": sorted(routes_by_path.values(), key=lambda x: x["path"]), "operations": records,
-            "counts": {"routes": len(routes_by_path), "application_methods": len(records),
-                       "methods": dict(Counter(r["method"] for r in records))}}
+    records = [
+        operation_record(route, method, schema) for route in routes_by_path.values() for method in route["methods"]
+    ]
+    return {
+        "routes": sorted(routes_by_path.values(), key=lambda x: x["path"]),
+        "operations": records,
+        "counts": {
+            "routes": len(routes_by_path),
+            "application_methods": len(records),
+            "methods": dict(Counter(r["method"] for r in records)),
+        },
+    }
 
 
 def safe_name(path: str, method: str) -> str:
@@ -324,9 +352,35 @@ def human_request_name(record: dict[str, Any]) -> str:
     path = [part for part in path if part]
     dynamic_index = next((index for index, part in enumerate(path) if part.startswith("<")), None)
     action_words = {
-        "activate", "archive", "approve", "block", "cancel", "close-lost", "close-won", "complete", "confirm",
-        "deactivate", "finalize", "hold", "mark-paid", "pause", "publish", "read", "reject", "release",
-        "read-all", "remind", "renew", "resolve", "submit", "terminate", "unarchive", "unblock", "unmute", "verify", "mute",
+        "activate",
+        "archive",
+        "approve",
+        "block",
+        "cancel",
+        "close-lost",
+        "close-won",
+        "complete",
+        "confirm",
+        "deactivate",
+        "finalize",
+        "hold",
+        "mark-paid",
+        "pause",
+        "publish",
+        "read",
+        "reject",
+        "release",
+        "read-all",
+        "remind",
+        "renew",
+        "resolve",
+        "submit",
+        "terminate",
+        "unarchive",
+        "unblock",
+        "unmute",
+        "verify",
+        "mute",
     }
     action = path[-1] if path and path[-1] in action_words else None
     if action:
@@ -337,47 +391,158 @@ def human_request_name(record: dict[str, Any]) -> str:
     if dynamic_index is not None and dynamic_index + 1 < len(path):
         resource = singular(path[dynamic_index - 1]) if dynamic_index else "resource"
         subresource = path[dynamic_index + 1]
-        verb = {"GET": "List", "POST": "Create", "PUT": "Update", "PATCH": "Update", "DELETE": "Delete"}.get(record["method"], record["method"].title())
+        verb = {"GET": "List", "POST": "Create", "PUT": "Update", "PATCH": "Update", "DELETE": "Delete"}.get(
+            record["method"], record["method"].title()
+        )
         object_name = humanize(subresource) if record["method"] == "GET" else singular(subresource)
         return f"{verb} {resource} {object_name}"
     if path and path[-1] in {"avatar", "photos", "image", "attachments", "messages"}:
         resource = singular(path[-1])
         if resource == "message":
             return "List messages"
-        verb = {"avatar": "Update", "photo": "Add", "image": "Send", "attachment": "Add", "message": "List"}.get(resource, "Manage")
+        verb = {"avatar": "Update", "photo": "Add", "image": "Send", "attachment": "Add", "message": "List"}.get(
+            resource, "Manage"
+        )
         return f"{verb} {resource}"
     if dynamic_index is not None:
         resource = singular(path[dynamic_index - 1]) if dynamic_index else "resource"
-        verb = {"GET": "Get", "POST": "Create", "PUT": "Update", "PATCH": "Update", "DELETE": "Delete"}.get(record["method"], record["method"].title())
+        verb = {"GET": "Get", "POST": "Create", "PUT": "Update", "PATCH": "Update", "DELETE": "Delete"}.get(
+            record["method"], record["method"].title()
+        )
         return f"{verb} {resource}"
     resource = path[-1] if path else "request"
     if record["method"] == "GET":
         return f"List {humanize(resource)}"
-    verb = {"POST": "Create", "PUT": "Update", "PATCH": "Update", "DELETE": "Delete", "GET": "Get"}.get(record["method"], record["method"].title())
+    verb = {"POST": "Create", "PUT": "Update", "PATCH": "Update", "DELETE": "Delete", "GET": "Get"}.get(
+        record["method"], record["method"].title()
+    )
     return f"{verb} {singular(resource)}"
 
 
 def domain(path: str) -> str:
-    bits = path.strip("/").split("/")
-    if len(bits) >= 3 and bits[1] == "v1":
-        if bits[2] == "mobile":
-            return "/".join(bits[2:4]) if len(bits) > 3 else "mobile"
-        return "-".join(bits[2:4]) if bits[2] in {"mobile", "payment-webhooks"} and len(bits) > 3 else bits[2]
-    return "misc"
+    bits = [b for b in path.strip("/").split("/") if b]
+    if len(bits) >= 2 and bits[0] == "api" and bits[1] == "v1":
+        bits = bits[2:]
+    if not bits:
+        return "misc"
+
+    section = bits[0]
+    sub = bits[1] if len(bits) > 1 else ""
+
+    if section == "mobile":
+        return f"mobile/{sub}" if sub else "mobile"
+
+    if section == "payment-webhooks":
+        provider = sub or "general"
+        return f"payment/webhook/{provider}"
+
+    if section == "management":
+        if sub in {"dashboard", "queue-counts", "vacancy", "assignees"}:
+            return "management/overview"
+        if sub in {"inquiries", "leads"}:
+            return "management/leads"
+        if sub in {"bookings"}:
+            return "management/bookings"
+        if sub in {"onboardings"}:
+            return "management/onboardings"
+        if sub in {"one-off-deals", "brokerage-commissions"}:
+            return "management/one-off-deals"
+        if sub in {"properties"}:
+            return "management/properties"
+        if sub in {"leases", "owner-agreements"}:
+            return "management/contracts"
+        if sub in {"payments", "payouts", "pnl", "settlements"}:
+            return "management/finance"
+        if sub in {"service-requests"}:
+            return "management/service-requests"
+        if sub in {"users"}:
+            return "management/users"
+        if sub in {"vas-orders", "vas-partners"}:
+            return "management/vas"
+        if sub in {"viewing-requests"}:
+            return "management/viewing-requests"
+        return f"management/{sub}" if sub else "management"
+
+    if section == "finance":
+        if sub in {"dashboard", "exchange-rates"}:
+            return "finance/overview"
+        if sub in {"payments", "payouts", "settlements", "pnl"}:
+            return f"finance/{sub}"
+        return f"finance/{sub}" if sub else "finance"
+
+    if section == "contracts":
+        if sub in {"leases", "owner-agreements"}:
+            return f"contracts/{sub}"
+        return f"contracts/{sub}" if sub else "contracts"
+
+    if section == "owner":
+        if sub in {"listings", "properties"}:
+            return f"owner/{sub}"
+        if sub in {"earnings", "settlements"}:
+            return "owner/finance"
+        if sub in {"onboarding", "public-offer", "why"}:
+            return "owner/onboarding"
+        return f"owner/{sub}" if sub else "owner"
+
+    if section == "tenant":
+        if sub:
+            return f"tenant/{sub}"
+        return "tenant"
+
+    if section == "chat":
+        if sub in {"conversations", "reports"}:
+            return f"chat/{sub}"
+        return "chat"
+
+    if section == "marketplace":
+        if sub in {"amenities", "districts", "faqs"}:
+            return "marketplace/reference"
+        if sub in {"listings", "inquiries"}:
+            return f"marketplace/{sub}"
+        return f"marketplace/{sub}" if sub else "marketplace"
+
+    return section
 
 
 def body_for(record: dict[str, Any]) -> Any:
     schema = record["resolved_request"]
     path = record["path"]
     if path == "/api/v1/payment-webhooks/payme/":
-        return {"jsonrpc": "2.0", "id": "fixture-request-id", "method": "CheckPerformTransaction", "params": {"amount": 100000, "account": {"checkout": "{{checkout_public_token}}"}}}
+        return {
+            "jsonrpc": "2.0",
+            "id": "fixture-request-id",
+            "method": "CheckPerformTransaction",
+            "params": {"amount": 100000, "account": {"checkout": "{{checkout_public_token}}"}},
+        }
     if path.startswith("/api/v1/payment-webhooks/click/"):
-        return {"click_trans_id": "{{click_transaction_id}}", "service_id": "{{click_service_id}}", "merchant_trans_id": "{{checkout_public_token}}", "amount": "100000", "action": "1" if path.endswith("/prepare/") else "2", "sign_time": "2026-01-01 00:00:00", "sign_string": "{{click_signature}}"}
+        return {
+            "click_trans_id": "{{click_transaction_id}}",
+            "service_id": "{{click_service_id}}",
+            "merchant_trans_id": "{{checkout_public_token}}",
+            "amount": "100000",
+            "action": "1" if path.endswith("/prepare/") else "2",
+            "sign_time": "2026-01-01 00:00:00",
+            "sign_string": "{{click_signature}}",
+        }
     if path == "/api/v1/payment-webhooks/stripe/":
-        return {"id": "evt_fixture", "type": "checkout.session.completed", "data": {"object": {"id": "{{stripe_session_id}}", "client_reference_id": "{{checkout_public_token}}", "amount_total": 100000, "currency": "usd", "metadata": {"public_token": "{{checkout_public_token}}"}}}}
+        return {
+            "id": "evt_fixture",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "{{stripe_session_id}}",
+                    "client_reference_id": "{{checkout_public_token}}",
+                    "amount_total": 100000,
+                    "currency": "usd",
+                    "metadata": {"public_token": "{{checkout_public_token}}"},
+                }
+            },
+        }
     if not schema.get("properties"):
         return None
-    return sample_object(schema, record["components"]) if schema.get("type") in {"object", None} else sample_value(schema)
+    return (
+        sample_object(schema, record["components"]) if schema.get("type") in {"object", None} else sample_value(schema)
+    )
 
 
 def multipart_fields(record: dict[str, Any]) -> list[dict[str, Any]] | None:
@@ -417,7 +582,9 @@ def nullable(schema: dict[str, Any]) -> bool:
     return bool(schema.get("nullable") or any(item.get("type") == "null" for item in schema.get("anyOf", [])))
 
 
-def documented_fields(schema: dict[str, Any], components: dict[str, Any], prefix: str = "") -> list[tuple[str, bool, bool, str]]:
+def documented_fields(
+    schema: dict[str, Any], components: dict[str, Any], prefix: str = ""
+) -> list[tuple[str, bool, bool, str]]:
     schema = deref(schema, components)
     required = set(schema.get("required", []))
     rows: list[tuple[str, bool, bool, str]] = []
@@ -438,18 +605,29 @@ def documented_fields(schema: dict[str, Any], components: dict[str, Any], prefix
         if nested.get("type") == "array":
             nested = deref(nested.get("items", {}), components)
         if nested.get("properties"):
-            rows.extend(documented_fields(nested, components, field_name + ("[]" if field.get("type") == "array" else "")))
+            rows.extend(
+                documented_fields(nested, components, field_name + ("[]" if field.get("type") == "array" else ""))
+            )
     return rows
 
 
 def docs_for(record: dict[str, Any]) -> str:
-    lines = [f"# {record['method']} {record['path']}", "", f"Authentication: **{record['auth']}**.", "", "## Request field notes", ""]
+    lines = [
+        f"# {record['method']} {record['path']}",
+        "",
+        f"Authentication: **{record['auth']}**.",
+        "",
+        "## Request field notes",
+        "",
+    ]
     if record["params"]:
         lines += ["| Field | Location | Required | Example | Notes |", "|---|---|---:|---|---|"]
         for p in record["params"]:
             schema = p.get("schema", {})
             nullable = "nullable" if schema.get("nullable") else "non-nullable"
-            lines.append(f"| `{p['name']}` | {p.get('in', 'query')} | {'yes' if p.get('required') else 'no'} | `{p.get('example', 'fixture-value')}` | {nullable}; fixture value; replace with a real ID when running. |")
+            lines.append(
+                f"| `{p['name']}` | {p.get('in', 'query')} | {'yes' if p.get('required') else 'no'} | `{p.get('example', 'fixture-value')}` | {nullable}; fixture value; replace with a real ID when running. |"
+            )
     else:
         lines.append("No path or query parameters.")
     schema = record["resolved_request"]
@@ -457,18 +635,33 @@ def docs_for(record: dict[str, Any]) -> str:
     if properties:
         lines += ["", "| Body field | Required | Nullable | Notes |", "|---|---:|---:|---|"]
         for name, required, is_nullable, notes in documented_fields(schema, record["components"]):
-            lines.append(f"| `{name}` | {'yes' if required else 'no'} | {'yes' if is_nullable else 'no'} | {notes}; replace fixture values with domain-valid data before runtime execution. |")
+            lines.append(
+                f"| `{name}` | {'yes' if required else 'no'} | {'yes' if is_nullable else 'no'} | {notes}; replace fixture values with domain-valid data before runtime execution. |"
+            )
     multipart = multipart_fields(record)
     form = form_fields(record)
     if multipart or form:
         lines += ["", "| Multipart field | Type | Required | Notes |", "|---|---|---:|---|"]
-        for item in (multipart or form):
-            lines.append(f"| `{item['name']}` | {item.get('type', 'text')} | yes | Fixture value; replace the file or provider payload before runtime execution. |")
+        for item in multipart or form or []:
+            lines.append(
+                f"| `{item['name']}` | {item.get('type', 'text')} | yes | Fixture value; replace the file or provider payload before runtime execution. |"
+            )
     if record["path"] == "/api/v1/management/properties/import/":
-        lines += ["", "CSV columns: `name`, `address`, `district_id`, `rooms`, `area_sqm`, `floor`, `owner_id`, `ask_price`, `owner_guaranteed_price`, and `tenant_charge_price` are required; optional columns are documented in the owning view."]
+        lines += [
+            "",
+            "CSV columns: `name`, `address`, `district_id`, `rooms`, `area_sqm`, `floor`, `owner_id`, `ask_price`, `owner_guaranteed_price`, and `tenant_charge_price` are required; optional columns are documented in the owning view.",
+        ]
     if record["path"].startswith("/api/v1/payment-webhooks/"):
-        lines += ["", "Provider transport is unauthenticated at the Django route but provider verification is required: Payme uses Basic `Paycom` plus the webhook key, Click uses its signed form fields, and Stripe uses `Stripe-Signature`."]
-    lines += ["", "## Saved examples", "", "Examples are static source-backed contract fixtures. Capture runtime responses with the local environment when fixtures and providers are available."]
+        lines += [
+            "",
+            "Provider transport is unauthenticated at the Django route but provider verification is required: Payme uses Basic `Paycom` plus the webhook key, Click uses its signed form fields, and Stripe uses `Stripe-Signature`.",
+        ]
+    lines += [
+        "",
+        "## Saved examples",
+        "",
+        "Examples are static source-backed contract fixtures. Capture runtime responses with the local environment when fixtures and providers are available.",
+    ]
     return "\n".join(lines)
 
 
@@ -489,15 +682,46 @@ def response_body(status: int) -> dict[str, Any]:
 def provider_response(record: dict[str, Any], error: bool = False) -> dict[str, Any]:
     path = record["path"]
     if "/payment-webhooks/payme/" in path:
-        return {"jsonrpc": "2.0", "id": "fixture-request-id", "error": {"code": -31050, "message": {"ru": "Checkout not found", "uz": "Checkout not found", "en": "Checkout not found"}}} if error else {"jsonrpc": "2.0", "id": "fixture-request-id", "result": {"allow": True}}
+        return (
+            {
+                "jsonrpc": "2.0",
+                "id": "fixture-request-id",
+                "error": {
+                    "code": -31050,
+                    "message": {"ru": "Checkout not found", "uz": "Checkout not found", "en": "Checkout not found"},
+                },
+            }
+            if error
+            else {"jsonrpc": "2.0", "id": "fixture-request-id", "result": {"allow": True}}
+        )
     if "click" in path:
-        return {"click_trans_id": "{{click_transaction_id}}", "merchant_trans_id": "{{checkout_public_token}}", "error": -5, "error_note": "USER DOES NOT EXIST"} if error else {"click_trans_id": "{{click_transaction_id}}", "merchant_trans_id": "{{checkout_public_token}}", "error": 0, "error_note": "Success"}
+        return (
+            {
+                "click_trans_id": "{{click_transaction_id}}",
+                "merchant_trans_id": "{{checkout_public_token}}",
+                "error": -5,
+                "error_note": "USER DOES NOT EXIST",
+            }
+            if error
+            else {
+                "click_trans_id": "{{click_transaction_id}}",
+                "merchant_trans_id": "{{checkout_public_token}}",
+                "error": 0,
+                "error_note": "Success",
+            }
+        )
     return {"error": "invalid_signature"} if error else {"received": True}
 
 
-def example(record: dict[str, Any], label: str, status: int, response: Any, request_body: dict[str, Any] | None = None) -> dict[str, Any]:
+def example(
+    record: dict[str, Any], label: str, status: int, response: Any, request_body: dict[str, Any] | None = None
+) -> dict[str, Any]:
     url = "{{base_url}}" + re.sub(r"<[^:>]+:([^>]+)>", r":\1", record["path"])
-    request: dict[str, Any] = {"url": url, "method": record["method"], "headers": [{"name": "accept", "value": "application/json"}]}
+    request: dict[str, Any] = {
+        "url": url,
+        "method": record["method"],
+        "headers": [{"name": "accept", "value": "application/json"}],
+    }
     if record["auth"] == "bearer":
         request["headers"].append({"name": "authorization", "value": "Bearer {{access_token}}"})
     if "/payment-webhooks/payme/" in record["path"]:
@@ -505,34 +729,66 @@ def example(record: dict[str, Any], label: str, status: int, response: Any, requ
     if "stripe" in record["path"]:
         request["headers"].append({"name": "Stripe-Signature", "value": "{{stripe_signature}}"})
     if record["params"]:
-        request["params"] = [{"name": p["name"], "value": str(p.get("example", "1")), "type": p.get("in", "query")} for p in record["params"] if p.get("in") == "query"]
+        request["params"] = [
+            {"name": p["name"], "value": str(p.get("example", "1")), "type": p.get("in", "query")}
+            for p in record["params"]
+            if p.get("in") == "query"
+        ]
     if request_body is not None:
         request["body"] = request_body
     elif request_body is None and record["method"] in {"POST", "PUT", "PATCH"}:
         body = body_for(record)
         if body is not None:
             request["body"] = {"type": "json", "data": json.dumps(body, indent=2)}
-    return {"name": label, "request": request, "response": {"status": status, "statusText": "OK" if status < 300 else "Error", "headers": [{"name": "content-type", "value": "application/json"}], "body": {"type": "json", "data": json.dumps(response, indent=2)}}}
+    return {
+        "name": label,
+        "request": request,
+        "response": {
+            "status": status,
+            "statusText": "OK" if status < 300 else "Error",
+            "headers": [{"name": "content-type", "value": "application/json"}],
+            "body": {"type": "json", "data": json.dumps(response, indent=2)},
+        },
+    }
 
 
 def write_yaml(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(value, sort_keys=False, allow_unicode=False), encoding="utf-8")
+    path.write_text(str(yaml.safe_dump(value, sort_keys=False, allow_unicode=False) or ""), encoding="utf-8")
 
 
 def environments(root: Path) -> None:
     common = [
-        ("access_token", "", True), ("refresh_token", "", True), ("pk", "1", False),
-        ("photo_id", "1", False), ("agent_id", "1", False), ("listing_id", "1", False),
-        ("property_id", "1", False), ("sample_image", "", False), ("sample_csv", "", False), ("webhook_secret", "", True),
-        ("webhook_signature", "", True), ("payme_key", "", True), ("checkout_public_token", "fixture-checkout-token", False),
-        ("click_transaction_id", "fixture-click-transaction", False), ("click_service_id", "", False),
-        ("click_signature", "", True), ("stripe_session_id", "cs_fixture", False), ("stripe_signature", "", True),
+        ("access_token", "", True),
+        ("refresh_token", "", True),
+        ("pk", "1", False),
+        ("photo_id", "1", False),
+        ("agent_id", "1", False),
+        ("listing_id", "1", False),
+        ("property_id", "1", False),
+        ("sample_image", "", False),
+        ("sample_csv", "", False),
+        ("webhook_secret", "", True),
+        ("webhook_signature", "", True),
+        ("payme_key", "", True),
+        ("checkout_public_token", "fixture-checkout-token", False),
+        ("click_transaction_id", "fixture-click-transaction", False),
+        ("click_service_id", "", False),
+        ("click_signature", "", True),
+        ("stripe_session_id", "cs_fixture", False),
+        ("stripe_signature", "", True),
         ("idempotency_key", "fixture-idempotency-key", False),
     ]
-    for name, base in (("Local", "http://127.0.0.1:8000"), ("Dev", "https://REPLACE_WITH_DEV_API_HOST"), ("Prod", "https://REPLACE_WITH_PROD_API_HOST")):
+    for name, base in (
+        ("Local", "http://127.0.0.1:8000"),
+        ("Dev", "https://REPLACE_WITH_DEV_API_HOST"),
+        ("Prod", "https://REPLACE_WITH_PROD_API_HOST"),
+    ):
         variables = [{"name": "base_url", "value": base, "enabled": True, "secret": False, "type": "text"}]
-        variables += [{"name": key, "value": value, "enabled": True, "secret": secret, "type": "text"} for key, value, secret in common]
+        variables += [
+            {"name": key, "value": value, "enabled": True, "secret": secret, "type": "text"}
+            for key, value, secret in common
+        ]
         write_yaml(root / "environments" / f"{name}.yml", {"name": name, "variables": variables})
 
 
@@ -543,29 +799,43 @@ def generate(root: Path, report: bool = True) -> dict[str, Any]:
     for old in root.glob("**/*.yml"):
         if old.parent.name != "environments" and old.name not in {"opencollection.yml"}:
             old.unlink()
+    for directory in sorted(root.glob("**/*"), key=lambda p: len(p.parts), reverse=True):
+        if directory.is_dir() and not any(directory.iterdir()) and directory.name != "environments":
+            directory.rmdir()
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for record in data["operations"]:
         groups[domain(record["path"])].append(record)
     used_names: set[str] = set()
-    sorted_groups = sorted(groups.items())
-    top_groups = sorted({group.split("/", 1)[0] for group in groups})
-    if "mobile" in top_groups:
-        top_groups.remove("mobile")
-        top_groups.insert(0, "mobile")
-    top_sequences = {group: index for index, group in enumerate(top_groups, 1)}
-    child_sequences: dict[str, int] = defaultdict(int)
-    for group, records in sorted_groups:
-        top_group = group.split("/", 1)[0]
-        if "/" in group:
-            child_sequences[top_group] += 1
-            folder_seq = child_sequences[top_group]
-            folder_name = group.rsplit("/", 1)[-1].replace("-", " ").title()
-            write_yaml(root / top_group / "folder.yml", {"info": {"name": top_group.replace("-", " ").title(), "type": "folder", "seq": top_sequences[top_group]}})
-        else:
-            folder_seq = top_sequences[top_group]
-            folder_name = group.replace("-", " ").title()
+
+    # Build folder hierarchy and write folder.yml for all levels
+    tree: dict[str, list[str]] = defaultdict(list)
+    for group in groups:
+        parts = group.split("/")
+        for i in range(len(parts)):
+            parent = "/".join(parts[:i])
+            child = parts[i]
+            if child not in tree[parent]:
+                tree[parent].append(child)
+
+    if "" in tree:
+        top_items = sorted(tree[""])
+        if "mobile" in top_items:
+            top_items.remove("mobile")
+            top_items.insert(0, "mobile")
+        tree[""] = top_items
+
+    for parent, children in tree.items():
+        if parent != "":
+            children = sorted(children)
+            tree[parent] = children
+        for seq, child in enumerate(children, 1):
+            rel_path = f"{parent}/{child}".lstrip("/")
+            folder_path = root / rel_path
+            folder_name = child.replace("-", " ").title()
+            write_yaml(folder_path / "folder.yml", {"info": {"name": folder_name, "type": "folder", "seq": seq}})
+
+    for group, records in sorted(groups.items()):
         folder = root / group
-        write_yaml(folder / "folder.yml", {"info": {"name": folder_name, "type": "folder", "seq": folder_seq}})
         for index, record in enumerate(sorted(records, key=lambda x: (x["path"], x["method"])), 1):
             display_name = human_request_name(record)
             if display_name in used_names:
@@ -578,10 +848,17 @@ def generate(root: Path, report: bool = True) -> dict[str, Any]:
             used_names.add(display_name)
             multipart = multipart_fields(record) if record["method"] in {"POST", "PUT", "PATCH"} else None
             form = form_fields(record) if record["method"] in {"POST", "PUT", "PATCH"} else None
-            body = body_for(record) if record["method"] in {"POST", "PUT", "PATCH"} and not multipart and not form else None
+            body = (
+                body_for(record)
+                if record["method"] in {"POST", "PUT", "PATCH"} and not multipart and not form
+                else None
+            )
             request: dict[str, Any] = {
                 "info": {"name": display_name, "type": "http", "seq": index},
-                "http": {"method": record["method"], "url": "{{base_url}}" + re.sub(r"<[^:>]+:([^>]+)>", r":\1", record["path"])},
+                "http": {
+                    "method": record["method"],
+                    "url": "{{base_url}}" + re.sub(r"<[^:>]+:([^>]+)>", r":\1", record["path"]),
+                },
                 "settings": {"encodeUrl": True, "timeout": 0, "followRedirects": True, "maxRedirects": 5},
                 "docs": docs_for(record),
             }
@@ -597,7 +874,13 @@ def generate(root: Path, report: bool = True) -> dict[str, Any]:
                     params.append({"name": p["name"], "value": "{{" + p["name"] + "}}", "type": "path"})
                 else:
                     schema = p.get("schema", {})
-                    params.append({"name": p["name"], "value": str(p.get("example") or sample_value(schema, p["name"])), "type": "query"})
+                    params.append(
+                        {
+                            "name": p["name"],
+                            "value": str(p.get("example") or sample_value(schema, p["name"])),
+                            "type": "query",
+                        }
+                    )
             if params:
                 request["http"]["params"] = params
             if multipart is not None:
@@ -608,22 +891,64 @@ def generate(root: Path, report: bool = True) -> dict[str, Any]:
                 request["http"]["body"] = {"type": "json", "data": json.dumps(body, indent=2)}
             statuses = record["responses"]
             success = next((s for s in statuses if 200 <= s < 300), 200)
-            request_body = ({"type": "multipart-form", "data": multipart} if multipart is not None else ({"type": "form-urlencoded", "data": form} if form is not None else None))
+            request_body = (
+                {"type": "multipart-form", "data": multipart}
+                if multipart is not None
+                else ({"type": "form-urlencoded", "data": form} if form is not None else None)
+            )
             if record["path"].startswith("/api/v1/payment-webhooks/"):
                 provider_request = request_body or {"type": "json", "data": json.dumps(body_for(record), indent=2)}
                 examples = [example(record, "success", 200, provider_response(record), provider_request)]
-                examples.append(example(record, "provider error", 200 if "/payment-webhooks/payme/" in record["path"] or "click" in record["path"] else 400, provider_response(record, True), provider_request))
+                examples.append(
+                    example(
+                        record,
+                        "provider error",
+                        200 if "/payment-webhooks/payme/" in record["path"] or "click" in record["path"] else 400,
+                        provider_response(record, True),
+                        provider_request,
+                    )
+                )
             else:
                 examples = [example(record, "success", success, response_body(success), request_body)]
             failure_statuses = []
             for status in (400, 401, 403, 404, 409):
-                if status in statuses or (status == 404 and record["params"] and any(p.get("in") == "path" for p in record["params"])) or (status in {400, 409} and record["method"] in {"POST", "PUT", "PATCH", "DELETE"}):
+                if (
+                    status in statuses
+                    or (status == 404 and record["params"] and any(p.get("in") == "path" for p in record["params"]))
+                    or (status in {400, 409} and record["method"] in {"POST", "PUT", "PATCH", "DELETE"})
+                ):
                     failure_statuses.append(status)
             for status in failure_statuses:
-                examples.append(example(record, {400: "validation error", 401: "unauthorized", 403: "forbidden", 404: "not found", 409: "conflict"}[status], status, response_body(status), request_body))
+                examples.append(
+                    example(
+                        record,
+                        {
+                            400: "validation error",
+                            401: "unauthorized",
+                            403: "forbidden",
+                            404: "not found",
+                            409: "conflict",
+                        }[status],
+                        status,
+                        response_body(status),
+                        request_body,
+                    )
+                )
             request["examples"] = examples
             write_yaml(folder / f"{index:03d}-{safe_name(record['path'], record['method'])}.yml", request)
-    write_yaml(root / "opencollection.yml", {"opencollection": "1.0.0", "info": {"name": "iDeal", "version": "1.0.0", "description": "Source-backed iDeal Backend API collection. Use Local/Dev/Prod environments; Dev and Prod hosts are placeholders until deployment URLs are supplied."}, "bundled": False, "extensions": {"bruno": {"ignore": ["node_modules", ".git", ".env*"]}}})
+    write_yaml(
+        root / "opencollection.yml",
+        {
+            "opencollection": "1.0.0",
+            "info": {
+                "name": "iDeal",
+                "version": "1.0.0",
+                "description": "Source-backed iDeal Backend API collection. Use Local/Dev/Prod environments; Dev and Prod hosts are placeholders until deployment URLs are supplied.",
+            },
+            "bundled": False,
+            "extensions": {"bruno": {"ignore": ["node_modules", ".git", ".env*"]}},
+        },
+    )
     if report:
         print(json.dumps(data["counts"], indent=2, sort_keys=True))
     return data
@@ -632,14 +957,19 @@ def generate(root: Path, report: bool = True) -> dict[str, Any]:
 def validate(root: Path) -> int:
     data = inventory()
     expected_records = {(normalized(r["path"]).rstrip("/"), r["method"]): r for r in data["operations"]}
-    files = [p for p in root.glob("**/*.yml") if p.parent.name != "environments" and p.name != "opencollection.yml" and p.name != "folder.yml"]
+    files = [
+        p
+        for p in root.glob("**/*.yml")
+        if p.parent.name != "environments" and p.name != "opencollection.yml" and p.name != "folder.yml"
+    ]
     errors: list[str] = []
     found: list[tuple[str, str]] = []
     names: dict[str, Path] = {}
     secret_pattern = re.compile(r"(?i)(sk_(?:live|test)_[A-Za-z0-9]+|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]+ KEY-----)")
     for path in files:
         try:
-            doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+            loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+            doc: dict[str, Any] = loaded if isinstance(loaded, dict) else {}
         except Exception as exc:
             errors.append(f"{path}: YAML parse: {exc}")
             continue
@@ -658,7 +988,9 @@ def validate(root: Path) -> int:
         expected_record = expected_records.get((route, method))
         if not info.get("name") or not method or "{{base_url}}" not in url:
             errors.append(f"{path}: missing info/method/base_url")
-        if not isinstance(doc.get("examples"), list) or not any(e.get("name") == "success" for e in doc.get("examples", [])):
+        if not isinstance(doc.get("examples"), list) or not any(
+            e.get("name") == "success" for e in doc.get("examples", [])
+        ):
             errors.append(f"{path}: missing success example")
         body = http.get("body") or doc.get("body")
         params = http.get("params") or doc.get("params") or []
@@ -673,9 +1005,15 @@ def validate(root: Path) -> int:
                 errors.append(f"{path}: invalid JSON body: {exc}")
         if expected_record:
             auth = http.get("auth")
-            if expected_record["auth"] == "bearer" and not (isinstance(auth, dict) and auth.get("type") == "bearer" and "{{access_token}}" in str(auth)):
+            if expected_record["auth"] == "bearer" and not (
+                isinstance(auth, dict) and auth.get("type") == "bearer" and "{{access_token}}" in str(auth)
+            ):
                 errors.append(f"{path}: expected bearer auth")
-            if expected_record["auth"] == "none" and expected_record["path"] != "/api/v1/payment-webhooks/payme/" and not (isinstance(auth, dict) and auth.get("type") == "none"):
+            if (
+                expected_record["auth"] == "none"
+                and expected_record["path"] != "/api/v1/payment-webhooks/payme/"
+                and not (isinstance(auth, dict) and auth.get("type") == "none")
+            ):
                 errors.append(f"{path}: expected no auth")
             expected_path = set(path_params(expected_record["path"]))
             actual_path = {p.get("name") for p in params if p.get("type") == "path"}
@@ -692,10 +1030,24 @@ def validate(root: Path) -> int:
             expected_fields = expected_multipart or expected_form
             if expected_fields and method in {"POST", "PUT", "PATCH"}:
                 actual_body = body or {}
-                actual_names = {item.get("name") for item in actual_body.get("data", [])} if actual_body.get("type") in {"multipart-form", "form-urlencoded"} else set()
-                required_names = {item.get("name") for item in expected_fields}
+                actual_names = (
+                    {
+                        str(item.get("name"))
+                        for item in actual_body.get("data", [])
+                        if isinstance(item, dict) and item.get("name") is not None
+                    }
+                    if actual_body.get("type") in {"multipart-form", "form-urlencoded"}
+                    else set()
+                )
+                required_names = {
+                    str(item.get("name"))
+                    for item in expected_fields
+                    if isinstance(item, dict) and item.get("name") is not None
+                }
                 if actual_names != required_names:
-                    errors.append(f"{path}: form fields expected {sorted(required_names)}, found {sorted(actual_names)}")
+                    errors.append(
+                        f"{path}: form fields expected {sorted(required_names)}, found {sorted(actual_names)}"
+                    )
         raw_text = path.read_text(encoding="utf-8")
         if secret_pattern.search(raw_text):
             errors.append(f"{path}: possible hard-coded secret")
@@ -714,12 +1066,29 @@ def validate(root: Path) -> int:
     env_variable_sets = []
     for env_file in env_files:
         try:
-            env_variable_sets.append({item.get("name") for item in (yaml.safe_load(env_file.read_text(encoding="utf-8")) or {}).get("variables", [])})
+            loaded_env = yaml.safe_load(env_file.read_text(encoding="utf-8"))
+            env_data: dict[str, Any] = loaded_env if isinstance(loaded_env, dict) else {}
+            vars_list: list[Any] = env_data.get("variables", [])
+            env_variable_sets.append(
+                {str(item.get("name")) for item in vars_list if isinstance(item, dict) and item.get("name") is not None}
+            )
         except Exception as exc:
             errors.append(f"{env_file}: invalid environment YAML: {exc}")
     if env_variable_sets and len({frozenset(items) for items in env_variable_sets}) != 1:
         errors.append("environments: variable names differ between Local, Dev, and Prod")
-    print(json.dumps({"expected_routes": len(data["routes"]), "expected_methods": len(expected), "request_files": len(files), "errors": len(errors), "error_details": errors[:50]}, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "expected_routes": len(data["routes"]),
+                "expected_methods": len(expected),
+                "request_files": len(files),
+                "errors": len(errors),
+                "error_details": errors[:50],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 1 if errors else 0
 
 
