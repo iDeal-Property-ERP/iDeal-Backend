@@ -62,6 +62,7 @@ LOCAL_APPS = [
     "inventory",
     "vas",
     "chat",
+    "mobile_config",
 ]
 
 INSTALLED_APPS = UNFOLD_APPS + DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

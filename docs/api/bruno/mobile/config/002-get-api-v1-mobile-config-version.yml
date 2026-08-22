@@ -1,0 +1,126 @@
+info:
+  name: Get version config
+  type: http
+  seq: 2
+http:
+  method: GET
+  url: "{{base_url}}/api/v1/mobile/config/version/"
+  headers:
+    - name: X-App-Platform
+      value: android
+      enabled: true
+    - name: X-App-Version
+      value: 0.1.0
+      enabled: true
+  auth:
+    type: none
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: "# GET /api/v1/mobile/config/version/
+
+
+  Authentication: **none**.
+
+
+  ## Request field notes
+
+
+  - `X-App-Platform`: Required header. Case-insensitive `android` or `ios`.
+  - `X-App-Version`: Required header. Strict `MAJOR.MINOR.PATCH` semantic version.
+
+
+  ## Response
+
+
+  - `update_type`: `none`, `normal`, or `critical`.
+  - `current_version`: Echo of requested version.
+  - `latest_version`: Active policy version or `null`.
+  - `store_url`: Platform store URL or `null`.
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures."
+examples:
+  - name: success
+    request:
+      url: "{{base_url}}/api/v1/mobile/config/version/"
+      method: GET
+      headers:
+        - name: X-App-Platform
+          value: android
+        - name: X-App-Version
+          value: 0.1.0
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+        - name: cache-control
+          value: no-store
+      body:
+        type: json
+        data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"update_type\": \"normal\",\n    \"current_version\": \"0.1.0\",\n    \"latest_version\": \"1.0.0\",\n    \"store_url\": \"https://play.google.com/store/apps/details?id=com.ideal.mobile\"\n  }\n}"
+  - name: critical_update
+    request:
+      url: "{{base_url}}/api/v1/mobile/config/version/"
+      method: GET
+      headers:
+        - name: X-App-Platform
+          value: ios
+        - name: X-App-Version
+          value: 0.0.5
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+        - name: cache-control
+          value: no-store
+      body:
+        type: json
+        data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"update_type\": \"critical\",\n    \"current_version\": \"0.0.5\",\n    \"latest_version\": \"1.0.0\",\n    \"store_url\": \"https://apps.apple.com/app/id123456789\"\n  }\n}"
+  - name: up_to_date
+    request:
+      url: "{{base_url}}/api/v1/mobile/config/version/"
+      method: GET
+      headers:
+        - name: X-App-Platform
+          value: android
+        - name: X-App-Version
+          value: 1.0.0
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+        - name: cache-control
+          value: no-store
+      body:
+        type: json
+        data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"update_type\": \"none\",\n    \"current_version\": \"1.0.0\",\n    \"latest_version\": \"1.0.0\",\n    \"store_url\": \"https://play.google.com/store/apps/details?id=com.ideal.mobile\"\n  }\n}"
+  - name: validation_error
+    request:
+      url: "{{base_url}}/api/v1/mobile/config/version/"
+      method: GET
+      headers:
+        - name: X-App-Platform
+          value: windows
+        - name: X-App-Version
+          value: invalid
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"error\": \"Invalid X-App-Platform header. Must be 'android' or 'ios'.\"\n}"
