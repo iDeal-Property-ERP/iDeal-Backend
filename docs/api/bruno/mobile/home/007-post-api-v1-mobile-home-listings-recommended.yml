@@ -1,0 +1,137 @@
+info:
+  name: Record activity mobile home
+  type: http
+  seq: 7
+http:
+  method: POST
+  url: "{{base_url}}/api/v1/mobile/home/listings/recommended/"
+  auth:
+    type: bearer
+    token: "{{auth_token}}"
+  body:
+    type: json
+    data: "{\n  \"type\": \"search\",\n  \"query\": \"apartment\",\n  \"filters\": {\n    \"district_id\": 1\n  }\n}"
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: "# POST /api/v1/mobile/home/listings/recommended/
+
+  Authentication: **Bearer token required**.
+
+  Record a search activity snapshot or listing view event for recommendations personalization."
+examples:
+  - name: record search success
+    request:
+      url: "{{base_url}}/api/v1/mobile/home/listings/recommended/"
+      method: POST
+      headers:
+        - name: accept
+          value: application/json
+        - name: content-type
+          value: application/json
+        - name: authorization
+          value: Bearer test-token
+      body:
+        type: json
+        data: "{\n  \"type\": \"search\",\n  \"query\": \"apartment\",\n  \"filters\": {\n    \"district_id\": 1\n  }\n}"
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"recorded\": true\n  }\n}"
+  - name: record view success
+    request:
+      url: "{{base_url}}/api/v1/mobile/home/listings/recommended/"
+      method: POST
+      headers:
+        - name: accept
+          value: application/json
+        - name: content-type
+          value: application/json
+        - name: authorization
+          value: Bearer test-token
+      body:
+        type: json
+        data: "{\n  \"type\": \"view\",\n  \"listing_id\": 1\n}"
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"recorded\": true\n  }\n}"
+  - name: validation error
+    request:
+      url: "{{base_url}}/api/v1/mobile/home/listings/recommended/"
+      method: POST
+      headers:
+        - name: accept
+          value: application/json
+        - name: content-type
+          value: application/json
+        - name: authorization
+          value: Bearer test-token
+      body:
+        type: json
+        data: "{\n  \"type\": \"search\"\n}"
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: "{\n  \"success\": false,\n  \"error\": \"query or filters is required when type is 'search'\",\n  \"message\": \"query or filters is required when type is 'search'\"\n}"
+  - name: listing not found
+    request:
+      url: "{{base_url}}/api/v1/mobile/home/listings/recommended/"
+      method: POST
+      headers:
+        - name: accept
+          value: application/json
+        - name: content-type
+          value: application/json
+        - name: authorization
+          value: Bearer test-token
+      body:
+        type: json
+        data: "{\n  \"type\": \"view\",\n  \"listing_id\": 99999\n}"
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: "{\n  \"success\": false,\n  \"error\": \"listing_not_found\",\n  \"message\": \"listing_not_found\"\n}"
+  - name: authentication error
+    request:
+      url: "{{base_url}}/api/v1/mobile/home/listings/recommended/"
+      method: POST
+      headers:
+        - name: accept
+          value: application/json
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: "{\n  \"type\": \"view\",\n  \"listing_id\": 1\n}"
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: "{\n  \"success\": false,\n  \"error\": \"Not authenticated\",\n  \"message\": \"Not authenticated\"\n}"

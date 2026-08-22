@@ -24,6 +24,7 @@ from tests.factories import (
     OwnerAgreementFactory,
     PropertyFactory,
     PropertyPhotoFactory,
+    TenantFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -32,6 +33,7 @@ LISTINGS_URL = "/api/v1/mobile/home/listings/"
 MAP_URL = "/api/v1/mobile/home/listings/map/"
 LISTING_DETAIL_URL = "/api/v1/mobile/home/listings/"
 FILTERS_URL = "/api/v1/mobile/home/filters/"
+RECOMMENDED_URL = "/api/v1/mobile/home/listings/recommended/"
 
 
 def _make_jwt(user, **overrides):
@@ -909,3 +911,212 @@ class TestMobileHomeFilters:
         data = response.json()["data"]
         assert data["price"] == {"min": None, "max": None}
         assert data["rooms"] == {"min": None, "max": None}
+
+
+class TestMobileHomeRecommendedListings:
+    @pytest.mark.parametrize("method", ["get", "post"])
+    def test_recommended_requires_authentication(self, api_client, method):
+        if method == "get":
+            response = api_client.get(RECOMMENDED_URL)
+        else:
+            response = api_client.post(
+                RECOMMENDED_URL,
+                data={"type": "view", "listing_id": 1},
+                content_type="application/json",
+            )
+
+        assert response.status_code == 401
+        assert response.json()["success"] is False
+
+    def test_recommended_route_ordering_not_shadowed_by_detail(self):
+        match = resolve(RECOMMENDED_URL)
+        assert match.url_name == "listings-recommended"
+
+    def test_recommended_get_empty_when_no_activity(self, api_client):
+        user = TenantFactory()
+        headers = _make_jwt(user)
+
+        response = api_client.get(RECOMMENDED_URL, **headers)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"] == {"items": [], "count": 0}
+
+    def test_record_search_and_deduplication(self, api_client):
+        from marketplace.models import RecentSearchActivity
+
+        user = TenantFactory()
+        headers = _make_jwt(user)
+
+        payload = {"type": "search", "query": "Yunusabad", "filters": {"rooms_min": 2, "price_max": 1000}}
+        response1 = api_client.post(RECOMMENDED_URL, data=payload, content_type="application/json", **headers)
+
+        assert response1.status_code == 200
+        assert response1.json()["data"]["recorded"] is True
+        assert RecentSearchActivity.objects.filter(user=user).count() == 1
+
+        first_activity = RecentSearchActivity.objects.get(user=user)
+        assert first_activity.query == "Yunusabad"
+        assert first_activity.filters["rooms_min"] == 2
+        first_updated_at = first_activity.updated_at
+
+        # Repeat same search
+        response2 = api_client.post(RECOMMENDED_URL, data=payload, content_type="application/json", **headers)
+        assert response2.status_code == 200
+        assert RecentSearchActivity.objects.filter(user=user).count() == 1
+
+        first_activity.refresh_from_db()
+        assert first_activity.updated_at >= first_updated_at
+
+    def test_record_search_validation_error_on_empty_criteria(self, api_client):
+        user = TenantFactory()
+        headers = _make_jwt(user)
+
+        payload = {"type": "search", "query": "   ", "filters": {}}
+        response = api_client.post(RECOMMENDED_URL, data=payload, content_type="application/json", **headers)
+
+        assert response.status_code == 400
+        assert response.json()["success"] is False
+
+    def test_record_search_pruning_at_20(self, api_client):
+        from marketplace.models import RecentSearchActivity
+
+        user = TenantFactory()
+        headers = _make_jwt(user)
+
+        for i in range(25):
+            payload = {"type": "search", "query": f"search-{i}"}
+            api_client.post(RECOMMENDED_URL, data=payload, content_type="application/json", **headers)
+
+        assert RecentSearchActivity.objects.filter(user=user).count() == 20
+        # The 5 oldest searches should have been pruned
+        queries = list(
+            RecentSearchActivity.objects.filter(user=user)
+            .order_by("-updated_at", "-id")
+            .values_list("query", flat=True)
+        )
+        assert "search-24" in queries
+        assert "search-0" not in queries
+
+    def test_record_view_and_deduplication(self, api_client):
+        from marketplace.models import ListingViewActivity
+
+        user = TenantFactory()
+        headers = _make_jwt(user)
+        listing = _make_vacant_listing()
+
+        payload = {"type": "view", "listing_id": listing.id}
+        response1 = api_client.post(RECOMMENDED_URL, data=payload, content_type="application/json", **headers)
+
+        assert response1.status_code == 200
+        assert response1.json()["data"]["recorded"] is True
+        assert ListingViewActivity.objects.filter(user=user).count() == 1
+
+        first_activity = ListingViewActivity.objects.get(user=user)
+        first_updated_at = first_activity.updated_at
+
+        # Repeat view
+        response2 = api_client.post(RECOMMENDED_URL, data=payload, content_type="application/json", **headers)
+        assert response2.status_code == 200
+        assert ListingViewActivity.objects.filter(user=user).count() == 1
+
+        first_activity.refresh_from_db()
+        assert first_activity.updated_at >= first_updated_at
+
+    def test_record_view_404_for_unknown_listing(self, api_client):
+        user = TenantFactory()
+        headers = _make_jwt(user)
+
+        payload = {"type": "view", "listing_id": 9999999}
+        response = api_client.post(RECOMMENDED_URL, data=payload, content_type="application/json", **headers)
+
+        assert response.status_code == 404
+        assert response.json()["success"] is False
+
+    def test_record_view_pruning_at_100(self, api_client):
+        from marketplace.models import ListingViewActivity
+
+        user = TenantFactory()
+        headers = _make_jwt(user)
+        listings = [_make_vacant_listing() for _ in range(105)]
+
+        for listing in listings:
+            payload = {"type": "view", "listing_id": listing.id}
+            api_client.post(RECOMMENDED_URL, data=payload, content_type="application/json", **headers)
+
+        assert ListingViewActivity.objects.filter(user=user).count() == 100
+
+    def test_recommended_scoring_and_exclusions(self, api_client):
+        from marketplace.services.recommendations import RecommendationService
+
+        district_a = DistrictFactory(name="District A")
+        district_b = DistrictFactory(name="District B")
+
+        # Candidate 1: matches search query + district A
+        l1 = _make_vacant_listing(monthly_price=500)
+        l1.property.name = "Luxury Villa"
+        l1.property.district = district_a
+        l1.property.save(update_fields=["name", "district"])
+
+        # Candidate 2: matches district A only
+        l2 = _make_vacant_listing(monthly_price=500)
+        l2.property.name = "Simple Cottage"
+        l2.property.district = district_a
+        l2.property.save(update_fields=["name", "district"])
+
+        # Candidate 3: district B (no match)
+        l3 = _make_vacant_listing(monthly_price=1500)
+        l3.property.name = "Far Away Studio"
+        l3.property.district = district_b
+        l3.property.save(update_fields=["name", "district"])
+
+        # Viewed listing (should be excluded from recommendations)
+        viewed_listing = _make_vacant_listing(monthly_price=500)
+        viewed_listing.property.district = district_a
+        viewed_listing.property.save(update_fields=["district"])
+
+        user = TenantFactory()
+        headers = _make_jwt(user)
+
+        # Record search matching "Luxury" and district A
+        RecommendationService.record_search(user, "Luxury", {"district_id": district_a.id})
+        # Record view on viewed_listing
+        RecommendationService.record_view(user, viewed_listing.id)
+
+        response = api_client.get(RECOMMENDED_URL, **headers)
+
+        assert response.status_code == 200
+        items = response.json()["data"]["items"]
+        item_ids = [item["id"] for item in items]
+
+        # l1 (Villa) matches both query (+5) and district (+5), scores highest
+        # l2 (Cottage) matches district (+5)
+        # viewed_listing is excluded
+        # l3 (Far away) score is 0, so excluded
+        assert l1.id in item_ids
+        assert l2.id in item_ids
+        assert viewed_listing.id not in item_ids
+        assert l3.id not in item_ids
+        assert item_ids.index(l1.id) < item_ids.index(l2.id)
+
+    def test_account_deletion_hard_deletes_activity_history(self):
+        from account.services.deletion import AccountDeletionService
+        from marketplace.models import ListingViewActivity, RecentSearchActivity
+        from marketplace.services.recommendations import RecommendationService
+
+        user = TenantFactory()
+        listing = _make_vacant_listing()
+
+        RecommendationService.record_search(user, "Apartment", {})
+        RecommendationService.record_view(user, listing.id)
+
+        assert RecentSearchActivity.objects.filter(user=user).count() == 1
+        assert ListingViewActivity.objects.filter(user=user).count() == 1
+
+        AccountDeletionService.delete_account(user)
+
+        assert RecentSearchActivity.objects.filter(user=user).count() == 0
+        assert RecentSearchActivity.global_objects.filter(user=user).count() == 0
+        assert ListingViewActivity.objects.filter(user=user).count() == 0
+        assert ListingViewActivity.global_objects.filter(user=user).count() == 0

@@ -1,5 +1,5 @@
 import math
-from typing import Literal
+from typing import Any, Literal
 
 import pydantic
 
@@ -163,3 +163,35 @@ class MobileListingDetail(pydantic.BaseModel):
     can_message: bool
     contact_phone: str | None
     booking: dict
+
+
+class MobileRecommendedListingsResponse(pydantic.BaseModel):
+    items: list[MobileListingCard]
+    count: int
+
+
+class MobileActivityRecordRequest(pydantic.BaseModel):
+    type: Literal["search", "view"]
+    query: str | None = None
+    filters: dict[str, Any] | None = None
+    listing_id: int | None = None
+
+    @pydantic.model_validator(mode="after")
+    def validate_payload(self):
+        if self.type == "view":
+            if self.listing_id is None:
+                raise ValueError("listing_id is required when type is 'view'")
+        elif self.type == "search":
+            has_query = bool((self.query or "").strip())
+            has_filters = bool(
+                self.filters
+                and isinstance(self.filters, dict)
+                and any(v is not None and v != "" for v in self.filters.values())
+            )
+            if not has_query and not has_filters:
+                raise ValueError("query or filters is required when type is 'search'")
+        return self
+
+
+class MobileActivityRecordResponse(pydantic.BaseModel):
+    recorded: bool = True

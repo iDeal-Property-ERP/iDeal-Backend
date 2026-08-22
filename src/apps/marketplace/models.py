@@ -376,3 +376,54 @@ class ProviderEvent(TimestampedModel, SoftDeleteModel):
         ordering = ["created_at"]
         db_table = "provider_events"
         constraints = [models.UniqueConstraint(fields=["provider", "external_event_id"], name="unique_provider_event")]
+
+
+class RecentSearchActivity(TimestampedModel, SoftDeleteModel):
+    user = models.ForeignKey("account.User", on_delete=models.CASCADE, related_name="recent_searches")
+    query = models.CharField(max_length=255, blank=True, default="")
+    filters = models.JSONField(default=dict, blank=True)
+    fingerprint = models.CharField(max_length=64, db_index=True)
+
+    class Meta:
+        verbose_name = _("Recent Search Activity")
+        verbose_name_plural = _("Recent Search Activities")
+        ordering = ["-updated_at", "-id"]
+        db_table = "recent_search_activities"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "fingerprint"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_active_user_search_fingerprint",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "updated_at"]),
+        ]
+
+    def __str__(self):
+        return f"Search #{self.id} — user={self.user_id} q={self.query}"
+
+
+class ListingViewActivity(TimestampedModel, SoftDeleteModel):
+    user = models.ForeignKey("account.User", on_delete=models.CASCADE, related_name="listing_views")
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="view_activities")
+
+    class Meta:
+        verbose_name = _("Listing View Activity")
+        verbose_name_plural = _("Listing View Activities")
+        ordering = ["-updated_at", "-id"]
+        db_table = "listing_view_activities"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "listing"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_active_user_listing_view",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "updated_at"]),
+            models.Index(fields=["listing", "updated_at"]),
+        ]
+
+    def __str__(self):
+        return f"View #{self.id} — user={self.user_id} listing={self.listing_id}"

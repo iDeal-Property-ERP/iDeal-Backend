@@ -1,11 +1,13 @@
 from http import HTTPStatus
+from typing import Any
 
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import Max, Min, Subquery
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
-from dmr import Path, Query
+from dmr import Body, Path, Query
 from dmr.exceptions import NotAuthenticatedError
 from dmr.pagination import Page, Paginated
 from marketplace.models import Listing
@@ -19,10 +21,13 @@ from marketplace.services.listings import (
     photo_variant_url,
     published_listings_queryset,
 )
+from marketplace.services.recommendations import RecommendationService
 from property.models import District
 
 from api.v1.marketplace.views import RESPONSE_TIME, _verification_checklist
 from api.v1.mobile.home.schemas import (
+    MobileActivityRecordRequest,
+    MobileActivityRecordResponse,
     MobileHomeFeedQuery,
     MobileHomeMapQuery,
     MobileListingAmenity,
@@ -32,6 +37,7 @@ from api.v1.mobile.home.schemas import (
     MobileListingMapResponse,
     MobileListingPhoto,
     MobileListingVerification,
+    MobileRecommendedListingsResponse,
     MobileVerificationItem,
     parse_bbox,
 )
@@ -40,6 +46,24 @@ from core.api.views import BaseController, DetailPath
 from core.constants import FurnishingType, ListingStatus, PropertyType, TariffChoices
 
 _OPTIONAL_AUTH = BlacklistAwareJWTSyncAuth()
+
+
+def _safe_float(val: Any, default: float | None = None) -> float | None:
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except ValueError, TypeError:
+        return default
+
+
+def _safe_int(val: Any, default: int | None = None) -> int | None:
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except ValueError, TypeError:
+        return default
 
 
 def get_optional_authenticated_user(request):
@@ -95,18 +119,18 @@ def serialize_mobile_listing_card(listing, request, *, favorite_ids: set[int] | 
         floor=prop.floor,
         total_floors=prop.total_floors,
         furnishing=prop.furnishing,
-        price=float(monthly_price) if monthly_price is not None else None,
+        price=_safe_float(monthly_price),
         currency=listing.currency or prop.ask_currency,
         tariff=prop.tariff,
         is_verified=prop.is_verified,
         is_featured=listing.is_featured,
-        score=float(prop.score),
+        score=_safe_float(prop.score, 0.0) or 0.0,
         review_count=prop.review_count,
         cover_image_url=photo_url(cover_photo, request) if cover_photo else None,
         cover_preview_url=photo_variant_url(cover_photo, "preview_image", request) if cover_photo else None,
         cover_display_url=photo_variant_url(cover_photo, "display_image", request) if cover_photo else None,
-        map_lat=float(prop.map_lat) if prop.map_lat is not None else None,
-        map_lon=float(prop.map_lon) if prop.map_lon is not None else None,
+        map_lat=_safe_float(prop.map_lat),
+        map_lon=_safe_float(prop.map_lon),
         is_favorite=listing.id in (favorite_ids or set()),
     ).model_dump(mode="json")
 
@@ -132,17 +156,17 @@ def serialize_mobile_listing_detail(listing, request) -> dict:
         floor=prop.floor,
         total_floors=prop.total_floors,
         furnishing=prop.furnishing,
-        price=float(monthly_price) if monthly_price is not None else None,
+        price=_safe_float(monthly_price),
         currency=listing.currency or prop.ask_currency,
         tariff=prop.tariff,
         is_verified=prop.is_verified,
         is_featured=listing.is_featured,
-        score=float(prop.score),
+        score=_safe_float(prop.score, 0.0) or 0.0,
         review_count=prop.review_count,
-        map_lat=float(prop.map_lat) if prop.map_lat is not None else None,
-        map_lon=float(prop.map_lon) if prop.map_lon is not None else None,
+        map_lat=_safe_float(prop.map_lat),
+        map_lon=_safe_float(prop.map_lon),
         description=listing.description or prop.description or None,
-        deposit_amount=float(deposit) if deposit is not None else None,
+        deposit_amount=_safe_float(deposit),
         minimum_stay=listing.minimum_stay,
         price_includes=listing.price_includes or [],
         response_time=str(RESPONSE_TIME),
@@ -280,12 +304,12 @@ class MobileHomeFiltersView(BaseController):
         furnishings = [{"value": value, "label": str(_(label))} for value, label in FurnishingType.CHOICES]
         property_types = [{"value": value, "label": str(_(label))} for value, label in PropertyType.CHOICES]
         price = {
-            "min": float(price_bounds["min"]) if price_bounds["min"] is not None else None,
-            "max": float(price_bounds["max"]) if price_bounds["max"] is not None else None,
+            "min": _safe_float(price_bounds["min"]),
+            "max": _safe_float(price_bounds["max"]),
         }
         rooms = {
-            "min": int(room_bounds["min"]) if room_bounds["min"] is not None else None,
-            "max": int(room_bounds["max"]) if room_bounds["max"] is not None else None,
+            "min": _safe_int(room_bounds["min"]),
+            "max": _safe_int(room_bounds["max"]),
         }
         return self.ok(
             {
@@ -297,3 +321,37 @@ class MobileHomeFiltersView(BaseController):
                 "rooms": rooms,
             }
         )
+
+
+class MobileHomeRecommendedListingsView(BaseController):
+    def get(self) -> dict:
+        user = self.request.user
+        recommendations = RecommendationService.get_recommendations(user, limit=6)
+        favorite_ids = FavoriteListingService.favorite_ids_for_listings(
+            user, [listing.id for listing in recommendations]
+        )
+        items = [
+            serialize_mobile_listing_card(listing, self.request, favorite_ids=favorite_ids)
+            for listing in recommendations
+        ]
+        data = MobileRecommendedListingsResponse(
+            items=items,
+            count=len(items),
+        )
+        return self.ok(data.model_dump(mode="json"))
+
+    def post(self, parsed_body: Body[MobileActivityRecordRequest]) -> dict:
+        user = self.request.user
+        if parsed_body.type == "search":
+            try:
+                RecommendationService.record_search(user, parsed_body.query, parsed_body.filters)
+            except ValueError as exc:
+                return self.fail(error=str(exc), status_code=HTTPStatus.BAD_REQUEST)
+        elif parsed_body.type == "view":
+            try:
+                if parsed_body.listing_id is None:
+                    return self.fail(error="listing_id_required", status_code=HTTPStatus.BAD_REQUEST)
+                RecommendationService.record_view(user, parsed_body.listing_id)
+            except Http404, Listing.DoesNotExist:
+                return self.fail(error="listing_not_found", status_code=HTTPStatus.NOT_FOUND)
+        return self.ok(MobileActivityRecordResponse(recorded=True).model_dump(mode="json"))

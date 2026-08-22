@@ -3,6 +3,7 @@ import uuid
 from account.models import User
 from django.db import transaction
 from django.utils import timezone
+from marketplace.models import ListingViewActivity, RecentSearchActivity
 from notification.models import DeviceToken, NotificationPreference
 
 
@@ -17,6 +18,8 @@ class AccountDeletionService:
         anonymized_id = uuid.uuid4().hex
 
         with transaction.atomic():
+            RecentSearchActivity.objects.filter(user=user).hard_delete()
+            ListingViewActivity.objects.filter(user=user).hard_delete()
             DeviceToken.objects.filter(user=user).hard_delete()
             NotificationPreference.objects.filter(user=user).hard_delete()
 
