@@ -30,14 +30,25 @@ class AuthCookieMiddleware:
         path = request.path
 
         if path in LOGIN_PATHS and response.status_code == HTTPStatus.OK:
-            self._set_token_cookies(response)
+            self._set_token_cookies(request, response)
         elif path == LOGOUT_PATH and response.status_code == HTTPStatus.OK:
             response.delete_cookie(ACCESS_COOKIE, path="/")
             response.delete_cookie(REFRESH_COOKIE, path="/")
 
         return response
 
-    def _set_token_cookies(self, response) -> None:
+    def _should_strip_body_tokens(self, request) -> bool:
+        # If client explicitly requested bearer transport or provided refresh_token
+        # in the request body (e.g. mobile or API clients), preserve body tokens.
+        if request.headers.get("X-Auth-Transport") == "bearer":
+            return False
+        if request.path == "/api/v1/auth/refresh/":
+            body = self._read_request_json(request)
+            if body and (body.get("refresh_token") or body.get("refresh")):
+                return False
+        return True
+
+    def _set_token_cookies(self, request, response) -> None:
         payload = self._read_json(response)
         if payload is None:
             return
@@ -52,10 +63,18 @@ class AuthCookieMiddleware:
         response.set_cookie(ACCESS_COOKIE, access, **access_cookie_kwargs())
         response.set_cookie(REFRESH_COOKIE, refresh, **refresh_cookie_kwargs())
 
-        # Strip the raw tokens from the body so a script can never read them.
-        data["access_token"] = ""
-        data["refresh_token"] = ""
-        response.content = json.dumps(payload).encode()
+        if self._should_strip_body_tokens(request):
+            # Strip the raw tokens from the body so browser scripts never read them.
+            data["access_token"] = ""
+            data["refresh_token"] = ""
+            response.content = json.dumps(payload).encode()
+
+    @staticmethod
+    def _read_request_json(request):
+        try:
+            return json.loads(request.body)
+        except ValueError, TypeError:
+            return None
 
     @staticmethod
     def _read_json(response):
@@ -64,5 +83,5 @@ class AuthCookieMiddleware:
             return None
         try:
             return json.loads(response.content)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
