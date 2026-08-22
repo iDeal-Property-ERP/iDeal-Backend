@@ -72,16 +72,41 @@ def test_each_sort_ordering_is_applied():
     expensive.is_featured = True
     expensive.save(update_fields=["is_featured", "updated_at"])
 
-    price_asc = apply_listing_filters(
-        published_listings_queryset(), ListingFilters(sort="price_asc")
-    ).values_list("id", flat=True)
-    price_desc = apply_listing_filters(
-        published_listings_queryset(), ListingFilters(sort="price_desc")
-    ).values_list("id", flat=True)
-    newest = apply_listing_filters(
-        published_listings_queryset(), ListingFilters(sort="newest")
-    ).values_list("id", flat=True)
+    price_asc = apply_listing_filters(published_listings_queryset(), ListingFilters(sort="price_asc")).values_list(
+        "id", flat=True
+    )
+    price_desc = apply_listing_filters(published_listings_queryset(), ListingFilters(sort="price_desc")).values_list(
+        "id", flat=True
+    )
+    newest = apply_listing_filters(published_listings_queryset(), ListingFilters(sort="newest")).values_list(
+        "id", flat=True
+    )
 
     assert list(price_asc)[:3] == [cheap.id, middle.id, expensive.id]
     assert list(price_desc)[:3] == [expensive.id, middle.id, cheap.id]
     assert list(newest)[0] == expensive.id
+
+
+def test_score_sort_ordering_is_applied():
+    low_score = _listing()
+    mid_score = _listing()
+    high_score = _listing()
+
+    low_score.property.score = 3.5
+    low_score.property.save(update_fields=["score", "updated_at"])
+
+    mid_score.property.score = 7.8
+    mid_score.property.save(update_fields=["score", "updated_at"])
+
+    high_score.property.score = 9.4
+    high_score.property.save(update_fields=["score", "updated_at"])
+
+    score_desc = apply_listing_filters(published_listings_queryset(), ListingFilters(sort="score_desc")).values_list(
+        "id", flat=True
+    )
+    rating_desc = apply_listing_filters(published_listings_queryset(), ListingFilters(sort="rating_desc")).values_list(
+        "id", flat=True
+    )
+
+    assert list(score_desc)[:3] == [high_score.id, mid_score.id, low_score.id]
+    assert list(rating_desc)[:3] == [high_score.id, mid_score.id, low_score.id]

@@ -187,7 +187,7 @@ STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET", default="")
 MAP_DEFAULT_PROVIDER = config("MAP_DEFAULT_PROVIDER", default="yandex")
 YANDEX_MAPKIT_API_KEY = config("YANDEX_MAPKIT_API_KEY", default="")
 GOOGLE_MAPS_API_KEY = config("GOOGLE_MAPS_API_KEY", default="")
-MAP_OBFUSCATION_SECRET = config("MAP_OBFUSCATION_SECRET", default="iDeal-Secret-Map-Seed-2025")
+MAP_OBFUSCATION_SECRET = config("MAP_OBFUSCATION_SECRET", default="")
 
 CACHES = {
     "default": {

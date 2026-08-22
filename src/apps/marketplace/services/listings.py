@@ -4,7 +4,8 @@ import datetime
 
 import pydantic
 from contract.models import Lease
-from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Coalesce
 from marketplace.models import Booking, Listing
 
 from core.constants import (
@@ -37,7 +38,7 @@ class ListingFilters(pydantic.BaseModel):
     tariff: str | None = None
     property_type: str | None = None
     amenities: str | None = None  # csv of amenity slugs (AND-match)
-    sort: str | None = None  # newest | price_asc | price_desc
+    sort: str | None = None  # newest | price_asc | price_desc | score_desc | rating_desc
     q: str | None = None
     bbox: str | None = None  # "minLon,minLat,maxLon,maxLat" for "search this area"
 
@@ -57,7 +58,7 @@ def published_listings_queryset():
         Listing.objects.select_related("property__district")
         .prefetch_related("property__photos", "property__amenities")
         .filter(status=ListingStatus.PUBLISHED)
-        .annotate(_price=models.functions.Coalesce("monthly_price", "listed_price"))
+        .annotate(_price=Coalesce("monthly_price", "listed_price"))
     )
 
 
@@ -75,8 +76,8 @@ def apply_listing_filters(qs, filters: ListingFilters, *, include_future_managed
             end_date__gte=latest_acceptable_start,
         )
         overlapping_bookings = Booking.objects.filter(
-            models.Q(status=BookingStatus.CONFIRMED)
-            | models.Q(
+            Q(status=BookingStatus.CONFIRMED)
+            | Q(
                 status=BookingStatus.PAYMENT_PENDING,
                 payment_checkout__status=PaymentCheckoutStatus.PENDING,
                 payment_checkout__expires_at__gt=datetime.datetime.now(datetime.UTC),
@@ -85,28 +86,29 @@ def apply_listing_filters(qs, filters: ListingFilters, *, include_future_managed
             requested_end_date__gte=latest_acceptable_start,
         )
 
-        qs = qs.filter(
-            property__owner_agreements__status=OwnerAgreementStatus.ACTIVE,
-            property__owner_agreements__start_date__lte=latest_acceptable_start,
-            property__owner_agreements__end_date__gte=earliest_acceptable_end,
-        ).exclude(
-            property__leases__in=overlapping_leases
-        ).exclude(
-            property__bookings__in=overlapping_bookings
-        ).distinct()
+        qs = (
+            qs.filter(
+                property__owner_agreements__status=OwnerAgreementStatus.ACTIVE,
+                property__owner_agreements__start_date__lte=latest_acceptable_start,
+                property__owner_agreements__end_date__gte=earliest_acceptable_end,
+            )
+            .exclude(property__leases__in=overlapping_leases)
+            .exclude(property__bookings__in=overlapping_bookings)
+            .distinct()
+        )
     else:
-        future_managed = models.Q(pk__in=[])
+        future_managed = Q(pk__in=[])
         if include_future_managed:
             from marketplace.services.booking import BookingService
 
             if BookingService.enabled_providers():
-                future_managed = models.Q(
+                future_managed = Q(
                     property__engagement_type=PropertyEngagementType.MANAGED,
                     property__is_verified=True,
                     property__owner_agreements__status=OwnerAgreementStatus.ACTIVE,
                     property__owner_agreements__end_date__gte=datetime.date.today(),
                 )
-        qs = qs.filter(models.Q(property__status=PropertyStatus.VACANT) | future_managed).distinct()
+        qs = qs.filter(Q(property__status=PropertyStatus.VACANT) | future_managed).distinct()
 
     if q.district_id is not None:
         qs = qs.filter(property__district_id=q.district_id)
@@ -139,9 +141,9 @@ def apply_listing_filters(qs, filters: ListingFilters, *, include_future_managed
         qs = qs.distinct()
     if q.q:
         qs = qs.filter(
-            models.Q(property__name__icontains=q.q)
-            | models.Q(property__address__icontains=q.q)
-            | models.Q(property__district__name__icontains=q.q)
+            Q(property__name__icontains=q.q)
+            | Q(property__address__icontains=q.q)
+            | Q(property__district__name__icontains=q.q)
         )
     if q.bbox:
         try:
@@ -159,6 +161,8 @@ def apply_listing_filters(qs, filters: ListingFilters, *, include_future_managed
         qs = qs.order_by("_price", "-created_at")
     elif q.sort == "price_desc":
         qs = qs.order_by("-_price", "-created_at")
+    elif q.sort in ("score_desc", "rating_desc"):
+        qs = qs.order_by("-property__score", "-is_featured", "-created_at")
     else:  # newest (default) — featured first
         qs = qs.order_by("-is_featured", "-created_at")
 

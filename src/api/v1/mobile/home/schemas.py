@@ -1,4 +1,5 @@
 import math
+from typing import Literal
 
 import pydantic
 
@@ -40,6 +41,7 @@ class MobileHomeFeedQuery(pydantic.BaseModel):
     furnishing: str | None = None
     tariff: str | None = None
     property_type: str | None = None
+    sort: Literal["newest", "price_asc", "price_desc", "score_desc", "rating_desc"] | None = None
 
 
 class MobileHomeMapQuery(pydantic.BaseModel):
@@ -91,9 +93,9 @@ class MobileListingCard(pydantic.BaseModel):
 
 
 class MobileListingMapItem(MobileListingCard):
-    map_lat: float
-    map_lon: float
-    contact_phone: str | None
+    map_lat: float | None = None
+    map_lon: float | None = None
+    contact_phone: str | None = None
 
 
 class MobileListingMapResponse(pydantic.BaseModel):

@@ -16,8 +16,8 @@ class MobileMapConfigView(BaseController):
             provider = "yandex"
             token = getattr(settings, "YANDEX_MAPKIT_API_KEY", "")
 
-        secret = getattr(settings, "MAP_OBFUSCATION_SECRET", "iDeal-Secret-Map-Seed-2025")
-        obfuscated_token = obfuscate_map_token(token, secret) if token else ""
+        secret = getattr(settings, "MAP_OBFUSCATION_SECRET", "")
+        obfuscated_token = obfuscate_map_token(token, secret) if token and secret else ""
 
         data = MobileMapConfigOutput(
             provider=provider,  # type: ignore[arg-type]

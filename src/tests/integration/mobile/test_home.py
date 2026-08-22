@@ -192,7 +192,11 @@ class TestMobileHomeListings:
         response = api_client.get(LISTINGS_URL, **_make_jwt(tenant, jti="valid-home-token"))
 
         assert response.status_code == 200
-        cards = {item["id"]: item for item in _items(response.json()) if item["id"] in {favorite_listing.id, other_listing.id}}
+        cards = {
+            item["id"]: item
+            for item in _items(response.json())
+            if item["id"] in {favorite_listing.id, other_listing.id}
+        }
         assert cards[favorite_listing.id]["is_favorite"] is True
         assert cards[other_listing.id]["is_favorite"] is False
 
@@ -367,12 +371,30 @@ class TestMobileHomeListings:
         assert [item["id"] for item in _items(page_one)] == expected_ids[:2]
         assert [item["id"] for item in _items(page_two)] == expected_ids[2:4]
 
+    def test_score_sorting_is_supported(self, api_client):
+        low = _make_vacant_listing()
+        mid = _make_vacant_listing()
+        high = _make_vacant_listing()
+
+        low.property.score = 2.4
+        low.property.save(update_fields=["score", "updated_at"])
+        mid.property.score = 6.9
+        mid.property.save(update_fields=["score", "updated_at"])
+        high.property.score = 9.8
+        high.property.save(update_fields=["score", "updated_at"])
+
+        response = api_client.get(LISTINGS_URL, {"sort": "score_desc"})
+        assert response.status_code == 200
+        items = _items(response.json())
+        test_ids = [item["id"] for item in items if item["id"] in {low.id, mid.id, high.id}]
+        assert test_ids == [high.id, mid.id, low.id]
+
 
 class TestMobileHomeListingMap:
     BBOX = "69,41,70,42"
 
     @staticmethod
-    def _set_coordinates(listing, *, lat=41.31, lon=69.28):
+    def _set_coordinates(listing, *, lat: float | None = 41.31, lon: float | None = 69.28):
         Property.objects.filter(pk=listing.property_id).update(map_lat=lat, map_lon=lon)
         listing.property.refresh_from_db()
 

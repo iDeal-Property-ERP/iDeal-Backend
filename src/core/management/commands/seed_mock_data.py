@@ -33,6 +33,7 @@ Usage::
     python manage.py seed_mock_data --password mypass
 """
 
+import contextlib
 import urllib.request
 import uuid
 from datetime import date, timedelta
@@ -52,7 +53,7 @@ from inventory.models import InventoryAct, InventoryActItem, InventoryActPhoto
 from maintenance.models import ServiceRequest, ServiceRequestPhoto
 from marketplace.models import Booking, Listing, ViewingRequest
 from notification.models import DeviceToken, Notification, NotificationPreference
-from property.models import District, Property, PropertyPhoto
+from property.models import Amenity, District, Property, PropertyPhoto
 from vas.models import ServiceCatalogItem, ServiceOrder
 
 from core.constants import (
@@ -61,6 +62,7 @@ from core.constants import (
     ConditionRating,
     Currency,
     DevicePlatform,
+    FurnishingType,
     InventoryActStatus,
     InventoryActType,
     LeaseStatus,
@@ -71,6 +73,7 @@ from core.constants import (
     PaymentStatus,
     PayoutStatus,
     PropertyStatus,
+    PropertyType,
     ServiceRequestPriority,
     ServiceRequestStatus,
     TariffChoices,
@@ -107,6 +110,18 @@ INVENTORY_AREAS = [
     "Bathroom",
     "Hallway",
     "Balcony",
+]
+
+AMENITIES_DATA = [
+    ("wifi", "High-speed Wi-Fi", "wifi", 10),
+    ("air_conditioning", "Air conditioning", "snowflake", 20),
+    ("parking", "Free parking", "car", 30),
+    ("elevator", "Elevator", "elevator", 40),
+    ("balcony", "Balcony", "balcony", 50),
+    ("furnished_kitchen", "Furnished kitchen", "kitchen", 60),
+    ("security", "Security & intercom", "shield", 70),
+    ("heating", "Central heating", "flame", 80),
+    ("pets_allowed", "Pets allowed", "paw", 90),
 ]
 
 # (service_type, name, partner, base_price_usd, commission_rate, cashback_rate)
@@ -177,6 +192,12 @@ class Command(BaseCommand):
             help="Volume of data to generate (default: medium).",
         )
         parser.add_argument(
+            "--properties",
+            type=int,
+            default=None,
+            help="Explicit number of properties/listings to create (e.g. 100).",
+        )
+        parser.add_argument(
             "--no-images",
             action="store_true",
             help="Skip downloading stock images and creating photo rows.",
@@ -192,6 +213,7 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------ #
     def handle(self, *args, **options):
         self.scale = options["scale"]
+        self.properties_count = options["properties"]
         self.with_images = not options["no_images"]
         self.password = options["password"]
         self.counts = SCALES[self.scale]
@@ -206,8 +228,9 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Seeding mock data (scale={self.scale}, images={self.with_images}, token={self.token})…")
 
-        with transaction.atomic():
+        with transaction.atomic():  # type: ignore[attr-defined]
             districts = self._seed_districts()
+            amenities = self._seed_amenities()
             # Stable, memorable demo accounts (idempotent) participate in the data
             # alongside the randomized bulk users so you always have known logins.
             self.demo = self._seed_demo_accounts()
@@ -219,7 +242,7 @@ class Command(BaseCommand):
             agent_users = [self.demo[UserRole.AGENT]] + self._seed_users(UserRole.AGENT, self.counts["agents"])
             offer = self._seed_public_offer()
 
-            properties = self._seed_properties(owners, districts, mgmt, offer)
+            properties = self._seed_properties(owners, districts, mgmt, offer, amenities=amenities)
             self._seed_leases_and_finance(properties, tenants, mgmt)
             self._seed_exchange_rates()
             self._seed_marketplace(properties, tenants, mgmt)
@@ -282,6 +305,16 @@ class Command(BaseCommand):
             districts.append(district)
         return districts
 
+    def _seed_amenities(self):
+        amenities = []
+        for slug, name, icon, sort_order in AMENITIES_DATA:
+            amenity, _ = Amenity.objects.get_or_create(
+                slug=slug,
+                defaults={"name": name, "icon": icon, "sort_order": sort_order, "is_active": True},
+            )
+            amenities.append(amenity)
+        return amenities
+
     def _seed_users(self, role, count):
         users = []
         for i in range(count):
@@ -331,7 +364,7 @@ class Command(BaseCommand):
             is_active=True,
         )
 
-    def _seed_properties(self, owners, districts, mgmt, offer):
+    def _seed_properties(self, owners, districts, mgmt, offer, amenities=None):
         """Create properties across realistic lifecycle tracks.
 
         Tracks (weighted): managed-rented, managed-vacant, maintenance,
@@ -339,10 +372,10 @@ class Command(BaseCommand):
         (submitted/rejected). Listings are auto-created by the marketplace
         signal for every property saved VACANT.
         """
-        total = max(len(owners) * 3, 12)
+        total = self.properties_count or max(len(owners) * 3, 12)
         tracks = self.rng.choices(
             ["rented", "vacant", "maintenance", "onboarding_approved", "onboarding_pending"],
-            weights=[34, 26, 10, 18, 12],
+            weights=[20, 60, 5, 10, 5],
             k=total,
         )
         properties = []
@@ -361,13 +394,17 @@ class Command(BaseCommand):
                 name=f"{district.name} {self.faker.street_name()} Apt {self.rng.randint(1, 200)}",
                 address=self.faker.street_address(),
                 district=district,
+                property_type=self.rng.choice([PropertyType.APARTMENT, PropertyType.HOUSE, PropertyType.STUDIO]),
                 rooms=self.rng.randint(1, 5),
                 area_sqm=self.rng.randint(28, 180),
                 floor=self.rng.randint(1, total_floors),
                 total_floors=total_floors,
+                furnishing=self.rng.choice(
+                    [FurnishingType.FURNISHED, FurnishingType.SEMI_FURNISHED, FurnishingType.UNFURNISHED]
+                ),
                 owner=owner,
                 status=initial_status,
-                score=Decimal(f"{self.rng.uniform(8.0, 9.9):.1f}"),
+                score=Decimal(f"{self.rng.uniform(8.2, 9.9):.1f}"),
                 review_count=self.rng.randint(12, 180),
                 is_verified=is_verified,
                 verified_at=timezone.now() if is_verified else None,
@@ -379,6 +416,8 @@ class Command(BaseCommand):
                 owner_guaranteed_price=(ask * Decimal("0.9")).quantize(Decimal("0.01")),
                 tenant_charge_price=(ask * Decimal("1.1")).quantize(Decimal("0.01")),
             )
+            if amenities:
+                prop.amenities.set(self.rng.sample(amenities, k=self.rng.randint(3, len(amenities))))
             self._seed_property_photos(prop)
 
             agreement = None
@@ -561,9 +600,15 @@ class Command(BaseCommand):
                     status=self.rng.choice([BookingStatus.REQUESTED, BookingStatus.APPROVED, BookingStatus.REJECTED]),
                     message=self.faker.sentence() if self.rng.random() < 0.6 else None,
                 )
-                # Convert a few approved bookings into real leases.
-                if booking.status == BookingStatus.APPROVED and entry["agreement"] and self.rng.random() < 0.5:
-                    booking.convert_to_lease(reviewed_by=self.rng.choice(mgmt))
+                # Convert a few approved bookings into real leases (only if no active lease exists).
+                if (
+                    booking.status == BookingStatus.APPROVED
+                    and entry["agreement"]
+                    and not entry.get("lease")
+                    and self.rng.random() < 0.5
+                ):
+                    with contextlib.suppress(Exception):
+                        booking.convert_to_lease(reviewed_by=self.rng.choice(mgmt))
 
     def _seed_maintenance(self, properties, tenants, mgmt):
         leased = [e for e in properties if e.get("lease")]
@@ -730,13 +775,13 @@ class Command(BaseCommand):
     # Reporting
     # ------------------------------------------------------------------ #
     def _report(self, before):
-        self.stdout.write(self.style.SUCCESS(f"\nSeeded (append) — scale={self.scale}"))
+        self.stdout.write(f"\nSeeded (append) — scale={self.scale}")
         width = max(len(label) for label, _ in REPORT_MODELS)
         for label, model in REPORT_MODELS:
             delta = model.objects.count() - before[label]
             self.stdout.write(f"  {label.ljust(width)}  +{delta}")
 
-        self.stdout.write(self.style.SUCCESS("\nDemo logins — sign in by USERNAME (not email)"))
+        self.stdout.write("\nDemo logins — sign in by USERNAME (not email)")
         self.stdout.write(f"  password: {self.password}")
         for username, role, _ in DEMO_ACCOUNTS:
             self.stdout.write(f"  {role.ljust(6)}: {username}")

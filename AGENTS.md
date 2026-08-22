@@ -17,6 +17,7 @@ just check             # python src/manage.py check
 ```
 
 Lint and format:
+
 ```bash
 ruff check src/        # lint (0 errors required)
 ruff check --fix src/  # auto-fix
@@ -117,6 +118,7 @@ class PropertyStatus(ConstantChoices):
 ## Translation
 
 All user-facing strings must be wrapped with `_()`:
+
 - `verbose_name`, `verbose_name_plural` in model `Meta`
 - Admin `fieldsets` labels
 - `CHOICES` display text in `core/constants.py`
