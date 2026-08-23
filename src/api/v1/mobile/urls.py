@@ -18,4 +18,6 @@ urlpatterns = [
     path("support/", include("api.v1.mobile.support.urls", namespace="support")),
     path("config/", include("api.v1.mobile.config.urls", namespace="config")),
     path("property-upload/", include("api.v1.mobile.property_upload.urls", namespace="property-upload")),
+    path("my-listings/", include("api.v1.mobile.my_listings.urls", namespace="my-listings")),
+    path("contracts/", include("api.v1.mobile.contracts.urls", namespace="contracts")),
 ]

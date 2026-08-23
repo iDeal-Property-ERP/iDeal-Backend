@@ -1,0 +1,72 @@
+info:
+  name: List contracts mobile contracts
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: '{{base_url}}/api/v1/mobile/contracts/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# GET /api/v1/mobile/contracts/
+
+
+  Authentication: **bearer**.
+
+
+  Returns leases belonging only to the authenticated tenant. `reference` is a
+  stable lease reference, not a legal contract number. `document_url` is null
+  until lease documents are stored by the backend.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/contracts/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": [\n    {\n      \"id\": 42,\n      \"reference\": \"#42\",\n      \"property\": {\n        \"id\": 7,\n        \"title\": \"Tenant contract home\",\n        \"address\": \"12 Amir Temur Street\"\n      },\n      \"start_date\": \"2026-02-01\",\n      \"end_date\": \"2027-02-01\",\n      \"monthly_rent\": \"850.00\",\n      \"currency\": \"USD\",\n      \"status\": \"active\",\n      \"status_display\": \"Active\",\n      \"document_url\": null\n    }\n  ]\n}"
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/mobile/contracts/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+  response:
+    status: 401
+    statusText: Unauthorized
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Not authenticated\",\n  \"error\": \"Not authenticated\"\n}"
