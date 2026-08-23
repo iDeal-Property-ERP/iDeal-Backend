@@ -56,20 +56,20 @@ class MobilePropertyContactInput(pydantic.BaseModel):
 
 
 class MobilePropertyUploadInput(pydantic.BaseModel):
-    name: str
-    property_type: str = "apartment"
+    name: str | None = None
+    property_type: str
     district_id: int
     rooms: int = pydantic.Field(ge=1)
     floor: int = pydantic.Field(ge=0)
     total_floors: int | None = pydantic.Field(default=None, ge=0)
     area_sqm: int = pydantic.Field(ge=1)
-    furnishing: str = "unfurnished"
+    furnishing: str
     description: str | None = None
     amenities: list[str] = pydantic.Field(default_factory=list)
     monthly_price: Decimal = pydantic.Field(ge=0)
-    deposit_amount: Decimal = pydantic.Field(ge=0)
+    deposit_amount: Decimal | None = None
     currency: str = "USD"
-    minimum_stay: int = 1
+    minimum_stay: int | None = None
     price_includes: list[str] = pydantic.Field(default_factory=list)
     accept_offer: bool
     contact: MobilePropertyContactInput | None = None

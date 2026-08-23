@@ -243,3 +243,35 @@ class TestMobilePropertyUploadSubmit:
         assert user.role == UserRole.OWNER
         assert user.last_name == "Karimov"
         assert user.email == "jasur@example.com"
+
+    def test_submit_without_name_autogenerates_title(self, api_client):
+        user = UserFactory(first_name="NoNameUser")
+        district = DistrictFactory(name="Mirzo Ulugbek")
+
+        payload = {
+            "property_type": "apartment",
+            "district_id": district.id,
+            "rooms": 3,
+            "floor": 2,
+            "total_floors": 5,
+            "area_sqm": 85,
+            "furnishing": "semi_furnished",
+            "monthly_price": 800,
+            "currency": "USD",
+            "accept_offer": True,
+        }
+
+        files = [SimpleUploadedFile(f"p{i}.png", _PNG, content_type="image/png") for i in range(5)]
+        res = api_client.post(
+            SUBMIT_URL,
+            data={"payload": json.dumps(payload), "images": files},
+            **_make_jwt(user),
+        )
+
+        assert res.status_code == 201
+        data = res.json()["data"]
+        prop = Property.objects.get(pk=data["property_id"])
+        assert prop.name == "3-room Apartment in Mirzo Ulugbek"
+        assert prop.rooms == 3
+        assert prop.area_sqm == 85
+        assert prop.deposit_amount == 0

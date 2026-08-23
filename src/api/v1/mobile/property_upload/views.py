@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from http import HTTPStatus
 from typing import cast
 
@@ -142,10 +143,16 @@ class MobilePropertyUploadSubmitView(BaseController):
             user.role = UserRole.OWNER
         user.save()
 
+        prop_name = (
+            validated.name.strip()
+            if validated.name and validated.name.strip()
+            else f"{validated.rooms}-room {validated.property_type.replace('_', ' ').title()} in {district.name}"
+        )
+
         try:
             with transaction.atomic():  # type: ignore[attr-defined]
                 prop = Property.objects.create(
-                    name=validated.name,
+                    name=prop_name,
                     address=district.name,
                     district=district,
                     property_type=validated.property_type,
@@ -163,7 +170,7 @@ class MobilePropertyUploadSubmitView(BaseController):
                     owner_guaranteed_currency=validated.currency,
                     tenant_charge_price=validated.monthly_price,
                     tenant_charge_currency=validated.currency,
-                    deposit_amount=validated.deposit_amount,
+                    deposit_amount=validated.deposit_amount or Decimal("0"),
                 )
 
                 if validated.amenities:
