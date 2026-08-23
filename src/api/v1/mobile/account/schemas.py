@@ -42,3 +42,17 @@ class AccountDeletionConfirmInput(pydantic.BaseModel):
     code: str = pydantic.Field(min_length=6, max_length=6)
 
     model_config = pydantic.ConfigDict(str_strip_whitespace=True)
+
+
+class PhoneChangeOTPRequestInput(pydantic.BaseModel):
+    phone: str
+    channel: Literal["sms", "telegram"] = "telegram"
+
+    model_config = pydantic.ConfigDict(str_strip_whitespace=True)
+
+
+class PhoneChangeConfirmInput(pydantic.BaseModel):
+    phone: str
+    code: str = pydantic.Field(pattern=r"^\d{6}$")
+
+    model_config = pydantic.ConfigDict(str_strip_whitespace=True)

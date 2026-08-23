@@ -10,6 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 
+from api.v1.mobile.account import views as account_views
 from api.v1.mobile.auth import views
 from core.constants import UserRole
 from tests.factories import UserFactory
@@ -22,8 +23,8 @@ def clear_cache():
     cache.clear()
 
 
-def _post(api_client, path, payload):
-    return api_client.post(path, data=json.dumps(payload), content_type="application/json")
+def _post(api_client, path, payload, **headers):
+    return api_client.post(path, data=json.dumps(payload), content_type="application/json", **headers)
 
 
 def _put(api_client, path, payload, **headers):
@@ -443,3 +444,130 @@ class TestMobileUserMeAPI:
             "message": "Upload failed",
             "error": "Unsupported image type 'text/plain'",
         }
+
+
+@pytest.mark.django_db
+class TestPhoneChangeAPI:
+    request_path = "/api/v1/mobile/account/phone/otp/request/"
+    confirm_path = "/api/v1/mobile/account/phone/confirm/"
+
+    @staticmethod
+    def _request(api_client, phone, **headers):
+        return _post(
+            api_client,
+            TestPhoneChangeAPI.request_path,
+            {"phone": phone, "channel": "telegram"},
+            **headers,
+        )
+
+    @staticmethod
+    def _confirm(api_client, phone, code="123456", **headers):
+        return _post(
+            api_client,
+            TestPhoneChangeAPI.confirm_path,
+            {"phone": phone, "code": code},
+            **headers,
+        )
+
+    def test_routes_require_authentication(self, api_client):
+        assert self._request(api_client, "+998901234567").status_code == 401
+        assert self._confirm(api_client, "+998901234567").status_code == 401
+
+    def test_request_normalizes_phone_and_stores_account_scoped_otp(self, api_client, jwt_header, user, monkeypatch):
+        monkeypatch.setattr(settings, "OTP_DEV_BYPASS_CODE", "123456")
+        monkeypatch.setattr(account_views.otp_service, "generate_otp", lambda: "999999")
+        phone = "+998 90 123 45 67"
+
+        response = self._request(api_client, phone, **jwt_header)
+
+        assert response.status_code == 200
+        assert response.json()["data"] == {"channel": "telegram", "expires_in": 300, "resend_after": 60}
+        assert account_views.otp_service.get_otp(
+            "+998901234567", purpose=f"phone-change:{user.pk}"
+        ) == "999999"
+        assert account_views.otp_service.get_otp("+998901234567") is None
+
+    def test_request_rejects_invalid_current_and_occupied_numbers_before_dispatch(
+        self, api_client, jwt_header, user, monkeypatch
+    ):
+        dispatched = []
+        monkeypatch.setattr(account_views.otp_service, "dispatch", lambda *args: dispatched.append(args))
+        occupied_phone = "+998901234568"
+        UserFactory(phone=occupied_phone)
+
+        invalid_response = self._request(api_client, "901234567", **jwt_header)
+        current_response = self._request(api_client, user.phone, **jwt_header)
+        occupied_response = self._request(api_client, occupied_phone, **jwt_header)
+
+        assert invalid_response.status_code == 400
+        assert current_response.status_code == 400
+        assert occupied_response.status_code == 409
+        assert occupied_response.json()["error"] == "This phone number is already in use"
+        assert dispatched == []
+        assert account_views.otp_service.get_otp(occupied_phone, purpose=f"phone-change:{user.pk}") is None
+
+    def test_request_rejects_disabled_channel_and_clears_failed_delivery_otp(
+        self, api_client, jwt_header, user, monkeypatch
+    ):
+        phone = "+998901234567"
+        with override_settings(OTP_TELEGRAM_ENABLED=False, OTP_SMS_ENABLED=True):
+            disabled_response = self._request(api_client, phone, **jwt_header)
+        assert disabled_response.status_code == 400
+
+        def fail_dispatch(*_args):
+            raise account_views.OTPDeliveryError("provider unavailable")
+
+        monkeypatch.setattr(account_views.otp_service, "dispatch", fail_dispatch)
+        failed_response = self._request(api_client, phone, **jwt_header)
+
+        assert failed_response.status_code == 502
+        assert account_views.otp_service.get_otp(phone, purpose=f"phone-change:{user.pk}") is None
+
+    @override_settings(RATE_LIMIT_ENABLED=True, OTP_DEV_BYPASS_CODE="123456")
+    def test_request_is_rate_limited_before_a_fourth_otp_is_dispatched(self, api_client, jwt_header):
+        for phone in ("+998901234567", "+998901234568", "+998901234569"):
+            assert self._request(api_client, phone, **jwt_header).status_code == 200
+
+        response = self._request(api_client, "+998901234570", **jwt_header)
+
+        assert response.status_code == 429
+        assert response.json()["error"] == "rate_limit_exceeded"
+
+    def test_confirm_requires_its_own_otp_and_preserves_phone_on_failure(self, api_client, jwt_header, user):
+        phone = "+998901234567"
+        account_views.otp_service.set_otp(phone, "123456")
+
+        with override_settings(OTP_DEV_BYPASS_CODE=""):
+            response = self._confirm(api_client, phone, **jwt_header)
+
+        assert response.status_code == 400
+        user.refresh_from_db()
+        assert user.phone != phone
+
+    def test_confirm_updates_phone_and_current_jwt_remains_valid(self, api_client, jwt_header, user, monkeypatch):
+        phone = "+998901234567"
+        monkeypatch.setattr(settings, "OTP_DEV_BYPASS_CODE", "123456")
+        assert self._request(api_client, phone, **jwt_header).status_code == 200
+
+        response = self._confirm(api_client, phone, **jwt_header)
+
+        assert response.status_code == 200
+        assert response.json()["data"]["phone"] == phone
+        user.refresh_from_db()
+        assert user.phone == phone
+        assert api_client.get("/api/v1/mobile/account/me/", **jwt_header).status_code == 200
+        assert account_views.otp_service.get_otp(phone, purpose=f"phone-change:{user.pk}") is None
+
+    def test_confirm_rechecks_uniqueness_after_otp_request(self, api_client, jwt_header, user, monkeypatch):
+        phone = "+998901234567"
+        monkeypatch.setattr(settings, "OTP_DEV_BYPASS_CODE", "123456")
+        assert self._request(api_client, phone, **jwt_header).status_code == 200
+        UserFactory(phone=phone)
+
+        response = self._confirm(api_client, phone, **jwt_header)
+
+        assert response.status_code == 409
+        assert response.json()["error"] == "This phone number is already in use"
+        user.refresh_from_db()
+        assert user.phone != phone
+        assert account_views.otp_service.get_otp(phone, purpose=f"phone-change:{user.pk}") is None

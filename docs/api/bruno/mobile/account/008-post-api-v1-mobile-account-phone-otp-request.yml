@@ -1,0 +1,125 @@
+info:
+  name: Request phone-change OTP
+  type: http
+  seq: 8
+http:
+  method: POST
+  url: '{{base_url}}/api/v1/mobile/account/phone/otp/request/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+  body:
+    type: json
+    data: |
+      {
+        "phone": "+998901234567",
+        "channel": "telegram"
+      }
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: |
+  # POST /api/v1/mobile/account/phone/otp/request/
+
+  Authentication: **bearer**. The backend normalizes the Uzbekistan phone number and checks that no other account owns it before it creates or dispatches an OTP. `channel` is `telegram` or `sms` and defaults to `telegram`.
+
+  Static source-backed examples are below; provider delivery is not exercised by these fixtures.
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/otp/request/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: '{"phone":"+998901234567","channel":"telegram"}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: '{"success":true,"message":"OK","data":{"channel":"telegram","expires_in":300,"resend_after":60}}'
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/otp/request/'
+    method: POST
+    headers: []
+    body:
+      type: json
+      data: '{"phone":"invalid","channel":"telegram"}'
+  response:
+    status: 400
+    statusText: Bad Request
+    headers: []
+    body:
+      type: json
+      data: '{"success":false,"message":"Validation error","error":"Invalid phone number"}'
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/otp/request/'
+    method: POST
+    headers: []
+    body:
+      type: json
+      data: '{"phone":"+998901234567","channel":"telegram"}'
+  response:
+    status: 401
+    statusText: Unauthorized
+    headers: []
+    body:
+      type: json
+      data: '{"success":false,"message":"Authentication required","error":"unauthorized"}'
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/otp/request/'
+    method: POST
+    headers: []
+    body:
+      type: json
+      data: '{"phone":"+998901234567","channel":"telegram"}'
+  response:
+    status: 409
+    statusText: Conflict
+    headers: []
+    body:
+      type: json
+      data: '{"success":false,"message":"Data conflict","error":"This phone number is already in use"}'
+- name: rate limit
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/otp/request/'
+    method: POST
+    headers: []
+    body:
+      type: json
+      data: '{"phone":"+998901234567","channel":"telegram"}'
+  response:
+    status: 429
+    statusText: Too Many Requests
+    headers: []
+    body:
+      type: json
+      data: '{"success":false,"message":"Too many requests. Please try again later.","error":"rate_limit_exceeded"}'
+- name: provider error
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/otp/request/'
+    method: POST
+    headers: []
+    body:
+      type: json
+      data: '{"phone":"+998901234567","channel":"telegram"}'
+  response:
+    status: 502
+    statusText: Bad Gateway
+    headers: []
+    body:
+      type: json
+      data: '{"success":false,"message":"Please try again later","error":"Unable to deliver verification code"}'

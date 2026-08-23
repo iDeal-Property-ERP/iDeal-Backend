@@ -1,0 +1,110 @@
+info:
+  name: Confirm phone change
+  type: http
+  seq: 7
+http:
+  method: POST
+  url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+  body:
+    type: json
+    data: |
+      {
+        "phone": "+998901234567",
+        "code": "123456"
+      }
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: |
+  # POST /api/v1/mobile/account/phone/confirm/
+
+  Authentication: **bearer**. The OTP must have been requested by this same authenticated account for this exact new phone number. A successful confirmation updates the phone immediately and returns the mobile profile.
+
+  Static source-backed examples are below; replace fixture values with a delivered OTP for Local runtime checks.
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
+    method: POST
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    body:
+      type: json
+      data: '{"phone":"+998901234567","code":"123456"}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: '{"success":true,"message":"OK","data":{"id":1,"first_name":"Fixture","last_name":null,"patronymic":null,"email":null,"phone":"+998901234567","nationality":null,"avatar_url":null}}'
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
+    method: POST
+    headers: []
+    body:
+      type: json
+      data: '{"phone":"invalid","code":"000000"}'
+  response:
+    status: 400
+    statusText: Bad Request
+    headers: []
+    body:
+      type: json
+      data: '{"success":false,"message":"Validation error","error":"Invalid phone number"}'
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
+    method: POST
+    headers: []
+    body:
+      type: json
+      data: '{"phone":"+998901234567","code":"123456"}'
+  response:
+    status: 401
+    statusText: Unauthorized
+    headers: []
+    body:
+      type: json
+      data: '{"success":false,"message":"Authentication required","error":"unauthorized"}'
+- name: conflict
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
+    method: POST
+    headers: []
+    body:
+      type: json
+      data: '{"phone":"+998901234567","code":"123456"}'
+  response:
+    status: 409
+    statusText: Conflict
+    headers: []
+    body:
+      type: json
+      data: '{"success":false,"message":"Data conflict","error":"This phone number is already in use"}'
+- name: rate limit
+  request:
+    url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
+    method: POST
+    headers: []
+    body:
+      type: json
+      data: '{"phone":"+998901234567","code":"123456"}'
+  response:
+    status: 429
+    statusText: Too Many Requests
+    headers: []
+    body:
+      type: json
+      data: '{"success":false,"message":"Too many requests. Please try again later.","error":"rate_limit_exceeded"}'

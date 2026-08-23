@@ -5,6 +5,7 @@ from account.models import TokenBlacklist, User
 from account.services.auth.otp import OTP_ATTEMPT_LIMIT, OTPDeliveryError, OTPService
 from account.services.deletion import AccountDeletionService
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
 from dmr import Body
 from dmr.security.jwt.auth import request_jwt
@@ -14,13 +15,32 @@ from api.v1.mobile.account.schemas import (
     AccountDeletionOTPRequestInput,
     MobileUserMeOutput,
     MobileUserMeUpdateInput,
+    PhoneChangeConfirmInput,
+    PhoneChangeOTPRequestInput,
 )
 from core.api.views import BaseController
+from core.utils.phone import normalize_uzbekistan_phone
 from core.utils.rate_limit import rate_limit
 from core.utils.uploads import UploadError, validate_image
 
 ACCOUNT_DELETION_OTP_PURPOSE = "account-deletion"
 otp_service = OTPService()
+
+
+def _phone_change_otp_purpose(user: User) -> str:
+    return f"phone-change:{user.pk}"
+
+
+def _invalid_phone(controller: BaseController):
+    return controller.fail(
+        error=str(_("Invalid phone number")),
+        message=str(_("Validation error")),
+        status_code=HTTPStatus.BAD_REQUEST,
+    )
+
+
+def _phone_is_taken(phone: str, *, excluding_user: User) -> bool:
+    return User.global_objects.filter(phone=phone).exclude(pk=excluding_user.pk).exists()
 
 
 def serialize_mobile_user(request, user: User) -> dict:
@@ -95,6 +115,103 @@ class MobileUserAvatarView(BaseController):
             previous_storage.delete(previous_name)
         return self.ok(serialize_mobile_user(self.request, user))
 
+
+class PhoneChangeOTPRequestView(BaseController):
+    @rate_limit(requests=3, window_seconds=3600)
+    def post(self, parsed_body: Body[PhoneChangeOTPRequestInput]) -> dict:
+        user: User = self.request.user
+        try:
+            phone = normalize_uzbekistan_phone(parsed_body.phone)
+        except ValueError:
+            return _invalid_phone(self)
+
+        if phone == user.phone:
+            return self.fail(
+                error=str(_("This is already your current phone number")),
+                message=str(_("Validation error")),
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+        if _phone_is_taken(phone, excluding_user=user):
+            return self.fail(
+                error=str(_("This phone number is already in use")),
+                message=str(_("Data conflict")),
+                status_code=HTTPStatus.CONFLICT,
+            )
+        if parsed_body.channel not in otp_service.get_available_channels():
+            return self.fail(
+                error=str(_("Selected OTP channel is disabled or unavailable")),
+                message=str(_("Validation error")),
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+
+        purpose = _phone_change_otp_purpose(user)
+        code = otp_service.generate_otp()
+        otp_service.clear_otp_attempts(phone, purpose=purpose)
+        otp_service.set_otp(phone, code, purpose=purpose)
+        try:
+            otp_service.dispatch(phone, code, parsed_body.channel)
+        except OTPDeliveryError:
+            otp_service.pop_otp(phone, purpose=purpose)
+            return self.fail(
+                error=str(_("Unable to deliver verification code")),
+                message=str(_("Please try again later")),
+                status_code=HTTPStatus.BAD_GATEWAY,
+            )
+
+        return self.ok(
+            {"channel": parsed_body.channel, "expires_in": 300, "resend_after": 60},
+            status_code=HTTPStatus.OK,
+        )
+
+
+class PhoneChangeConfirmView(BaseController):
+    @rate_limit(requests=10, window_seconds=3600)
+    def post(self, parsed_body: Body[PhoneChangeConfirmInput]) -> dict:
+        user: User = self.request.user
+        try:
+            phone = normalize_uzbekistan_phone(parsed_body.phone)
+        except ValueError:
+            return _invalid_phone(self)
+
+        purpose = _phone_change_otp_purpose(user)
+        if otp_service.get_otp_attempts(phone, purpose=purpose) >= OTP_ATTEMPT_LIMIT:
+            return self.fail(
+                error=str(_("Too many verification attempts")),
+                message=str(_("Please request a new code")),
+                status_code=HTTPStatus.TOO_MANY_REQUESTS,
+            )
+
+        bypass_code = settings.OTP_DEV_BYPASS_CODE
+        if not (
+            (bypass_code and parsed_body.code == bypass_code)
+            or parsed_body.code == otp_service.get_otp(phone, purpose=purpose)
+        ):
+            otp_service.increment_otp_attempts(phone, purpose=purpose)
+            return self.fail(
+                error=str(_("Invalid or expired code")),
+                message=str(_("Verification failed")),
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+
+        try:
+            with transaction.atomic():
+                locked_user = User.global_objects.select_for_update().get(pk=user.pk)
+                if phone == locked_user.phone or _phone_is_taken(phone, excluding_user=locked_user):
+                    raise IntegrityError
+                locked_user.phone = phone
+                locked_user.save(update_fields=["phone", "updated_at"])
+        except IntegrityError:
+            otp_service.pop_otp(phone, purpose=purpose)
+            otp_service.clear_otp_attempts(phone, purpose=purpose)
+            return self.fail(
+                error=str(_("This phone number is already in use")),
+                message=str(_("Data conflict")),
+                status_code=HTTPStatus.CONFLICT,
+            )
+
+        otp_service.pop_otp(phone, purpose=purpose)
+        otp_service.clear_otp_attempts(phone, purpose=purpose)
+        return self.ok(serialize_mobile_user(self.request, locked_user), status_code=HTTPStatus.OK)
 
 class AccountDeletionOTPRequestView(BaseController):
     @rate_limit(requests=3, window_seconds=3600)
