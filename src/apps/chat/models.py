@@ -48,6 +48,11 @@ class Conversation(TimestampedModel, SoftDeleteModel):
     )
     staff_unread_count = models.PositiveIntegerField(default=0, verbose_name=_("Staff Unread Count"))
 
+    # Versions are audience-specific: a private mute/archive action must not
+    # create a false sequence gap for management clients (and vice versa).
+    user_realtime_version = models.PositiveBigIntegerField(default=0, verbose_name=_("User Realtime Version"))
+    staff_realtime_version = models.PositiveBigIntegerField(default=0, verbose_name=_("Staff Realtime Version"))
+
     is_user_blocked = models.BooleanField(default=False, db_index=True, verbose_name=_("Is User Blocked"))
     blocked_by = models.ForeignKey(
         "account.User",
@@ -207,3 +212,32 @@ class ConversationReport(TimestampedModel):
 
     def __str__(self):
         return f"Report #{self.pk} for conversation #{self.conversation_id}"
+
+
+class ChatRealtimeEvent(TimestampedModel):
+    """A short-lived, audience-scoped replay outbox for chat WebSockets."""
+
+    audience = models.CharField(max_length=10, verbose_name=_("Audience"))
+    recipient_user = models.ForeignKey(
+        "account.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("Recipient User"),
+    )
+    # Keep this as a scalar rather than a foreign key so a purge event remains
+    # replayable after the conversation itself has been soft-deleted.
+    conversation_id = models.BigIntegerField(db_index=True, verbose_name=_("Conversation ID"))
+    conversation_version = models.PositiveBigIntegerField(verbose_name=_("Conversation Version"))
+    event_type = models.CharField(max_length=64, verbose_name=_("Event Type"))
+    payload = models.JSONField(default=dict, verbose_name=_("Payload"))
+
+    class Meta:
+        verbose_name = _("Chat Realtime Event")
+        verbose_name_plural = _("Chat Realtime Events")
+        db_table = "chat_realtime_events"
+        indexes = [
+            models.Index(fields=["audience", "recipient_user", "id"]),
+            models.Index(fields=["created_at"]),
+        ]

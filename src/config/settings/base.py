@@ -40,6 +40,7 @@ DJANGO_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
+    "channels",
     "dmr",
     "corsheaders",
     "django_softdelete",
@@ -314,6 +315,22 @@ Q_CLUSTER = {
     "redis": config("REDIS_URL", default="redis://localhost:6379/0"),
     "catch_up": False,
 }
+
+# The Redis channel layer lets every ASGI worker deliver the same chat events.
+# Keep it separate from the cache configuration so capacity can be tuned for
+# realtime traffic without changing cache eviction behaviour.
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [config("REDIS_URL", default="redis://localhost:6379/0")],
+            "capacity": config("CHAT_CHANNEL_CAPACITY", default=200, cast=int),
+            "expiry": config("CHAT_CHANNEL_EXPIRY_SECONDS", default=60, cast=int),
+        },
+    },
+}
+CHAT_REALTIME_EVENT_RETENTION_DAYS = config("CHAT_REALTIME_EVENT_RETENTION_DAYS", default=7, cast=int)
+CHAT_REALTIME_REPLAY_LIMIT = config("CHAT_REALTIME_REPLAY_LIMIT", default=500, cast=int)
 
 UNFOLD = {
     "SITE_URL": "/admin/",

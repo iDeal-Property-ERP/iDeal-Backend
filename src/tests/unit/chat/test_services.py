@@ -3,7 +3,7 @@ from unittest.mock import call, patch
 
 import pytest
 from chat.exceptions import ChatReadOnlyError, ChatUnavailableError
-from chat.models import Conversation, Message
+from chat.models import ChatRealtimeEvent, Conversation, Message
 from chat.services import (
     assert_staff_can_write,
     assert_user_can_write,
@@ -221,6 +221,50 @@ def test_mark_read_advances_watermark_stamps_peer_messages_and_never_rewinds():
     assert conversation.staff_last_read_message_id == staff_message.id
     assert conversation.staff_unread_count == 0
     assert user_message.read_at is not None
+
+
+@pytest.mark.django_db
+def test_mark_read_clamps_a_future_watermark_and_keeps_later_messages_unread():
+    conversation = ConversationFactory()
+    staff = UserFactory()
+    with patch("chat.services.conversations.enqueue_chat_message_push"):
+        first, _ = send_message(conversation, sender=staff, side=ChatSenderSide.STAFF, text="first")
+        second, _ = send_message(conversation, sender=staff, side=ChatSenderSide.STAFF, text="second")
+
+    mark_read(conversation, side=ChatSenderSide.USER, up_to_message_id=first.id)
+    conversation.refresh_from_db()
+    assert conversation.user_last_read_message_id == first.id
+    assert conversation.user_unread_count == 1
+
+    mark_read(conversation, side=ChatSenderSide.USER, up_to_message_id=second.id + 1000)
+    conversation.refresh_from_db()
+    second.refresh_from_db()
+    assert conversation.user_last_read_message_id == second.id
+    assert conversation.user_unread_count == 0
+    assert second.read_at is not None
+
+
+@pytest.mark.django_db
+def test_message_creation_writes_a_replayable_event_for_each_audience():
+    conversation = ConversationFactory()
+    message, _ = send_message(
+        conversation,
+        sender=conversation.user,
+        side=ChatSenderSide.USER,
+        text="Need help",
+    )
+
+    events = list(ChatRealtimeEvent.objects.filter(conversation_id=conversation.id).order_by("id"))
+    assert [(event.audience, event.event_type) for event in events] == [
+        ("user", "chat.message.created"),
+        ("staff", "chat.message.created"),
+    ]
+    assert events[0].recipient_user_id == conversation.user_id
+    assert events[1].recipient_user_id is None
+    assert events[0].payload["message"]["id"] == message.id
+    conversation.refresh_from_db()
+    assert conversation.user_realtime_version == 1
+    assert conversation.staff_realtime_version == 1
 
 
 @pytest.mark.django_db

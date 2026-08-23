@@ -1,6 +1,13 @@
 from account.models import User
 from chat.exceptions import ChatReadOnlyError, ChatUnavailableError
 from chat.models import Conversation, ConversationReport, Message
+from chat.realtime import (
+    STAFF_AUDIENCE,
+    USER_AUDIENCE,
+    RealtimeEventSpec,
+    queue_events,
+    specs_for_both,
+)
 from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.utils import timezone
@@ -54,7 +61,10 @@ def open_or_get(listing, user):
 
     try:
         with transaction.atomic():
-            return Conversation.objects.get_or_create(listing=listing, user=user)
+            conversation, created = Conversation.objects.get_or_create(listing=listing, user=user)
+            if created:
+                queue_events(conversation, specs=specs_for_both("chat.conversation.updated"))
+            return conversation, created
     except IntegrityError:
         conversation = Conversation.objects.get(listing=listing, user=user)
         return conversation, False
@@ -76,6 +86,8 @@ def _sync_conversation_state(source, target):
         "user_unread_count",
         "staff_last_read_message_id",
         "staff_unread_count",
+        "user_realtime_version",
+        "staff_realtime_version",
         "user_archived_at",
         "staff_archived_at",
         "is_user_blocked",
@@ -151,6 +163,7 @@ def send_message(conversation, *, sender, side, text=None, image=None, client_id
         previous_unread_count = getattr(locked, unread_field)
         setattr(locked, unread_field, previous_unread_count + 1)
         locked.save(update_fields=["last_message", "last_message_at", unread_field, "updated_at"])
+        queue_events(locked, specs=specs_for_both("chat.message.created"), message=message)
         _sync_conversation_state(locked, conversation)
 
         if side == ChatSenderSide.STAFF and not locked.user_muted and previous_unread_count == 0:
@@ -177,15 +190,16 @@ def mark_read(conversation, *, side, up_to_message_id=None):
             unread_field = "staff_unread_count"
 
         current_watermark = getattr(locked, watermark_field)
-        candidate = up_to_message_id
-        if candidate is None:
-            candidate = Message.objects.filter(conversation=locked).order_by("-id").values_list("id", flat=True).first()
+        highest_existing_id = (
+            Message.objects.filter(conversation=locked).order_by("-id").values_list("id", flat=True).first()
+        )
+        candidate = highest_existing_id if up_to_message_id is None else min(up_to_message_id, highest_existing_id or 0)
         watermark = current_watermark
         if candidate is not None and (watermark is None or candidate > watermark):
             watermark = candidate
 
+        peer_side = ChatSenderSide.STAFF if side == ChatSenderSide.USER else ChatSenderSide.USER
         if watermark is not None:
-            peer_side = ChatSenderSide.STAFF if side == ChatSenderSide.USER else ChatSenderSide.USER
             Message.objects.filter(
                 conversation=locked,
                 sender_side=peer_side,
@@ -194,10 +208,16 @@ def mark_read(conversation, *, side, up_to_message_id=None):
             ).update(read_at=timezone.now())
 
         previous_unread_count = getattr(locked, unread_field)
+        remaining_unread_count = Message.objects.filter(
+            conversation=locked,
+            sender_side=peer_side,
+            read_at__isnull=True,
+        ).count()
         setattr(locked, watermark_field, watermark)
-        setattr(locked, unread_field, 0)
-        if watermark != current_watermark or previous_unread_count != 0:
+        setattr(locked, unread_field, remaining_unread_count)
+        if watermark != current_watermark or previous_unread_count != remaining_unread_count:
             locked.save(update_fields=[watermark_field, unread_field, "updated_at"])
+            queue_events(locked, specs=specs_for_both("chat.read.updated"))
         _sync_conversation_state(locked, conversation)
 
     return conversation
@@ -210,6 +230,15 @@ def set_archived(conversation, *, side, value: bool):
         field_name = "user_archived_at" if side == ChatSenderSide.USER else "staff_archived_at"
         setattr(locked, field_name, timezone.now() if value else None)
         locked.save(update_fields=[field_name, "updated_at"])
+        queue_events(
+            locked,
+            specs=(
+                RealtimeEventSpec(
+                    USER_AUDIENCE if side == ChatSenderSide.USER else STAFF_AUDIENCE,
+                    "chat.conversation.updated",
+                ),
+            ),
+        )
         _sync_conversation_state(locked, conversation)
     return conversation
 
@@ -219,6 +248,7 @@ def set_muted(conversation, value: bool):
         locked = _lock_conversation(conversation)
         locked.user_muted = value
         locked.save(update_fields=["user_muted", "updated_at"])
+        queue_events(locked, specs=(RealtimeEventSpec(USER_AUDIENCE, "chat.conversation.updated"),))
         _sync_conversation_state(locked, conversation)
     return conversation
 
@@ -230,6 +260,7 @@ def set_blocked(conversation, *, staff_user, value: bool):
         locked.blocked_by = staff_user if value else None
         locked.blocked_at = timezone.now() if value else None
         locked.save(update_fields=["is_user_blocked", "blocked_by", "blocked_at", "updated_at"])
+        queue_events(locked, specs=specs_for_both("chat.conversation.updated"))
         _sync_conversation_state(locked, conversation)
     return conversation
 
@@ -244,6 +275,13 @@ def delete_for_user(conversation, user):
         locked.user_deleted_at = locked.user_deleted_at or timezone.now()
         locked.user_unread_count = 0
         locked.save(update_fields=["user_deleted_at", "user_unread_count", "updated_at"])
+        queue_events(
+            locked,
+            specs=(
+                RealtimeEventSpec(USER_AUDIENCE, "chat.conversation.removed"),
+                RealtimeEventSpec(STAFF_AUDIENCE, "chat.conversation.updated"),
+            ),
+        )
         _sync_conversation_state(locked, conversation)
     return conversation
 
@@ -257,6 +295,7 @@ def purge(conversation):
         messages = list(Message.global_objects.select_for_update().filter(conversation_id=locked.pk))
         for message in messages:
             message.image.delete(save=False)
+        queue_events(locked, specs=specs_for_both("chat.conversation.removed"))
         locked.delete()
     return locked
 
@@ -284,4 +323,6 @@ def report(conversation, *, reported_by, reason, note=""):
                     audience=NotificationAudience.ERP,
                 )
             )
+        locked = _lock_conversation(conversation)
+        queue_events(locked, specs=(RealtimeEventSpec(STAFF_AUDIENCE, "chat.conversation.updated"),))
     return conversation_report
