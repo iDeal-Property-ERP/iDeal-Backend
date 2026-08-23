@@ -5,7 +5,7 @@ from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from notification.services import notify
+from notification.services import enqueue_chat_message_push, notify
 
 from core.constants import (
     ChatMessageKind,
@@ -148,21 +148,16 @@ def send_message(conversation, *, sender, side, text=None, image=None, client_id
         locked.last_message = message
         locked.last_message_at = message.created_at
         unread_field = "staff_unread_count" if side == ChatSenderSide.USER else "user_unread_count"
-        setattr(locked, unread_field, getattr(locked, unread_field) + 1)
+        previous_unread_count = getattr(locked, unread_field)
+        setattr(locked, unread_field, previous_unread_count + 1)
         locked.save(update_fields=["last_message", "last_message_at", unread_field, "updated_at"])
         _sync_conversation_state(locked, conversation)
 
-        if side == ChatSenderSide.STAFF and not locked.user_muted:
-            preview = str(_("Photo")) if kind == ChatMessageKind.IMAGE else (text or "")[:120]
+        if side == ChatSenderSide.STAFF and not locked.user_muted and previous_unread_count == 0:
             transaction.on_commit(
-                lambda recipient=locked.user, conversation_id=locked.id, body=preview: notify(
+                lambda recipient=locked.user, conversation_id=locked.id: enqueue_chat_message_push(
                     recipient=recipient,
-                    type=NotificationType.CHAT_MESSAGE,
-                    title=str(_("New message")),
-                    body=body,
-                    related_object_type="chat_conversation",
-                    related_object_id=conversation_id,
-                    audience=NotificationAudience.MOBILE,
+                    conversation_id=conversation_id,
                 )
             )
 

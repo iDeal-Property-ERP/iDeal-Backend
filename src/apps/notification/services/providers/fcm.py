@@ -47,11 +47,25 @@ class FCMPushProvider(PushProvider):
 
     def send(self, message: PushMessage) -> None:
         data = {str(key): str(value) for key, value in message.data.items() if value is not None}
+        replacement_key = message.replacement_key
+        android = None
+        apns = None
+        if replacement_key:
+            android = messaging.AndroidConfig(
+                collapse_key=replacement_key,
+                notification=messaging.AndroidNotification(tag=replacement_key),
+            )
+            apns = messaging.APNSConfig(
+                headers={"apns-collapse-id": replacement_key},
+                payload=messaging.APNSPayload(aps=messaging.Aps(thread_id=replacement_key)),
+            )
 
         try:
             fcm_message = messaging.Message(
                 notification=messaging.Notification(title=message.title, body=message.body),
                 data=data,
+                android=android,
+                apns=apns,
                 token=message.token,
             )
             messaging.send(fcm_message, app=_get_app())

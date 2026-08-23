@@ -81,3 +81,26 @@ def test_push_service_does_not_send_when_fcm_is_disabled():
         assert PushService(provider=provider).send_for_notification(notification) == 0
 
     assert provider.messages == []
+
+
+def test_fcm_provider_uses_replacement_key_for_android_and_ios(mocker):
+    from notification.services.providers import fcm
+
+    send = mocker.patch("notification.services.providers.fcm.messaging.send")
+    mocker.patch("notification.services.providers.fcm._get_app", return_value=object())
+
+    fcm.FCMPushProvider().send(
+        PushMessage(
+            token="token",
+            title="New message",
+            body="You have a new message about Home.",
+            data={"type": "chat_message"},
+            replacement_key="chat_conversation:42",
+        )
+    )
+
+    message = send.call_args.args[0]
+    assert message.android.collapse_key == "chat_conversation:42"
+    assert message.android.notification.tag == "chat_conversation:42"
+    assert message.apns.headers["apns-collapse-id"] == "chat_conversation:42"
+    assert message.apns.payload.aps.thread_id == "chat_conversation:42"

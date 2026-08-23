@@ -1,0 +1,12 @@
+msgid ""
+msgstr ""
+"Language: ru\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "New message"
+msgstr "Новое сообщение"
+
+msgid "You have a new message about %(listing)s."
+msgstr "У вас новое сообщение по объявлению %(listing)s."

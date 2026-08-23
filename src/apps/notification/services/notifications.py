@@ -6,7 +6,7 @@ import django_q.tasks
 from notification.models import DeviceToken, Notification
 from notification.services.push import PushService
 
-from core.constants import NotificationAudience
+from core.constants import NotificationAudience, NotificationCategory
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,22 @@ def notify(
 
 def _should_enqueue_mobile_push(notification: Notification) -> bool:
     """Avoid queueing a delivery task when there is no eligible mobile target."""
-    if not DeviceToken.objects.filter(user_id=notification.recipient_id, is_active=True).exists():
+    return _has_eligible_mobile_target(recipient=notification.recipient, category=notification.category)
+
+
+def enqueue_chat_message_push(*, recipient, conversation_id: int) -> None:
+    """Queue the first push for an unread mobile chat burst."""
+    if not _has_eligible_mobile_target(recipient=recipient, category=NotificationCategory.MESSAGES):
+        return
+
+    try:
+        django_q.tasks.async_task("notification.tasks.send_chat_message_push", conversation_id)
+    except Exception:
+        logger.warning("Unable to enqueue chat push conversation_id=%s", conversation_id, exc_info=True)
+
+
+def _has_eligible_mobile_target(*, recipient, category: str) -> bool:
+    if not DeviceToken.objects.filter(user_id=recipient.id, is_active=True).exists():
         return False
 
-    return PushService().should_send(notification)
+    return PushService().should_send_to_user(user=recipient, category=category)

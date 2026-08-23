@@ -123,7 +123,7 @@ def test_management_searches_conversations_by_listing_title_and_user_phone(api_c
 @pytest.mark.django_db
 def test_staff_reply_attributes_message_and_increments_user_unread_count(api_client, management):
     conversation = ConversationFactory()
-    with patch("chat.services.conversations.notify"):
+    with patch("chat.services.conversations.enqueue_chat_message_push"):
         response = api_client.post(
             _message_url(conversation),
             json.dumps({"text": "Welcome", "client_id": "staff-1"}),
@@ -144,7 +144,7 @@ def test_staff_reply_attributes_message_and_increments_user_unread_count(api_cli
 def test_client_id_replay_returns_same_message_without_a_second_row(api_client, management):
     conversation = ConversationFactory()
     payload = json.dumps({"text": "First reply", "client_id": "retry-1"})
-    with patch("chat.services.conversations.notify"):
+    with patch("chat.services.conversations.enqueue_chat_message_push"):
         first = api_client.post(
             _message_url(conversation),
             payload,

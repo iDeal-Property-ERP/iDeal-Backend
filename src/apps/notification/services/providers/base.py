@@ -8,6 +8,7 @@ class PushMessage:
     title: str
     body: str
     data: dict[str, str]
+    replacement_key: str | None = None
 
 
 class PushDeliveryError(Exception):

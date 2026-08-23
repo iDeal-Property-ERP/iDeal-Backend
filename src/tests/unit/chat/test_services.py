@@ -1,5 +1,5 @@
 from base64 import b64decode
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 from chat.exceptions import ChatReadOnlyError, ChatUnavailableError
@@ -19,6 +19,7 @@ from chat.services import (
 )
 from django.core.files.uploadedfile import SimpleUploadedFile
 from marketplace.models import Listing
+from notification.models import Notification
 
 from core.constants import (
     ChatMessageKind,
@@ -93,8 +94,7 @@ def test_send_message_increments_only_the_other_side_unread_count():
     assert conversation.staff_unread_count == 1
     assert conversation.user_unread_count == 0
 
-    with patch("chat.services.conversations.notify"):
-        send_message(conversation, sender=staff, side=ChatSenderSide.STAFF, text="answer")
+    send_message(conversation, sender=staff, side=ChatSenderSide.STAFF, text="answer")
 
     conversation.refresh_from_db()
     assert conversation.staff_unread_count == 1
@@ -102,14 +102,17 @@ def test_send_message_increments_only_the_other_side_unread_count():
 
 
 @pytest.mark.django_db
-def test_staff_reply_notifies_mobile_user_after_commit_with_preview(django_capture_on_commit_callbacks):
+def test_staff_reply_enqueues_one_privacy_safe_mobile_push_after_commit(django_capture_on_commit_callbacks):
     conversation = ConversationFactory()
     staff = UserFactory()
 
     # The notification is deliberately deferred with transaction.on_commit, and
     # pytest-django's test transaction never commits, so the callbacks have to
     # be drained explicitly.
-    with patch("chat.services.conversations.notify") as notify, django_capture_on_commit_callbacks(execute=True):
+    with (
+        patch("chat.services.conversations.enqueue_chat_message_push") as enqueue,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
         send_message(
             conversation,
             sender=staff,
@@ -117,11 +120,63 @@ def test_staff_reply_notifies_mobile_user_after_commit_with_preview(django_captu
             text="A" * 200,
         )
 
-    notify.assert_called_once()
-    kwargs = notify.call_args.kwargs
+    enqueue.assert_called_once()
+    kwargs = enqueue.call_args.kwargs
     assert kwargs["recipient"] == conversation.user
-    assert kwargs["audience"] == NotificationAudience.MOBILE
-    assert kwargs["body"] == "A" * 120
+    assert kwargs["conversation_id"] == conversation.id
+    assert not Notification.objects.filter(
+        recipient=conversation.user,
+        type="chat_message",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_staff_reply_enqueues_only_the_first_message_in_an_unread_burst(django_capture_on_commit_callbacks):
+    conversation = ConversationFactory()
+    staff = UserFactory()
+
+    with (
+        patch("chat.services.conversations.enqueue_chat_message_push") as enqueue,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        send_message(conversation, sender=staff, side=ChatSenderSide.STAFF, text="first")
+        send_message(conversation, sender=staff, side=ChatSenderSide.STAFF, text="second")
+
+    conversation.refresh_from_db()
+    assert conversation.user_unread_count == 2
+    enqueue.assert_called_once_with(recipient=conversation.user, conversation_id=conversation.id)
+
+
+@pytest.mark.django_db
+def test_reading_a_conversation_allows_the_next_unread_burst_to_alert(django_capture_on_commit_callbacks):
+    conversation = ConversationFactory()
+    staff = UserFactory()
+
+    with (
+        patch("chat.services.conversations.enqueue_chat_message_push") as enqueue,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        first, _ = send_message(conversation, sender=staff, side=ChatSenderSide.STAFF, text="first")
+        mark_read(conversation, side=ChatSenderSide.USER, up_to_message_id=first.id)
+        send_message(conversation, sender=staff, side=ChatSenderSide.STAFF, text="second")
+
+    expected = call(recipient=conversation.user, conversation_id=conversation.id)
+    enqueue.assert_has_calls([expected, expected])
+    assert enqueue.call_count == 2
+
+
+@pytest.mark.django_db
+def test_muted_conversation_never_enqueues_a_chat_push(django_capture_on_commit_callbacks):
+    conversation = ConversationFactory(user_muted=True)
+    staff = UserFactory()
+
+    with (
+        patch("chat.services.conversations.enqueue_chat_message_push") as enqueue,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        send_message(conversation, sender=staff, side=ChatSenderSide.STAFF, text="answer")
+
+    enqueue.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -135,7 +190,7 @@ def test_mark_read_advances_watermark_stamps_peer_messages_and_never_rewinds():
         side=ChatSenderSide.USER,
         text="question",
     )
-    with patch("chat.services.conversations.notify"):
+    with patch("chat.services.conversations.enqueue_chat_message_push"):
         staff_message, _ = send_message(
             conversation,
             sender=staff,
