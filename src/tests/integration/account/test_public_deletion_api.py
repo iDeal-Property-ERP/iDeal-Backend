@@ -1,0 +1,172 @@
+import json
+
+import pytest
+from django.conf import settings
+from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
+
+from api.v1.account import views as account_views
+from tests.factories import BookingFactory, DeviceTokenFactory, NotificationPreferenceFactory, TenantFactory
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    cache.clear()
+    yield
+    cache.clear()
+
+
+def _post(api_client, path, payload, **headers):
+    return api_client.post(path, data=json.dumps(payload), content_type="application/json", **headers)
+
+
+@pytest.mark.django_db
+class TestPublicAccountDeletionAPI:
+    def test_get_deletion_channels(self, api_client):
+        response = api_client.get("/api/v1/users/deletion/channels/")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert "channels" in body["data"]
+        assert "telegram" in body["data"]["channels"]
+
+    def test_public_deletion_otp_request_nonexistent_user_returns_404(self, api_client):
+        response = _post(
+            api_client,
+            "/api/v1/users/deletion/otp/request/",
+            {"phone": "+998901111111", "channel": "telegram"},
+        )
+        assert response.status_code == 404
+        body = response.json()
+        assert body["success"] is False
+        assert "no active account found" in body["error"].lower()
+
+    def test_public_deletion_otp_request_invalid_phone_returns_400(self, api_client):
+        response = _post(
+            api_client,
+            "/api/v1/users/deletion/otp/request/",
+            {"phone": "invalid-phone", "channel": "telegram"},
+        )
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+
+    def test_public_deletion_otp_request_success(self, api_client, monkeypatch):
+        user = TenantFactory(phone="+998901234567")
+        monkeypatch.setattr(account_views.otp_service, "generate_otp", lambda: "123456")
+
+        response = _post(
+            api_client,
+            "/api/v1/users/deletion/otp/request/",
+            {"phone": user.phone, "channel": "telegram"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["channel"] == "telegram"
+        assert body["data"]["expires_in"] == 300
+        assert body["data"]["resend_after"] == 60
+
+        cached_otp = account_views.otp_service.get_otp(
+            user.phone, purpose=account_views.PUBLIC_ACCOUNT_DELETION_OTP_PURPOSE
+        )
+        assert cached_otp == "123456"
+
+    def test_public_deletion_confirm_invalid_code_and_attempt_limit(self, api_client, monkeypatch):
+        user = TenantFactory(phone="+998901234568")
+        monkeypatch.setattr(settings, "OTP_DEV_BYPASS_CODE", "")
+        monkeypatch.setattr(account_views.otp_service, "generate_otp", lambda: "654321")
+        monkeypatch.setattr(account_views.otp_service, "dispatch", lambda *args, **kwargs: None)
+
+        req_res = _post(
+            api_client,
+            "/api/v1/users/deletion/otp/request/",
+            {"phone": user.phone, "channel": "telegram"},
+        )
+        assert req_res.status_code == 200
+
+        # Wrong code
+        wrong_res = _post(
+            api_client,
+            "/api/v1/users/deletion/confirm/",
+            {"phone": user.phone, "code": "000000"},
+        )
+        assert wrong_res.status_code == 400
+        assert "invalid or expired" in wrong_res.json()["error"].lower()
+
+        # Exhaust 5 attempts
+        for _ in range(4):
+            _post(
+                api_client,
+                "/api/v1/users/deletion/confirm/",
+                {"phone": user.phone, "code": "000000"},
+            )
+
+        locked_res = _post(
+            api_client,
+            "/api/v1/users/deletion/confirm/",
+            {"phone": user.phone, "code": "654321"},
+        )
+        assert locked_res.status_code == 429
+        assert "too many" in locked_res.json()["error"].lower()
+
+    def test_public_deletion_confirm_success(self, api_client, monkeypatch):
+        user = TenantFactory(phone="+998901234569", first_name="Public", last_name="Delete")
+        booking = BookingFactory(tenant=user)
+        DeviceTokenFactory(user=user)
+        NotificationPreferenceFactory(user=user)
+        user.avatar.save("avatar.png", SimpleUploadedFile("avatar.png", b"image data", content_type="image/png"))
+
+        monkeypatch.setattr(settings, "OTP_DEV_BYPASS_CODE", "999999")
+        monkeypatch.setattr(account_views.otp_service, "generate_otp", lambda: "112233")
+
+        # Request OTP
+        req_res = _post(
+            api_client,
+            "/api/v1/users/deletion/otp/request/",
+            {"phone": user.phone, "channel": "telegram"},
+        )
+        assert req_res.status_code == 200
+
+        # Confirm deletion with generated code
+        confirm_res = _post(
+            api_client,
+            "/api/v1/users/deletion/confirm/",
+            {"phone": user.phone, "code": "112233"},
+        )
+        assert confirm_res.status_code == 200
+        assert confirm_res.json()["data"] == {"deleted": True}
+
+        from account.models import User
+        from notification.models import DeviceToken, NotificationPreference
+
+        deleted_user = User.global_objects.get(pk=user.pk)
+        assert deleted_user.is_deleted is True
+        assert deleted_user.is_active is False
+        assert deleted_user.phone is None
+        assert deleted_user.email.endswith("@deleted.ideal.local")
+        assert deleted_user.first_name == "Deleted user"
+        assert not deleted_user.has_usable_password()
+        assert not deleted_user.avatar
+        assert DeviceToken.global_objects.filter(user_id=user.pk).count() == 0
+        assert NotificationPreference.global_objects.filter(user_id=user.pk).count() == 0
+        assert booking.__class__.objects.get(pk=booking.pk).tenant_id == user.pk
+
+    def test_public_deletion_dev_bypass_code(self, api_client, monkeypatch):
+        user = TenantFactory(phone="+998909876543")
+        monkeypatch.setattr(settings, "OTP_DEV_BYPASS_CODE", "123456")
+        monkeypatch.setattr(account_views.otp_service, "generate_otp", lambda: "999999")
+
+        _post(
+            api_client,
+            "/api/v1/users/deletion/otp/request/",
+            {"phone": user.phone, "channel": "telegram"},
+        )
+
+        confirm_res = _post(
+            api_client,
+            "/api/v1/users/deletion/confirm/",
+            {"phone": user.phone, "code": "123456"},
+        )
+        assert confirm_res.status_code == 200
+        assert confirm_res.json()["data"] == {"deleted": True}

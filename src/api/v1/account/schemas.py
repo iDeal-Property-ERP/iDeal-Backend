@@ -1,4 +1,5 @@
 import datetime
+from typing import Literal
 
 import pydantic
 
@@ -20,3 +21,31 @@ class UserMeOutput(pydantic.BaseModel):
     updated_at: datetime.datetime
 
     model_config = pydantic.ConfigDict(from_attributes=True)
+
+
+class PublicAccountDeletionOTPRequestInput(pydantic.BaseModel):
+    phone: str
+    channel: Literal["sms", "telegram"] = "telegram"
+
+    model_config = pydantic.ConfigDict(str_strip_whitespace=True)
+
+
+class PublicAccountDeletionConfirmInput(pydantic.BaseModel):
+    phone: str
+    code: str = pydantic.Field(min_length=6, max_length=6)
+
+    model_config = pydantic.ConfigDict(str_strip_whitespace=True)
+
+
+class PublicAccountDeletionOTPRequestOutput(pydantic.BaseModel):
+    channel: str
+    expires_in: int
+    resend_after: int
+
+
+class PublicAccountDeletionConfirmOutput(pydantic.BaseModel):
+    deleted: bool
+
+
+class PublicAccountDeletionChannelsOutput(pydantic.BaseModel):
+    channels: list[str]
