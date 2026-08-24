@@ -1065,24 +1065,57 @@ class TestMobileHomeRecommendedListings:
         l2.property.district = district_a
         l2.property.save(update_fields=["name", "district"])
 
-        # Candidate 3: district B (no match)
+        # Candidate 3 is intentionally unrelated to every view-seed scoring
+        # dimension: district, type, rooms, price, tokens, area, furnishing,
+        # and tariff.  This protects the documented any-seed algorithm rather
+        # than accidentally relying on factory defaults.
         l3 = _make_vacant_listing(monthly_price=1500)
-        l3.property.name = "Far Away Studio"
+        l3.property.name = "Remote Estate"
+        l3.property.address = "999 Completely Elsewhere Road"
         l3.property.district = district_b
-        l3.property.save(update_fields=["name", "district"])
+        l3.property.property_type = "house"
+        l3.property.rooms = 5
+        l3.property.area_sqm = 1000
+        l3.property.furnishing = "unfurnished"
+        l3.property.tariff = "premium"
+        l3.property.save(
+            update_fields=[
+                "name",
+                "address",
+                "district",
+                "property_type",
+                "rooms",
+                "area_sqm",
+                "furnishing",
+                "tariff",
+            ]
+        )
+        # Property saves synchronize listing prices. Reapply this intentional
+        # out-of-range candidate price after the property mutation.
+        Listing.objects.filter(pk=l3.pk).update(monthly_price=1500, listed_price=1500)
+        l3.refresh_from_db()
 
         # Viewed listing (should be excluded from recommendations)
         viewed_listing = _make_vacant_listing(monthly_price=500)
         viewed_listing.property.district = district_a
-        viewed_listing.property.save(update_fields=["district"])
+        viewed_listing.property.property_type = "apartment"
+        viewed_listing.property.rooms = 2
+        viewed_listing.property.area_sqm = 100
+        viewed_listing.property.furnishing = "furnished"
+        viewed_listing.property.tariff = "standard"
+        viewed_listing.property.address = "100 Seed Avenue"
+        viewed_listing.property.save(
+            update_fields=["district", "property_type", "rooms", "area_sqm", "furnishing", "tariff", "address"]
+        )
 
         user = TenantFactory()
         headers = _make_jwt(user)
 
         # Record search matching "Luxury" and district A
-        RecommendationService.record_search(user, "Luxury", {"district_id": district_a.id})
+        recommendations = RecommendationService()
+        recommendations.record_search(user, "Luxury", {"district_id": district_a.id})
         # Record view on viewed_listing
-        RecommendationService.record_view(user, viewed_listing.id)
+        recommendations.record_view(user, viewed_listing.id)
 
         response = api_client.get(RECOMMENDED_URL, **headers)
 
@@ -1108,8 +1141,9 @@ class TestMobileHomeRecommendedListings:
         user = TenantFactory()
         listing = _make_vacant_listing()
 
-        RecommendationService.record_search(user, "Apartment", {})
-        RecommendationService.record_view(user, listing.id)
+        recommendations = RecommendationService()
+        recommendations.record_search(user, "Apartment", {})
+        recommendations.record_view(user, listing.id)
 
         assert RecentSearchActivity.objects.filter(user=user).count() == 1
         assert ListingViewActivity.objects.filter(user=user).count() == 1

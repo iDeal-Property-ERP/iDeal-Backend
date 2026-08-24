@@ -1,5 +1,5 @@
 info:
-  name: Confirm phone change
+  name: Confirm phone
   type: http
   seq: 7
 http:
@@ -10,22 +10,40 @@ http:
     token: '{{access_token}}'
   body:
     type: json
-    data: |
-      {
-        "phone": "+998901234567",
-        "code": "123456"
-      }
+    data: "{\n  \"phone\": \"+998901234567\",\n  \"code\": \"fixture-value\"\n}"
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-docs: |
-  # POST /api/v1/mobile/account/phone/confirm/
+docs: '# POST /api/v1/mobile/account/phone/confirm/
 
-  Authentication: **bearer**. The OTP must have been requested by this same authenticated account for this exact new phone number. A successful confirmation updates the phone immediately and returns the mobile profile.
 
-  Static source-backed examples are below; replace fixture values with a delivered OTP for Local runtime checks.
+  Authentication: **bearer**.
+
+
+  ## Request field notes
+
+
+  No path or query parameters.
+
+
+  | Body field | Required | Nullable | Notes |
+
+  |---|---:|---:|---|
+
+  | `phone` | yes | no | fixture value; replace fixture values with domain-valid data
+  before runtime execution. |
+
+  | `code` | yes | no | fixture value; replace fixture values with domain-valid data
+  before runtime execution. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
 examples:
 - name: success
   request:
@@ -38,73 +56,79 @@ examples:
       value: Bearer {{access_token}}
     body:
       type: json
-      data: '{"phone":"+998901234567","code":"123456"}'
+      data: "{\n  \"phone\": \"+998901234567\",\n  \"code\": \"fixture-value\"\n}"
   response:
-    status: 200
+    status: 201
     statusText: OK
     headers:
     - name: content-type
       value: application/json
     body:
       type: json
-      data: '{"success":true,"message":"OK","data":{"id":1,"first_name":"Fixture","last_name":null,"patronymic":null,"email":null,"phone":"+998901234567","nationality":null,"avatar_url":null}}'
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
 - name: validation error
   request:
     url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
     method: POST
-    headers: []
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
     body:
       type: json
-      data: '{"phone":"invalid","code":"000000"}'
+      data: "{\n  \"phone\": \"+998901234567\",\n  \"code\": \"fixture-value\"\n}"
   response:
     status: 400
-    statusText: Bad Request
-    headers: []
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
     body:
       type: json
-      data: '{"success":false,"message":"Validation error","error":"Invalid phone number"}'
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
 - name: unauthorized
   request:
     url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
     method: POST
-    headers: []
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
     body:
       type: json
-      data: '{"phone":"+998901234567","code":"123456"}'
+      data: "{\n  \"phone\": \"+998901234567\",\n  \"code\": \"fixture-value\"\n}"
   response:
     status: 401
-    statusText: Unauthorized
-    headers: []
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
     body:
       type: json
-      data: '{"success":false,"message":"Authentication required","error":"unauthorized"}'
+      data: "{\n  \"success\": false,\n  \"message\": \"Authentication required\"\
+        ,\n  \"error\": \"unauthorized\"\n}"
 - name: conflict
   request:
     url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
     method: POST
-    headers: []
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
     body:
       type: json
-      data: '{"phone":"+998901234567","code":"123456"}'
+      data: "{\n  \"phone\": \"+998901234567\",\n  \"code\": \"fixture-value\"\n}"
   response:
     status: 409
-    statusText: Conflict
-    headers: []
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
     body:
       type: json
-      data: '{"success":false,"message":"Data conflict","error":"This phone number is already in use"}'
-- name: rate limit
-  request:
-    url: '{{base_url}}/api/v1/mobile/account/phone/confirm/'
-    method: POST
-    headers: []
-    body:
-      type: json
-      data: '{"phone":"+998901234567","code":"123456"}'
-  response:
-    status: 429
-    statusText: Too Many Requests
-    headers: []
-    body:
-      type: json
-      data: '{"success":false,"message":"Too many requests. Please try again later.","error":"rate_limit_exceeded"}'
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

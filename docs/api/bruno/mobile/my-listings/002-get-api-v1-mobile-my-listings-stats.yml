@@ -1,10 +1,10 @@
 info:
-  name: List recommended
+  name: List stats mobile my listings
   type: http
-  seq: 6
+  seq: 2
 http:
   method: GET
-  url: '{{base_url}}/api/v1/mobile/home/listings/recommended/'
+  url: '{{base_url}}/api/v1/mobile/my-listings/stats/'
   auth:
     type: bearer
     token: '{{access_token}}'
@@ -13,7 +13,7 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-docs: '# GET /api/v1/mobile/home/listings/recommended/
+docs: '# GET /api/v1/mobile/my-listings/stats/
 
 
   Authentication: **bearer**.
@@ -33,7 +33,7 @@ docs: '# GET /api/v1/mobile/home/listings/recommended/
 examples:
 - name: success
   request:
-    url: '{{base_url}}/api/v1/mobile/home/listings/recommended/'
+    url: '{{base_url}}/api/v1/mobile/my-listings/stats/'
     method: GET
     headers:
     - name: accept
@@ -51,7 +51,7 @@ examples:
       data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
 - name: unauthorized
   request:
-    url: '{{base_url}}/api/v1/mobile/home/listings/recommended/'
+    url: '{{base_url}}/api/v1/mobile/my-listings/stats/'
     method: GET
     headers:
     - name: accept

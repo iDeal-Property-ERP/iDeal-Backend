@@ -13,41 +13,41 @@ install:
     uv sync
 
 run host="127.0.0.1" port="8000":
-    python src/manage.py runserver {{host}}:{{port}}
+    uv run python src/manage.py runserver {{host}}:{{port}}
 
 migrate:
-    python src/manage.py migrate
+    uv run python src/manage.py migrate
 
 makemigrations app="":
-    if [ -n "{{app}}" ]; then python src/manage.py makemigrations "{{app}}"; else python src/manage.py makemigrations; fi
+    if [ -n "{{app}}" ]; then uv run python src/manage.py makemigrations "{{app}}"; else uv run python src/manage.py makemigrations; fi
 
 collectstatic:
-    python src/manage.py collectstatic --noinput
+    uv run python src/manage.py collectstatic --noinput
 
 superuser:
-    python src/manage.py createsuperuser
+    uv run python src/manage.py createsuperuser
 
 shell:
-    python src/manage.py shell
+    uv run python src/manage.py shell
 
 test:
-    pytest src/tests
+    uv run pytest src/tests
 
 test-unit:
-    pytest -m unit src/tests
+    uv run pytest -m unit src/tests
 
 test-integration:
-    pytest -m integration src/tests
+    uv run pytest -m integration src/tests
 
 test-cov:
-    pytest -n 0 --cov=src/apps --cov=src/api --cov=src/core --cov=src/config --cov-report=html:htmlcov --cov-fail-under=0 src/tests
+    uv run pytest -n 0 --cov=src/apps --cov=src/api --cov=src/core --cov=src/config --cov-report=html:htmlcov --cov-fail-under=80 src/tests
 
 check:
-    python src/manage.py check
-    python src/manage.py test
+    uv run python src/manage.py check
+    uv run python src/manage.py test
 
 startapp name ver="v1":
-    python src/manage.py startapp {{name}} --ver {{ver}}
+    uv run python src/manage.py startapp {{name}} --ver {{ver}}
 
 health-local port="8000":
     curl -fsS "http://127.0.0.1:{{port}}/api/v1/health/" > /dev/null

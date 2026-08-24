@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.db.models.functions import Coalesce
 from marketplace.models import Booking, Listing
 
+from core.api.filters import PydanticFilterSet
 from core.constants import (
     BookingStatus,
     LeaseStatus,
@@ -20,6 +21,7 @@ from core.constants import (
 
 
 class ListingFilters(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(extra="ignore")
     page: int = 1
     per_page: int = 20
     district_id: int | None = None
@@ -62,111 +64,139 @@ def published_listings_queryset():
     )
 
 
-def apply_listing_filters(qs, filters: ListingFilters, *, include_future_managed: bool = False):
-    q = filters
+class ListingFilterSet(PydanticFilterSet[ListingFilters]):
+    """Filtering, search and ordering for listing discovery querysets only."""
 
-    if q.start_date and q.end_date:
-        flex = q.flexibility_days if q.flexibility_days is not None else 3
-        latest_acceptable_start = q.start_date + datetime.timedelta(days=flex)
-        earliest_acceptable_end = q.end_date - datetime.timedelta(days=flex)
+    class Meta:
+        model = Listing
+        fields: list[str] = []
 
-        overlapping_leases = Lease.objects.filter(
-            status__in=[LeaseStatus.PENDING_SIGNATURE, LeaseStatus.SCHEDULED, LeaseStatus.ACTIVE],
-            start_date__lte=earliest_acceptable_end,
-            end_date__gte=latest_acceptable_start,
-        )
-        overlapping_bookings = Booking.objects.filter(
-            Q(status=BookingStatus.CONFIRMED)
-            | Q(
-                status=BookingStatus.PAYMENT_PENDING,
-                payment_checkout__status=PaymentCheckoutStatus.PENDING,
-                payment_checkout__expires_at__gt=datetime.datetime.now(datetime.UTC),
-            ),
-            requested_start_date__lte=earliest_acceptable_end,
-            requested_end_date__gte=latest_acceptable_start,
-        )
+    def filter_queryset(self, queryset):
+        q = self.query
+        qs = queryset
 
-        qs = (
-            qs.filter(
-                property__owner_agreements__status=OwnerAgreementStatus.ACTIVE,
-                property__owner_agreements__start_date__lte=latest_acceptable_start,
-                property__owner_agreements__end_date__gte=earliest_acceptable_end,
+        if q.district_id is not None:
+            qs = qs.filter(property__district_id=q.district_id)
+        if q.price_min is not None:
+            qs = qs.filter(_price__gte=q.price_min)
+        if q.price_max is not None:
+            qs = qs.filter(_price__lte=q.price_max)
+        if q.rooms is not None:
+            qs = qs.filter(property__rooms=q.rooms)
+        if q.rooms_min is not None:
+            qs = qs.filter(property__rooms__gte=q.rooms_min)
+        if q.rooms_max is not None:
+            qs = qs.filter(property__rooms__lte=q.rooms_max)
+        if q.area_min is not None:
+            qs = qs.filter(property__area_sqm__gte=q.area_min)
+        if q.area_max is not None:
+            qs = qs.filter(property__area_sqm__lte=q.area_max)
+        if q.verified is not None:
+            qs = qs.filter(property__is_verified=q.verified)
+        if q.furnishing:
+            qs = qs.filter(property__furnishing=q.furnishing)
+        if q.tariff:
+            qs = qs.filter(property__tariff=q.tariff)
+        if q.property_type:
+            qs = qs.filter(property__property_type=q.property_type)
+        if q.amenities:
+            for slug in (value.strip() for value in q.amenities.split(",")):
+                if slug:
+                    qs = qs.filter(property__amenities__slug=slug)
+            qs = qs.distinct()
+        if q.q:
+            qs = qs.filter(
+                Q(property__name__icontains=q.q)
+                | Q(property__address__icontains=q.q)
+                | Q(property__district__name__icontains=q.q)
             )
-            .exclude(property__leases__in=overlapping_leases)
-            .exclude(property__bookings__in=overlapping_bookings)
-            .distinct()
-        )
-    else:
+        if q.bbox:
+            # Legacy callers do not use the bounded mobile map query.  Keep
+            # their historical ignore-on-malformed policy until their v1 slice
+            # is migrated, while MobileHomeMapQuery now rejects it at parsing.
+            try:
+                min_lon, min_lat, max_lon, max_lat = (float(v) for v in q.bbox.split(","))
+            except TypeError, ValueError:
+                pass
+            else:
+                qs = qs.filter(
+                    property__map_lat__gte=min_lat,
+                    property__map_lat__lte=max_lat,
+                    property__map_lon__gte=min_lon,
+                    property__map_lon__lte=max_lon,
+                )
+
+        if q.sort == "price_asc":
+            return qs.order_by("_price", "-created_at", "-id")
+        if q.sort == "price_desc":
+            return qs.order_by("-_price", "-created_at", "-id")
+        if q.sort in ("score_desc", "rating_desc"):
+            return qs.order_by("-property__score", "-is_featured", "-created_at", "-id")
+        return qs.order_by("-is_featured", "-created_at", "-id")
+
+
+class ListingDiscoveryService:
+    """Prepares visible/available listing querysets before a FilterSet runs."""
+
+    def __init__(self, *, booking_service_factory=None):
+        self.booking_service_factory = booking_service_factory
+
+    def filter(self, queryset, filters: ListingFilters, *, request=None, include_future_managed: bool = False):
+        queryset = self.visible_queryset(queryset, filters, include_future_managed=include_future_managed)
+        return ListingFilterSet(query=filters, request=request, queryset=queryset).apply()
+
+    def visible_queryset(self, qs, filters: ListingFilters, *, include_future_managed: bool = False):
+        """Apply availability and visibility; never apply query filters here."""
+        q = filters
+        if q.start_date and q.end_date:
+            flex = q.flexibility_days if q.flexibility_days is not None else 3
+            latest_acceptable_start = q.start_date + datetime.timedelta(days=flex)
+            earliest_acceptable_end = q.end_date - datetime.timedelta(days=flex)
+
+            overlapping_leases = Lease.objects.filter(
+                status__in=[LeaseStatus.PENDING_SIGNATURE, LeaseStatus.SCHEDULED, LeaseStatus.ACTIVE],
+                start_date__lte=earliest_acceptable_end,
+                end_date__gte=latest_acceptable_start,
+            )
+            overlapping_bookings = Booking.objects.filter(
+                Q(status=BookingStatus.CONFIRMED)
+                | Q(
+                    status=BookingStatus.PAYMENT_PENDING,
+                    payment_checkout__status=PaymentCheckoutStatus.PENDING,
+                    payment_checkout__expires_at__gt=datetime.datetime.now(datetime.UTC),
+                ),
+                requested_start_date__lte=earliest_acceptable_end,
+                requested_end_date__gte=latest_acceptable_start,
+            )
+            return (
+                qs.filter(
+                    property__owner_agreements__status=OwnerAgreementStatus.ACTIVE,
+                    property__owner_agreements__start_date__lte=latest_acceptable_start,
+                    property__owner_agreements__end_date__gte=earliest_acceptable_end,
+                )
+                .exclude(property__leases__in=overlapping_leases)
+                .exclude(property__bookings__in=overlapping_bookings)
+                .distinct()
+            )
+
         future_managed = Q(pk__in=[])
         if include_future_managed:
             from marketplace.services.booking import BookingService
 
-            if BookingService.enabled_providers():
+            booking_service = self.booking_service_factory() if self.booking_service_factory else BookingService()
+            if booking_service.enabled_providers():
                 future_managed = Q(
                     property__engagement_type=PropertyEngagementType.MANAGED,
                     property__is_verified=True,
                     property__owner_agreements__status=OwnerAgreementStatus.ACTIVE,
                     property__owner_agreements__end_date__gte=datetime.date.today(),
                 )
-        qs = qs.filter(Q(property__status=PropertyStatus.VACANT) | future_managed).distinct()
+        return qs.filter(Q(property__status=PropertyStatus.VACANT) | future_managed).distinct()
 
-    if q.district_id is not None:
-        qs = qs.filter(property__district_id=q.district_id)
-    if q.price_min is not None:
-        qs = qs.filter(_price__gte=q.price_min)
-    if q.price_max is not None:
-        qs = qs.filter(_price__lte=q.price_max)
-    if q.rooms is not None:
-        qs = qs.filter(property__rooms=q.rooms)
-    if q.rooms_min is not None:
-        qs = qs.filter(property__rooms__gte=q.rooms_min)
-    if q.rooms_max is not None:
-        qs = qs.filter(property__rooms__lte=q.rooms_max)
-    if q.area_min is not None:
-        qs = qs.filter(property__area_sqm__gte=q.area_min)
-    if q.area_max is not None:
-        qs = qs.filter(property__area_sqm__lte=q.area_max)
-    if q.verified is not None:
-        qs = qs.filter(property__is_verified=q.verified)
-    if q.furnishing:
-        qs = qs.filter(property__furnishing=q.furnishing)
-    if q.tariff:
-        qs = qs.filter(property__tariff=q.tariff)
-    if q.property_type:
-        qs = qs.filter(property__property_type=q.property_type)
-    if q.amenities:
-        slugs = [s.strip() for s in q.amenities.split(",") if s.strip()]
-        for slug in slugs:  # AND-match: every requested amenity must be present
-            qs = qs.filter(property__amenities__slug=slug)
-        qs = qs.distinct()
-    if q.q:
-        qs = qs.filter(
-            Q(property__name__icontains=q.q)
-            | Q(property__address__icontains=q.q)
-            | Q(property__district__name__icontains=q.q)
-        )
-    if q.bbox:
-        try:
-            min_lon, min_lat, max_lon, max_lat = (float(v) for v in q.bbox.split(","))
-            qs = qs.filter(
-                property__map_lat__gte=min_lat,
-                property__map_lat__lte=max_lat,
-                property__map_lon__gte=min_lon,
-                property__map_lon__lte=max_lon,
-            )
-        except ValueError, TypeError:
-            pass
 
-    if q.sort == "price_asc":
-        qs = qs.order_by("_price", "-created_at")
-    elif q.sort == "price_desc":
-        qs = qs.order_by("-_price", "-created_at")
-    elif q.sort in ("score_desc", "rating_desc"):
-        qs = qs.order_by("-property__score", "-is_featured", "-created_at")
-    else:  # newest (default) — featured first
-        qs = qs.order_by("-is_featured", "-created_at")
-
-    return qs
+def apply_listing_filters(qs, filters: ListingFilters, *, include_future_managed: bool = False):
+    """Compatibility façade for callers not migrated to ``ListingDiscoveryService``."""
+    return ListingDiscoveryService().filter(qs, filters, include_future_managed=include_future_managed)
 
 
 def photo_url(photo, request):

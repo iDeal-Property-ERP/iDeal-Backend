@@ -1,10 +1,10 @@
 info:
-  name: Get map config
+  name: List map mobile config
   type: http
   seq: 1
 http:
   method: GET
-  url: "{{base_url}}/api/v1/mobile/config/map/"
+  url: '{{base_url}}/api/v1/mobile/config/map/'
   auth:
     type: none
 settings:
@@ -12,7 +12,7 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-docs: "# GET /api/v1/mobile/config/map/
+docs: '# GET /api/v1/mobile/config/map/
 
 
   Authentication: **none**.
@@ -28,21 +28,21 @@ docs: "# GET /api/v1/mobile/config/map/
 
 
   Examples are static source-backed contract fixtures. Capture runtime responses with
-  the local environment when fixtures and providers are available."
+  the local environment when fixtures and providers are available.'
 examples:
-  - name: success
-    request:
-      url: "{{base_url}}/api/v1/mobile/config/map/"
-      method: GET
-      headers:
-        - name: accept
-          value: application/json
-    response:
-      status: 200
-      statusText: OK
-      headers:
-        - name: content-type
-          value: application/json
-      body:
-        type: json
-        data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {\n    \"provider\": \"yandex\",\n    \"token\": \"mock-token\"\n  }\n}"
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/mobile/config/map/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"

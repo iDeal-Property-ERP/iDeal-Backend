@@ -12,6 +12,7 @@ from marketplace.services.listings import (
     photo_url,
     published_listings_queryset,
 )
+from marketplace.services.presentation import RESPONSE_TIME, verification_checklist
 from property.models import District, Property
 
 from api.v1.marketplace.schemas import (
@@ -23,24 +24,13 @@ from core.constants import ListingStatus, PropertyStatus
 from core.utils.pagination import build_paginated_response
 from core.utils.rate_limit import rate_limit
 
-# Static verification checklist shown only on verified listing detail pages.
-VERIFICATION_CHECKLIST = [
-    {"key": "ownership", "label": _("Official ownership check")},
-    {"key": "team", "label": _("Verified by iDeal team")},
-    {"key": "contract", "label": _("In-app contract & payments")},
-    {"key": "managed", "label": _("Managed end-to-end")},
-]
-RESPONSE_TIME = _("Usually responds within 1 hour")
-
 
 def _amenities_brief(prop):
     return [{"slug": a.slug, "name": a.name, "icon": a.icon} for a in prop.amenities.all() if a.is_active]
 
 
 def _verification_checklist(prop):
-    if not prop.is_verified:
-        return []
-    return [{"key": item["key"], "label": str(item["label"])} for item in VERIFICATION_CHECKLIST]
+    return verification_checklist(prop)
 
 
 def _build_property_brief(prop, request=None):
@@ -311,6 +301,7 @@ class ContactInquiryView(BaseController):
             }
         )
 
+
 class PublicListingSubmitView(BaseController):
     auth = ()
 
@@ -412,7 +403,7 @@ class PublicListingSubmitView(BaseController):
                     created_photos = save_uploaded_images(PropertyPhoto, "property", prop, files)
                     for idx, photo in enumerate(created_photos):
                         photo.sort_order = idx
-                        photo.is_primary = (idx == 0)
+                        photo.is_primary = idx == 0
                         photo.save(update_fields=["sort_order", "is_primary", "updated_at"])
                 except UploadError as err:
                     raise ValueError(str(err)) from err

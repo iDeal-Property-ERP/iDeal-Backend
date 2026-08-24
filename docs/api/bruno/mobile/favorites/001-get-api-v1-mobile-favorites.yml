@@ -37,7 +37,7 @@ http:
     value: 'True'
     type: query
   - name: furnishing
-    value: unfurnished
+    value: furnished
     type: query
   - name: tariff
     value: standard

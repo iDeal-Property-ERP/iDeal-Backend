@@ -65,9 +65,8 @@ class ChatManagementView(ManagementView):
     def _conversation(self, parsed_path: Path[DetailPath]):
         return get_for_staff_or_404(parsed_path.pk)
 
-    @staticmethod
-    def _read_only_failure(error):
-        return ChatManagementView.fail(
+    def _read_only_failure(self, error):
+        return self.fail(
             error=str(error),
             message=str(_("Conversation is read-only")),
             status_code=HTTPStatus.CONFLICT,

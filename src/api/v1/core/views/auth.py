@@ -17,6 +17,7 @@ from dmr.security.jwt.views import (
 )
 
 from core.api.mixins import JWTMixin
+from core.api.responses import EnvelopeResponseMixin
 from core.api.views import BaseController
 
 
@@ -46,7 +47,9 @@ def _blacklist(jti: str | None, expires_at: datetime | None) -> None:
 
 
 class LoginAPIView(
-    JWTMixin, ObtainTokensSyncController[PydanticFastSerializer, ObtainTokensPayload, ObtainTokensResponse]
+    JWTMixin,
+    EnvelopeResponseMixin,
+    ObtainTokensSyncController[PydanticFastSerializer, ObtainTokensPayload, ObtainTokensResponse],
 ):
     def convert_auth_payload(self, payload: ObtainTokensPayload) -> ObtainTokensPayload:
         return {
@@ -69,7 +72,7 @@ class LoginAPIView(
 
     @modify(status_code=HTTPStatus.OK)
     def post(self, parsed_body: Body[ObtainTokensPayload]) -> dict:
-        return BaseController.ok(self.login(parsed_body))
+        return self.ok(self.login(parsed_body))
 
 
 class RefreshInput(pydantic.BaseModel):
@@ -79,16 +82,13 @@ class RefreshInput(pydantic.BaseModel):
     refresh: str | None = None
 
 
-class RefreshAPIView(JWTMixin, RefreshTokenSyncController[PydanticFastSerializer, dict, ObtainTokensResponse]):
+class RefreshAPIView(
+    JWTMixin, EnvelopeResponseMixin, RefreshTokenSyncController[PydanticFastSerializer, dict, ObtainTokensResponse]
+):
     def convert_refresh_payload(self, payload: dict) -> str:
         from core.auth_cookies import REFRESH_COOKIE
 
-        return (
-            payload.get("refresh")
-            or payload.get("refresh_token")
-            or self.request.COOKIES.get(REFRESH_COOKIE)
-            or ""
-        )
+        return payload.get("refresh") or payload.get("refresh_token") or self.request.COOKIES.get(REFRESH_COOKIE) or ""
 
     def make_api_response(self) -> ObtainTokensResponse:
         return {
@@ -106,7 +106,7 @@ class RefreshAPIView(JWTMixin, RefreshTokenSyncController[PydanticFastSerializer
         body = parsed_body.model_dump()
         raw = self.convert_refresh_payload(body)
         if not raw:
-            return BaseController.fail(
+            return self.fail(
                 error=str(_("Refresh token is required")),
                 message=str(_("Validation error")),
             )
@@ -115,14 +115,14 @@ class RefreshAPIView(JWTMixin, RefreshTokenSyncController[PydanticFastSerializer
             from account.models import TokenBlacklist
 
             if TokenBlacklist.objects.filter(jti=jti).exists():
-                BaseController.fail(
+                self.fail(
                     error=str(_("Refresh token has been revoked")),
                     message=str(_("Token is invalid")),
                     status_code=HTTPStatus.UNAUTHORIZED,
                 )
         response = self.refresh(body)
         _blacklist(jti, exp)
-        return BaseController.ok(response)
+        return self.ok(response)
 
 
 class LogoutInput(pydantic.BaseModel):

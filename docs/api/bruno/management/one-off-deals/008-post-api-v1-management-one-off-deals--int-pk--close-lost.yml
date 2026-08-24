@@ -1,10 +1,10 @@
 info:
-  name: Update one off deal receipt
+  name: Close lost one off deal
   type: http
-  seq: 22
+  seq: 8
 http:
-  method: PATCH
-  url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
+  method: POST
+  url: '{{base_url}}/api/v1/management/one-off-deals/:pk/close-lost/'
   auth:
     type: bearer
     token: '{{access_token}}'
@@ -14,15 +14,14 @@ http:
     type: path
   body:
     type: json
-    data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-      : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-      : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
+    data: "{\n  \"close_date\": \"2026-01-01T00:00:00Z\",\n  \"notes\": \"\",\n  \"\
+      evidence\": [\n    {}\n  ],\n  \"keep_property_active\": false\n}"
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-docs: '# PATCH /api/v1/management/one-off-deals/<int:pk>/receipt/
+docs: '# POST /api/v1/management/one-off-deals/<int:pk>/close-lost/
 
 
   Authentication: **bearer**.
@@ -43,22 +42,28 @@ docs: '# PATCH /api/v1/management/one-off-deals/<int:pk>/receipt/
 
   |---|---:|---:|---|
 
-  | `seller` | no | yes | fixture value; replace fixture values with domain-valid
+  | `close_date` | yes | no | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
-  | `channel` | no | yes | fixture value; replace fixture values with domain-valid
+  | `notes` | no | no | default=''''; replace fixture values with domain-valid data
+  before runtime execution. |
+
+  | `evidence` | no | no | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
-  | `commission_type` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `commission_fixed_amount` | no | yes | fixture value; replace fixture values with
+  | `evidence[].filename` | yes | no | fixture value; replace fixture values with
   domain-valid data before runtime execution. |
 
-  | `commission_percentage` | no | yes | fixture value; replace fixture values with
+  | `evidence[].url` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `evidence[].content_type` | no | yes | fixture value; replace fixture values with
   domain-valid data before runtime execution. |
 
-  | `commission_currency` | no | yes | fixture value; replace fixture values with
+  | `evidence[].size_bytes` | no | yes | fixture value; replace fixture values with
+  domain-valid data before runtime execution. |
+
+  | `keep_property_active` | no | no | default=False; replace fixture values with
   domain-valid data before runtime execution. |
 
 
@@ -70,8 +75,8 @@ docs: '# PATCH /api/v1/management/one-off-deals/<int:pk>/receipt/
 examples:
 - name: success
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
-    method: PATCH
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/close-lost/'
+    method: POST
     headers:
     - name: accept
       value: application/json
@@ -80,11 +85,10 @@ examples:
     params: []
     body:
       type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
+      data: "{\n  \"close_date\": \"2026-01-01T00:00:00Z\",\n  \"notes\": \"\",\n\
+        \  \"evidence\": [\n    {}\n  ],\n  \"keep_property_active\": false\n}"
   response:
-    status: 200
+    status: 201
     statusText: OK
     headers:
     - name: content-type
@@ -94,8 +98,8 @@ examples:
       data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
 - name: validation error
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
-    method: PATCH
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/close-lost/'
+    method: POST
     headers:
     - name: accept
       value: application/json
@@ -104,9 +108,8 @@ examples:
     params: []
     body:
       type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
+      data: "{\n  \"close_date\": \"2026-01-01T00:00:00Z\",\n  \"notes\": \"\",\n\
+        \  \"evidence\": [\n    {}\n  ],\n  \"keep_property_active\": false\n}"
   response:
     status: 400
     statusText: Error
@@ -119,8 +122,8 @@ examples:
         error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
 - name: unauthorized
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
-    method: PATCH
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/close-lost/'
+    method: POST
     headers:
     - name: accept
       value: application/json
@@ -129,9 +132,8 @@ examples:
     params: []
     body:
       type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
+      data: "{\n  \"close_date\": \"2026-01-01T00:00:00Z\",\n  \"notes\": \"\",\n\
+        \  \"evidence\": [\n    {}\n  ],\n  \"keep_property_active\": false\n}"
   response:
     status: 401
     statusText: Error
@@ -144,8 +146,8 @@ examples:
         ,\n  \"error\": \"unauthorized\"\n}"
 - name: not found
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
-    method: PATCH
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/close-lost/'
+    method: POST
     headers:
     - name: accept
       value: application/json
@@ -154,9 +156,8 @@ examples:
     params: []
     body:
       type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
+      data: "{\n  \"close_date\": \"2026-01-01T00:00:00Z\",\n  \"notes\": \"\",\n\
+        \  \"evidence\": [\n    {}\n  ],\n  \"keep_property_active\": false\n}"
   response:
     status: 404
     statusText: Error
@@ -169,8 +170,8 @@ examples:
         : \"not_found\"\n}"
 - name: conflict
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
-    method: PATCH
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/close-lost/'
+    method: POST
     headers:
     - name: accept
       value: application/json
@@ -179,9 +180,8 @@ examples:
     params: []
     body:
       type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
+      data: "{\n  \"close_date\": \"2026-01-01T00:00:00Z\",\n  \"notes\": \"\",\n\
+        \  \"evidence\": [\n    {}\n  ],\n  \"keep_property_active\": false\n}"
   response:
     status: 409
     statusText: Error

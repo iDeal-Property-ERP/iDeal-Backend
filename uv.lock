@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.14"
 
 [options]
-exclude-newer = "2026-08-16T18:08:14.945305504Z"
+exclude-newer = "2026-08-16T21:02:41.784634158Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -849,6 +849,7 @@ dependencies = [
     { name = "pillow" },
     { name = "psycopg2-binary" },
     { name = "pycparser" },
+    { name = "pydantic" },
     { name = "pygments" },
     { name = "python-decouple" },
     { name = "redis" },
@@ -886,10 +887,10 @@ requires-dist = [
     { name = "channels-redis", specifier = ">=4.3.0" },
     { name = "colorlog", specifier = ">=6.10.1" },
     { name = "dj-database-url", specifier = ">=3.0.1" },
-    { name = "django", specifier = ">=5.2.4" },
+    { name = "django", specifier = ">=6.0.5" },
     { name = "django-cors-headers", specifier = ">=4.9.0" },
     { name = "django-filter", specifier = ">=25.1" },
-    { name = "django-modern-rest", extras = ["msgspec", "jwt", "openapi", "pydantic"], specifier = ">=0.8.0" },
+    { name = "django-modern-rest", extras = ["msgspec", "jwt", "openapi", "pydantic"], specifier = ">=0.10.0" },
     { name = "django-q2", specifier = ">=1.7.5" },
     { name = "django-soft-delete", specifier = ">=1.0.23" },
     { name = "django-unfold", specifier = ">=0.63.0" },
@@ -897,6 +898,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "pycparser", specifier = ">=2.22" },
+    { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pygments", specifier = ">=2.19.2" },
     { name = "python-decouple", specifier = ">=3.8" },
     { name = "redis", specifier = ">=5.2.1" },

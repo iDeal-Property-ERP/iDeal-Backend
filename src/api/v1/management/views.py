@@ -536,8 +536,7 @@ class BrokerageCommissionStatsView(ManagementView):
 
         deals = OneOffDeal.objects.select_related("receipt").all()
         won = deals.filter(
-            Q(status=OneOffDealStatus.CLOSED_WON)
-            | Q(status=OneOffDealStatus.ARCHIVED, commission_amount__isnull=False)
+            Q(status=OneOffDealStatus.CLOSED_WON) | Q(status=OneOffDealStatus.ARCHIVED, commission_amount__isnull=False)
         )
         expected = Decimal("0.00")
         received = Decimal("0.00")
@@ -696,9 +695,9 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
 
     def to_output(self, instance):
         # Pass the request so the schema can build absolute cover-photo URLs.
-        return ManagementPropertyOutput.model_validate(
-            instance, context={"request": self.request}
-        ).model_dump(mode="json")
+        return ManagementPropertyOutput.model_validate(instance, context={"request": self.request}).model_dump(
+            mode="json"
+        )
 
     def get_queryset(self):
         from contract.models import Lease
@@ -819,7 +818,11 @@ class OneOffDealDetailView(ManagementView, GenericController):
     def get_queryset(self):
         from property.models import OneOffDeal
 
-        return OneOffDeal.objects.select_related("property", "receipt__recorded_by").prefetch_related("receipt__attachments").all()
+        return (
+            OneOffDeal.objects.select_related("property", "receipt__recorded_by")
+            .prefetch_related("receipt__attachments")
+            .all()
+        )
 
     def get(self, parsed_path: Path[DetailPath]) -> dict:
         return self.ok(self.to_output(self.get_object(pk=parsed_path.pk)))
@@ -847,7 +850,18 @@ class OneOffDealDetailView(ManagementView, GenericController):
         return self.ok(self.to_output(deal), status_code=HTTPStatus.OK)
 
 
-class OneOffDealActionView(OneOffDealDetailView):
+class OneOffDealActionView(ManagementView, GenericController):
+    """POST-only action base; it must not inherit detail GET/PATCH handlers."""
+
+    output_schema = OneOffDealOutput
+
+    def get_queryset(self):
+        from property.models import OneOffDeal
+
+        return OneOffDeal.objects.select_related("property", "receipt__recorded_by").prefetch_related(
+            "receipt__attachments"
+        )
+
     def _deal(self, parsed_path):
         return self.get_object(pk=parsed_path.pk)
 
@@ -1041,9 +1055,9 @@ class ManagementPropertyMapView(ManagementView):
 
         rows = []
         for prop in qs:
-            row = ManagementPropertyOutput.model_validate(
-                prop, context={"request": self.request}
-            ).model_dump(mode="json")
+            row = ManagementPropertyOutput.model_validate(prop, context={"request": self.request}).model_dump(
+                mode="json"
+            )
             lease = prop.active_leases[0] if prop.active_leases else None
             row["tenant_name"] = f"{lease.tenant.first_name} {lease.tenant.last_name or ''}".strip() if lease else None
             row["lease_end_date"] = lease.end_date.isoformat() if lease else None

@@ -4,7 +4,7 @@ from http import HTTPStatus
 from django.conf import settings
 from django.db import IntegrityError
 from django.db.models.deletion import ProtectedError
-from django.http import Http404, JsonResponse
+from django.http import Http404
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from dmr.exceptions import (
@@ -18,34 +18,39 @@ from dmr.exceptions import (
     ValidationError,
 )
 
+from core.api.schemas import ErrorResponse
+
 logger = logging.getLogger("django.request")
+
+
+def _error_response(controller, *, error, message, status_code):
+    """Use DMR's response path for every error envelope."""
+    return controller.to_error(
+        ErrorResponse(message=str(message), error=error),
+        status_code=status_code,
+    )
 
 
 def global_error_handler(endpoint, controller, exc):
     if isinstance(exc, NotAuthenticatedError):
-        return JsonResponse(
-            {"success": False, "message": str(_("Not authenticated")), "error": str(exc)},
-            status=HTTPStatus.UNAUTHORIZED,
+        return _error_response(
+            controller, error=str(exc), message=_("Not authenticated"), status_code=HTTPStatus.UNAUTHORIZED
         )
     if isinstance(exc, TooManyRequestsError):
-        return JsonResponse(
-            {"success": False, "message": str(_("Too many requests")), "error": str(exc)},
-            status=HTTPStatus.TOO_MANY_REQUESTS,
+        return _error_response(
+            controller, error=str(exc), message=_("Too many requests"), status_code=HTTPStatus.TOO_MANY_REQUESTS
         )
     if isinstance(exc, ValidationError):
-        return JsonResponse(
-            {"success": False, "message": str(_("Validation error")), "error": exc.payload},
-            status=exc.status_code,
+        return _error_response(
+            controller, error=exc.payload, message=_("Validation error"), status_code=exc.status_code
         )
     if isinstance(exc, RequestSerializationError):
-        return JsonResponse(
-            {"success": False, "message": str(_("Invalid request body")), "error": str(exc)},
-            status=HTTPStatus.BAD_REQUEST,
+        return _error_response(
+            controller, error=str(exc), message=_("Invalid request body"), status_code=HTTPStatus.BAD_REQUEST
         )
     if isinstance(exc, NotAcceptableError):
-        return JsonResponse(
-            {"success": False, "message": str(_("Not acceptable")), "error": str(exc)},
-            status=HTTPStatus.NOT_ACCEPTABLE,
+        return _error_response(
+            controller, error=str(exc), message=_("Not acceptable"), status_code=HTTPStatus.NOT_ACCEPTABLE
         )
     if isinstance(exc, (InternalServerError, DataRenderingError, ResponseSchemaError)):
         error_text = str(exc) if settings.DEBUG else force_str(InternalServerError.default_message)
@@ -55,38 +60,33 @@ def global_error_handler(endpoint, controller, exc):
             exc_info=exc,
             extra={"request": getattr(controller, "request", None)},
         )
-        resp = JsonResponse(
-            {"success": False, "message": str(_("Internal server error")), "error": error_text},
-            status=HTTPStatus.INTERNAL_SERVER_ERROR,
+        resp = _error_response(
+            controller,
+            error=error_text,
+            message=_("Internal server error"),
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
         )
         resp._has_been_logged = True
         return resp
 
     if isinstance(exc, Http404):
-        return JsonResponse(
-            {"success": False, "message": str(_("Not found")), "error": str(exc)},
-            status=HTTPStatus.NOT_FOUND,
-        )
+        return _error_response(controller, error=str(exc), message=_("Not found"), status_code=HTTPStatus.NOT_FOUND)
 
     # Database-level guards. These must NEVER echo the raw exception (it leaks the
     # failing row / SQL / constraint internals), regardless of DEBUG.
     if isinstance(exc, ProtectedError):
-        return JsonResponse(
-            {
-                "success": False,
-                "message": str(_("Cannot delete")),
-                "error": str(_("This record is referenced by other records and cannot be deleted.")),
-            },
-            status=HTTPStatus.CONFLICT,
+        return _error_response(
+            controller,
+            error=str(_("This record is referenced by other records and cannot be deleted.")),
+            message=_("Cannot delete"),
+            status_code=HTTPStatus.CONFLICT,
         )
     if isinstance(exc, IntegrityError):
-        return JsonResponse(
-            {
-                "success": False,
-                "message": str(_("Data conflict")),
-                "error": str(_("The request conflicts with existing data or references a missing record.")),
-            },
-            status=HTTPStatus.CONFLICT,
+        return _error_response(
+            controller,
+            error=str(_("The request conflicts with existing data or references a missing record.")),
+            message=_("Data conflict"),
+            status_code=HTTPStatus.CONFLICT,
         )
 
     status_code = getattr(exc, "status_code", HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -100,10 +100,7 @@ def global_error_handler(endpoint, controller, exc):
             extra={"request": getattr(controller, "request", None)},
         )
 
-    resp = JsonResponse(
-        {"success": False, "message": str(_("Internal server error")), "error": error_text},
-        status=status_code,
-    )
+    resp = _error_response(controller, error=error_text, message=_("Internal server error"), status_code=status_code)
     if status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
         resp._has_been_logged = True
     return resp

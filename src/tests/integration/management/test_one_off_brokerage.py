@@ -46,6 +46,21 @@ def _create_one_off(api_client, management, **overrides):
 
 @pytest.mark.django_db
 class TestOneOffBrokerageAPI:
+    def test_action_routes_reject_inherited_get_and_patch(self, api_client):
+        action_paths = (
+            "activate/",
+            "pause/",
+            "close-won/",
+            "close-lost/",
+            "archive/",
+            "receipt/",
+            "receipt/attachments/",
+        )
+        for suffix in action_paths:
+            path = f"/api/v1/management/one-off-deals/999999/{suffix}"
+            assert api_client.get(path).status_code == 405
+            assert api_client.patch(path, data="{}", content_type="application/json").status_code == 405
+
     def test_creates_marketplace_deal_without_owner_account(self, api_client, management):
         response = _create_one_off(api_client, management)
 

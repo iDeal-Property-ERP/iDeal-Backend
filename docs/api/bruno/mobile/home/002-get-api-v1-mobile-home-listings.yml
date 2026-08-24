@@ -36,13 +36,16 @@ http:
     value: 'True'
     type: query
   - name: furnishing
-    value: unfurnished
+    value: furnished
     type: query
   - name: tariff
     value: standard
     type: query
   - name: property_type
     value: apartment
+    type: query
+  - name: sort
+    value: newest
     type: query
 settings:
   encodeUrl: true
@@ -98,6 +101,9 @@ docs: '# GET /api/v1/mobile/home/listings/
   | `property_type` | query | no | `fixture-value` | non-nullable; fixture value;
   replace with a real ID when running. |
 
+  | `sort` | query | no | `fixture-value` | non-nullable; fixture value; replace with
+  a real ID when running. |
+
 
   ## Saved examples
 
@@ -147,6 +153,9 @@ examples:
       value: '1'
       type: query
     - name: property_type
+      value: '1'
+      type: query
+    - name: sort
       value: '1'
       type: query
   response:
@@ -200,6 +209,9 @@ examples:
       value: '1'
       type: query
     - name: property_type
+      value: '1'
+      type: query
+    - name: sort
       value: '1'
       type: query
   response:

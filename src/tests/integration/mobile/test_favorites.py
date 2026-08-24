@@ -137,7 +137,9 @@ class TestMobileFavoritesList:
         draft_listing.save(update_fields=["status", "updated_at"])
         draft_favorite = FavoriteListingFactory(user=tenant, listing=draft_listing)
 
-        rented_listing = ListingFactory(property=PropertyFactory(status=PropertyStatus.RENTED), status=ListingStatus.PUBLISHED)
+        rented_listing = ListingFactory(
+            property=PropertyFactory(status=PropertyStatus.RENTED), status=ListingStatus.PUBLISHED
+        )
         rented_favorite = FavoriteListingFactory(user=tenant, listing=rented_listing)
 
         soft_deleted_listing = _visible_listing()
@@ -178,14 +180,17 @@ class TestMobileFavoritesList:
         assert rented_listing.id not in returned_ids
         assert soft_deleted_listing.id not in returned_ids
         assert managed_without_agreement.id not in returned_ids
-        assert FavoriteListing.objects.filter(
-            pk__in=[
-                draft_favorite.pk,
-                rented_favorite.pk,
-                managed_without_agreement_favorite.pk,
-                eligible_future_favorite.pk,
-            ]
-        ).count() == 4
+        assert (
+            FavoriteListing.objects.filter(
+                pk__in=[
+                    draft_favorite.pk,
+                    rented_favorite.pk,
+                    managed_without_agreement_favorite.pk,
+                    eligible_future_favorite.pk,
+                ]
+            ).count()
+            == 4
+        )
         assert FavoriteListing.global_objects.filter(pk=soft_deleted_favorite.pk).exists()
 
 
@@ -211,11 +216,17 @@ class TestMobileFavoritesListFilters:
         tenant = TenantFactory()
         district = DistrictFactory(name="Yunusabad")
         by_name = FavoriteListingFactory(user=tenant, listing=_visible_listing(name="Fancy Loft"))
-        by_address = FavoriteListingFactory(user=tenant, listing=_visible_listing(name="Plain House", address="12 Amir Temur Street"))
-        by_district = FavoriteListingFactory(user=tenant, listing=_visible_listing(name="Plain Flat", address="9 Navoi Street", district=district))
+        by_address = FavoriteListingFactory(
+            user=tenant, listing=_visible_listing(name="Plain House", address="12 Amir Temur Street")
+        )
+        by_district = FavoriteListingFactory(
+            user=tenant, listing=_visible_listing(name="Plain Flat", address="9 Navoi Street", district=district)
+        )
         FavoriteListingFactory(
             user=tenant,
-            listing=_visible_listing(name="Basic Flat", address="5 Somewhere Road", district=DistrictFactory(name="Chilonzor")),
+            listing=_visible_listing(
+                name="Basic Flat", address="5 Somewhere Road", district=DistrictFactory(name="Chilonzor")
+            ),
         )
 
         for query, expected in (
@@ -320,9 +331,7 @@ class TestMobileFavoritesMap:
 
     def test_favorites_only_returns_only_favorites_inside_bbox(self, api_client):
         tenant = TenantFactory()
-        inside_favorite = FavoriteListingFactory(
-            user=tenant, listing=_visible_listing(map_lat=41.31, map_lon=69.28)
-        )
+        inside_favorite = FavoriteListingFactory(user=tenant, listing=_visible_listing(map_lat=41.31, map_lon=69.28))
         FavoriteListingFactory(user=tenant, listing=_visible_listing(map_lat=40.5, map_lon=68.5))
         _visible_listing(map_lat=41.32, map_lon=69.29)
 
@@ -339,9 +348,7 @@ class TestMobileFavoritesMap:
         match = FavoriteListingFactory(
             user=tenant, listing=_visible_listing(name="Map Loft", map_lat=41.31, map_lon=69.28)
         )
-        FavoriteListingFactory(
-            user=tenant, listing=_visible_listing(name="Other Flat", map_lat=41.32, map_lon=69.29)
-        )
+        FavoriteListingFactory(user=tenant, listing=_visible_listing(name="Other Flat", map_lat=41.32, map_lon=69.29))
 
         response = api_client.get(MAP_URL, self._map_query(q="loft"), **_make_jwt(tenant))
 
@@ -393,7 +400,7 @@ class TestMobileFavoriteToggle:
         def favorite_in_thread():
             close_old_connections()
             try:
-                return FavoriteListingService.favorite(tenant, listing).pk
+                return FavoriteListingService().favorite(tenant, listing).pk
             finally:
                 connection.close()
 
@@ -416,7 +423,7 @@ class TestMobileFavoriteToggle:
             close_old_connections()
             try:
                 barrier.wait(timeout=10)
-                return FavoriteListingService.favorite(tenant, listing).pk
+                return FavoriteListingService().favorite(tenant, listing).pk
             finally:
                 connection.close()
 

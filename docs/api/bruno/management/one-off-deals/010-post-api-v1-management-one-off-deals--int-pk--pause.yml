@@ -1,9 +1,9 @@
 info:
-  name: Pause one off deal management one off deals
+  name: Pause one off deal
   type: http
-  seq: 19
+  seq: 10
 http:
-  method: PATCH
+  method: POST
   url: '{{base_url}}/api/v1/management/one-off-deals/:pk/pause/'
   auth:
     type: bearer
@@ -12,17 +12,12 @@ http:
   - name: pk
     value: '{{pk}}'
     type: path
-  body:
-    type: json
-    data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-      : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-      : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-docs: '# PATCH /api/v1/management/one-off-deals/<int:pk>/pause/
+docs: '# POST /api/v1/management/one-off-deals/<int:pk>/pause/
 
 
   Authentication: **bearer**.
@@ -39,29 +34,6 @@ docs: '# PATCH /api/v1/management/one-off-deals/<int:pk>/pause/
   when running. |
 
 
-  | Body field | Required | Nullable | Notes |
-
-  |---|---:|---:|---|
-
-  | `seller` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `channel` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `commission_type` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `commission_fixed_amount` | no | yes | fixture value; replace fixture values with
-  domain-valid data before runtime execution. |
-
-  | `commission_percentage` | no | yes | fixture value; replace fixture values with
-  domain-valid data before runtime execution. |
-
-  | `commission_currency` | no | yes | fixture value; replace fixture values with
-  domain-valid data before runtime execution. |
-
-
   ## Saved examples
 
 
@@ -71,20 +43,15 @@ examples:
 - name: success
   request:
     url: '{{base_url}}/api/v1/management/one-off-deals/:pk/pause/'
-    method: PATCH
+    method: POST
     headers:
     - name: accept
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
   response:
-    status: 200
+    status: 201
     statusText: OK
     headers:
     - name: content-type
@@ -95,18 +62,13 @@ examples:
 - name: validation error
   request:
     url: '{{base_url}}/api/v1/management/one-off-deals/:pk/pause/'
-    method: PATCH
+    method: POST
     headers:
     - name: accept
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
   response:
     status: 400
     statusText: Error
@@ -120,18 +82,13 @@ examples:
 - name: unauthorized
   request:
     url: '{{base_url}}/api/v1/management/one-off-deals/:pk/pause/'
-    method: PATCH
+    method: POST
     headers:
     - name: accept
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
   response:
     status: 401
     statusText: Error
@@ -145,18 +102,13 @@ examples:
 - name: not found
   request:
     url: '{{base_url}}/api/v1/management/one-off-deals/:pk/pause/'
-    method: PATCH
+    method: POST
     headers:
     - name: accept
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
   response:
     status: 404
     statusText: Error
@@ -170,18 +122,13 @@ examples:
 - name: conflict
   request:
     url: '{{base_url}}/api/v1/management/one-off-deals/:pk/pause/'
-    method: PATCH
+    method: POST
     headers:
     - name: accept
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"seller\": {},\n  \"channel\": \"fixture-value\",\n  \"commission_type\"\
-        : \"fixture-value\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-        : 1,\n  \"commission_currency\": \"fixture-value\"\n}"
   response:
     status: 409
     statusText: Error

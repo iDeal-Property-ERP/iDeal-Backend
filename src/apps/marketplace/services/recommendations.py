@@ -81,24 +81,42 @@ def _tokenize(text: str) -> set[str]:
 
 
 class RecommendationService:
-    @staticmethod
+    """Activity-backed discovery recommendations with injectable persistence and clock."""
+
+    def __init__(
+        self,
+        *,
+        user_model=User,
+        listing_model=Listing,
+        search_activity_model=RecentSearchActivity,
+        view_activity_model=ListingViewActivity,
+        favorite_model=FavoriteListing,
+        now=timezone.now,
+    ):
+        self.user_model = user_model
+        self.listing_model = listing_model
+        self.search_activity_model = search_activity_model
+        self.view_activity_model = view_activity_model
+        self.favorite_model = favorite_model
+        self.now = now
+
     @transaction.atomic
-    def record_search(user: User, query: str | None, filters: dict[str, Any] | None) -> RecentSearchActivity:
+    def record_search(self, user: User, query: str | None, filters: dict[str, Any] | None) -> RecentSearchActivity:
         normalized_query, normalized_filters, fingerprint = normalize_search_payload(query, filters)
 
         # Lock user record to serialize activity writes per user
-        User.objects.select_for_update().get(id=user.id)
+        self.user_model.objects.select_for_update().get(id=user.id)
 
         activity = (
-            RecentSearchActivity.global_objects.select_for_update()
+            self.search_activity_model.global_objects.select_for_update()
             .filter(user=user, fingerprint=fingerprint)
             .order_by("-updated_at", "-id")
             .first()
         )
 
-        now = timezone.now()
+        now = self.now()
         if activity is None:
-            activity = RecentSearchActivity.objects.create(
+            activity = self.search_activity_model.objects.create(
                 user=user,
                 query=normalized_query,
                 filters=normalized_filters,
@@ -114,31 +132,32 @@ class RecommendationService:
 
         # Prune beyond 20 searches
         all_ids = list(
-            RecentSearchActivity.objects.filter(user=user).order_by("-updated_at", "-id").values_list("id", flat=True)
+            self.search_activity_model.objects.filter(user=user)
+            .order_by("-updated_at", "-id")
+            .values_list("id", flat=True)
         )
         if len(all_ids) > MAX_RETAINED_SEARCHES:
-            RecentSearchActivity.objects.filter(id__in=all_ids[MAX_RETAINED_SEARCHES:]).hard_delete()
+            self.search_activity_model.objects.filter(id__in=all_ids[MAX_RETAINED_SEARCHES:]).hard_delete()
 
         return activity
 
-    @staticmethod
     @transaction.atomic
-    def record_view(user: User, listing_id: int) -> ListingViewActivity:
-        listing = get_object_or_404(Listing, pk=listing_id)
+    def record_view(self, user: User, listing_id: int) -> ListingViewActivity:
+        listing = get_object_or_404(self.listing_model, pk=listing_id)
 
         # Lock user record to serialize activity writes per user
-        User.objects.select_for_update().get(id=user.id)
+        self.user_model.objects.select_for_update().get(id=user.id)
 
         activity = (
-            ListingViewActivity.global_objects.select_for_update()
+            self.view_activity_model.global_objects.select_for_update()
             .filter(user=user, listing=listing)
             .order_by("-updated_at", "-id")
             .first()
         )
 
-        now = timezone.now()
+        now = self.now()
         if activity is None:
-            activity = ListingViewActivity.objects.create(user=user, listing=listing)
+            activity = self.view_activity_model.objects.create(user=user, listing=listing)
         else:
             activity.deleted_at = None
             activity.restored_at = now
@@ -147,26 +166,27 @@ class RecommendationService:
 
         # Prune beyond 100 views
         all_ids = list(
-            ListingViewActivity.objects.filter(user=user).order_by("-updated_at", "-id").values_list("id", flat=True)
+            self.view_activity_model.objects.filter(user=user)
+            .order_by("-updated_at", "-id")
+            .values_list("id", flat=True)
         )
         if len(all_ids) > MAX_RETAINED_VIEWS:
-            ListingViewActivity.objects.filter(id__in=all_ids[MAX_RETAINED_VIEWS:]).hard_delete()
+            self.view_activity_model.objects.filter(id__in=all_ids[MAX_RETAINED_VIEWS:]).hard_delete()
 
         return activity
 
-    @staticmethod
-    def get_recommendations(user: User, *, limit: int = MAX_RECOMMENDED_ITEMS) -> list[Listing]:
+    def get_recommendations(self, user: User, *, limit: int = MAX_RECOMMENDED_ITEMS) -> list[Listing]:
         searches = list(
-            RecentSearchActivity.objects.filter(user=user).order_by("-updated_at", "-id")[:MAX_RETAINED_SEARCHES]
+            self.search_activity_model.objects.filter(user=user).order_by("-updated_at", "-id")[:MAX_RETAINED_SEARCHES]
         )
         views = list(
-            ListingViewActivity.objects.filter(user=user)
+            self.view_activity_model.objects.filter(user=user)
             .select_related("listing__property__district")
             .prefetch_related("listing__property__photos", "listing__property__amenities")
             .order_by("-updated_at", "-id")[:MAX_RETAINED_VIEWS]
         )
         favorites = list(
-            FavoriteListing.objects.filter(user=user)
+            self.favorite_model.objects.filter(user=user)
             .select_related("listing__property__district")
             .prefetch_related("listing__property__photos", "listing__property__amenities")
             .order_by("-created_at", "-id")[:MAX_FAVORITES_SEEDS]
@@ -176,8 +196,8 @@ class RecommendationService:
             return []
 
         # Exclude all retained views and active favorites
-        excluded_view_ids = set(ListingViewActivity.objects.filter(user=user).values_list("listing_id", flat=True))
-        excluded_fav_ids = set(FavoriteListing.objects.filter(user=user).values_list("listing_id", flat=True))
+        excluded_view_ids = set(self.view_activity_model.objects.filter(user=user).values_list("listing_id", flat=True))
+        excluded_fav_ids = set(self.favorite_model.objects.filter(user=user).values_list("listing_id", flat=True))
         excluded_ids = excluded_view_ids | excluded_fav_ids
 
         candidate_qs = apply_listing_filters(
@@ -253,7 +273,7 @@ class RecommendationService:
                 if not seed_listing:
                     continue
                 recency = 1.0 / (rank + 1.0)
-                points = RecommendationService._score_listing_seed(
+                points = self._score_listing_seed(
                     cand_prop,
                     cand_price,
                     cand_rooms,
@@ -272,7 +292,7 @@ class RecommendationService:
                 if not seed_listing:
                     continue
                 recency = 1.0 / (rank + 1.0)
-                points = RecommendationService._score_listing_seed(
+                points = self._score_listing_seed(
                     cand_prop,
                     cand_price,
                     cand_rooms,
@@ -293,8 +313,8 @@ class RecommendationService:
 
         return [item[4] for item in scored_candidates[:limit]]
 
-    @staticmethod
     def _score_listing_seed(
+        self,
         cand_prop,
         cand_price: float | None,
         cand_rooms: int | None,

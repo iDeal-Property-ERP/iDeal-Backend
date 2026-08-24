@@ -1,7 +1,7 @@
 info:
-  name: Close won one off deal management one off deals 2
+  name: Close won one off deal
   type: http
-  seq: 17
+  seq: 9
 http:
   method: POST
   url: '{{base_url}}/api/v1/management/one-off-deals/:pk/close-won/'

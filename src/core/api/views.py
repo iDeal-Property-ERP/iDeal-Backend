@@ -1,52 +1,30 @@
-from http import HTTPStatus
 from typing import Any
 
 import pydantic
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Controller, Path, Query
 from dmr.plugins.pydantic import PydanticFastSerializer
-from dmr.response import APIError
 
 from core.api.permissions import BlacklistAwareJWTSyncAuth
+from core.api.responses import EnvelopeResponseMixin
+from core.api.schemas import SuccessResponse
 from core.models import BaseModel
-from core.utils.pagination import build_paginated_response
+from core.services import ServiceControllerMixin
+from core.utils.pagination import build_paginated_response_from_queryset
 
 
-class BaseController(Controller[PydanticFastSerializer]):
+class BaseController(EnvelopeResponseMixin, ServiceControllerMixin, Controller[PydanticFastSerializer]):
     SUCCESS_MESSAGE = _("OK")
     ERROR_MESSAGE = _("NOT OK")
     auth = (BlacklistAwareJWTSyncAuth(),)
 
-    @staticmethod
-    def ok(data, *, status_code=None):
-        raw_data = {
-            "success": True,
-            "message": str(_("OK")),
-            "data": data,
-        }
-        if status_code is not None:
-            return JsonResponse(raw_data, status=status_code)
-        return raw_data
-
-    @staticmethod
-    def fail(error, message=None, status_code=HTTPStatus.BAD_REQUEST):
-        if message is None:
-            message = str(_("NOT OK"))
-        raise APIError(
-            raw_data={
-                "success": False,
-                "message": message,
-                "error": error,
-            },
-            status_code=status_code,
-        )
-
 
 class ListQuery(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(extra="ignore")
+
     page: int | None = None
-    per_page: int = 20
+    per_page: int = pydantic.Field(default=20, ge=1, le=100)
 
 
 class DetailPath(pydantic.BaseModel):
@@ -74,6 +52,10 @@ class GenericController(BaseController):
 
     def to_output(self, instance):
         if self.output_schema is not None:
+            # Generic controllers are a legacy compatibility surface. New
+            # bounded contexts return their output models directly; this
+            # adapter remains a dictionary until each legacy override that
+            # mutates its output has been migrated.
             return self.output_schema.model_validate(instance).model_dump(mode="json")
         return instance
 
@@ -89,12 +71,12 @@ class GenericController(BaseController):
     def perform_destroy(self, instance):
         instance.delete()
 
-    def list_response(self, qs, parsed_query) -> dict:
-        items = [self.to_output(obj) for obj in qs]
+    def list_response(self, qs, parsed_query):
         if parsed_query.page is not None:
-            paginated = build_paginated_response(items, parsed_query.page, parsed_query.per_page)
-            return self.ok(paginated)
-        return self.ok(items)
+            return self.ok(
+                build_paginated_response_from_queryset(qs, parsed_query.page, parsed_query.per_page, self.to_output)
+            )
+        return self.ok([self.to_output(obj) for obj in qs])
 
     def _validate_body(self, schema_cls, data, *, exclude_unset=False):
         try:
@@ -108,34 +90,25 @@ class GenericController(BaseController):
 
 
 class CreateAPIView(GenericController):
-    def post(self, parsed_body: Body[dict]) -> dict:
+    def post(self, parsed_body: Body[dict]) -> SuccessResponse[Any]:
         data = self._validate_body(self.create_schema, parsed_body) if self.create_schema is not None else parsed_body
         instance = self.perform_create(data)
         return self.ok(self.to_output(instance))
 
 
 class ListAPIView(GenericController):
-    def get(self, parsed_query: Query[ListQuery]) -> dict:
-        qs = self.get_queryset()
-        items = [self.to_output(obj) for obj in qs]
-        if parsed_query.page is not None:
-            paginated = build_paginated_response(
-                items,
-                parsed_query.page,
-                parsed_query.per_page,
-            )
-            return self.ok(paginated)
-        return self.ok(items)
+    def get(self, parsed_query: Query[ListQuery]) -> SuccessResponse[Any]:
+        return self.list_response(self.get_queryset(), parsed_query)
 
 
 class RetrieveAPIView(GenericController):
-    def get(self, parsed_path: Path[DetailPath]) -> dict:
+    def get(self, parsed_path: Path[DetailPath]) -> SuccessResponse[Any]:
         instance = self.get_object(pk=parsed_path.pk)
         return self.ok(self.to_output(instance))
 
 
 class UpdateAPIView(GenericController):
-    def put(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
+    def put(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> SuccessResponse[Any]:
         instance = self.get_object(pk=parsed_path.pk)
         data = self._validate_body(self.update_schema, parsed_body) if self.update_schema is not None else parsed_body
         instance = self.perform_update(instance, data)
@@ -143,7 +116,7 @@ class UpdateAPIView(GenericController):
 
 
 class PartialUpdateAPIView(GenericController):
-    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> SuccessResponse[Any]:
         instance = self.get_object(pk=parsed_path.pk)
         if self.update_schema is not None:
             data = self._validate_body(self.update_schema, parsed_body, exclude_unset=True)
@@ -154,7 +127,7 @@ class PartialUpdateAPIView(GenericController):
 
 
 class DeleteAPIView(GenericController):
-    def delete(self, parsed_path: Path[DetailPath]) -> dict:
+    def delete(self, parsed_path: Path[DetailPath]) -> SuccessResponse[Any]:
         instance = self.get_object(pk=parsed_path.pk)
         self.perform_destroy(instance)
         return self.ok({"deleted": True})

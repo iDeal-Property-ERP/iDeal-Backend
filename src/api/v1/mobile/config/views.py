@@ -2,7 +2,6 @@ from http import HTTPStatus
 from typing import Any
 
 from django.conf import settings
-from django.http import JsonResponse
 from django.utils.translation import gettext_lazy as _
 from mobile_config.models import MobileUpdatePolicy
 from mobile_config.utils import is_valid_semver, parse_semver
@@ -96,7 +95,7 @@ class MobileVersionConfigView(BaseController):
                     latest_version=None,
                     store_url=None,
                 )
-                response = JsonResponse(self.ok(data.model_dump(mode="json")), status=HTTPStatus.OK)
+                response = self.ok(data, status_code=HTTPStatus.OK)
                 response["Cache-Control"] = "no-store"
                 return response
 
@@ -127,6 +126,6 @@ class MobileVersionConfigView(BaseController):
                     store_url=policy.store_url,
                 )
 
-        response = JsonResponse(self.ok(data.model_dump(mode="json")), status=HTTPStatus.OK)
+        response = self.ok(data, status_code=HTTPStatus.OK)
         response["Cache-Control"] = "no-store"
         return response

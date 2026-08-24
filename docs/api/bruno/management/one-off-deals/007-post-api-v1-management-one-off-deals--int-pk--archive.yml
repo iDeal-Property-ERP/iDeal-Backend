@@ -1,10 +1,10 @@
 info:
-  name: Create one off deal receipt
+  name: Archive one off deal
   type: http
-  seq: 23
+  seq: 7
 http:
   method: POST
-  url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
+  url: '{{base_url}}/api/v1/management/one-off-deals/:pk/archive/'
   auth:
     type: bearer
     token: '{{access_token}}'
@@ -12,17 +12,12 @@ http:
   - name: pk
     value: '{{pk}}'
     type: path
-  body:
-    type: json
-    data: "{\n  \"amount\": 1,\n  \"currency\": \"USD\",\n  \"received_date\": \"\
-      2026-01-01T00:00:00Z\",\n  \"method\": \"fixture-value\",\n  \"reference\":\
-      \ \"\"\n}"
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-docs: '# POST /api/v1/management/one-off-deals/<int:pk>/receipt/
+docs: '# POST /api/v1/management/one-off-deals/<int:pk>/archive/
 
 
   Authentication: **bearer**.
@@ -39,26 +34,6 @@ docs: '# POST /api/v1/management/one-off-deals/<int:pk>/receipt/
   when running. |
 
 
-  | Body field | Required | Nullable | Notes |
-
-  |---|---:|---:|---|
-
-  | `amount` | yes | no | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `currency` | yes | no | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `received_date` | yes | no | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `method` | yes | no | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `reference` | no | no | default=''''; replace fixture values with domain-valid
-  data before runtime execution. |
-
-
   ## Saved examples
 
 
@@ -67,7 +42,7 @@ docs: '# POST /api/v1/management/one-off-deals/<int:pk>/receipt/
 examples:
 - name: success
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/archive/'
     method: POST
     headers:
     - name: accept
@@ -75,11 +50,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"amount\": 1,\n  \"currency\": \"USD\",\n  \"received_date\": \"\
-        2026-01-01T00:00:00Z\",\n  \"method\": \"fixture-value\",\n  \"reference\"\
-        : \"\"\n}"
   response:
     status: 201
     statusText: OK
@@ -91,7 +61,7 @@ examples:
       data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
 - name: validation error
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/archive/'
     method: POST
     headers:
     - name: accept
@@ -99,11 +69,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"amount\": 1,\n  \"currency\": \"USD\",\n  \"received_date\": \"\
-        2026-01-01T00:00:00Z\",\n  \"method\": \"fixture-value\",\n  \"reference\"\
-        : \"\"\n}"
   response:
     status: 400
     statusText: Error
@@ -116,7 +81,7 @@ examples:
         error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
 - name: unauthorized
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/archive/'
     method: POST
     headers:
     - name: accept
@@ -124,11 +89,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"amount\": 1,\n  \"currency\": \"USD\",\n  \"received_date\": \"\
-        2026-01-01T00:00:00Z\",\n  \"method\": \"fixture-value\",\n  \"reference\"\
-        : \"\"\n}"
   response:
     status: 401
     statusText: Error
@@ -141,7 +101,7 @@ examples:
         ,\n  \"error\": \"unauthorized\"\n}"
 - name: not found
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/archive/'
     method: POST
     headers:
     - name: accept
@@ -149,11 +109,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"amount\": 1,\n  \"currency\": \"USD\",\n  \"received_date\": \"\
-        2026-01-01T00:00:00Z\",\n  \"method\": \"fixture-value\",\n  \"reference\"\
-        : \"\"\n}"
   response:
     status: 404
     statusText: Error
@@ -166,7 +121,7 @@ examples:
         : \"not_found\"\n}"
 - name: conflict
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
+    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/archive/'
     method: POST
     headers:
     - name: accept
@@ -174,11 +129,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"amount\": 1,\n  \"currency\": \"USD\",\n  \"received_date\": \"\
-        2026-01-01T00:00:00Z\",\n  \"method\": \"fixture-value\",\n  \"reference\"\
-        : \"\"\n}"
   response:
     status: 409
     statusText: Error

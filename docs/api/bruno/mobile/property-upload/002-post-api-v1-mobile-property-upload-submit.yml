@@ -1,23 +1,19 @@
 info:
-  name: List one off deal receipt
+  name: Submit property upload
   type: http
-  seq: 21
+  seq: 2
 http:
-  method: GET
-  url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
+  method: POST
+  url: '{{base_url}}/api/v1/mobile/property-upload/submit/'
   auth:
     type: bearer
     token: '{{access_token}}'
-  params:
-  - name: pk
-    value: '{{pk}}'
-    type: path
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-docs: '# GET /api/v1/management/one-off-deals/<int:pk>/receipt/
+docs: '# POST /api/v1/mobile/property-upload/submit/
 
 
   Authentication: **bearer**.
@@ -26,12 +22,7 @@ docs: '# GET /api/v1/management/one-off-deals/<int:pk>/receipt/
   ## Request field notes
 
 
-  | Field | Location | Required | Example | Notes |
-
-  |---|---|---:|---|---|
-
-  | `pk` | path | yes | `1` | non-nullable; fixture value; replace with a real ID
-  when running. |
+  No path or query parameters.
 
 
   ## Saved examples
@@ -42,16 +33,15 @@ docs: '# GET /api/v1/management/one-off-deals/<int:pk>/receipt/
 examples:
 - name: success
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
-    method: GET
+    url: '{{base_url}}/api/v1/mobile/property-upload/submit/'
+    method: POST
     headers:
     - name: accept
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
-    params: []
   response:
-    status: 200
+    status: 201
     statusText: OK
     headers:
     - name: content-type
@@ -61,14 +51,13 @@ examples:
       data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
 - name: validation error
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
-    method: GET
+    url: '{{base_url}}/api/v1/mobile/property-upload/submit/'
+    method: POST
     headers:
     - name: accept
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
-    params: []
   response:
     status: 400
     statusText: Error
@@ -81,14 +70,13 @@ examples:
         error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
 - name: unauthorized
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
-    method: GET
+    url: '{{base_url}}/api/v1/mobile/property-upload/submit/'
+    method: POST
     headers:
     - name: accept
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
-    params: []
   response:
     status: 401
     statusText: Error
@@ -99,23 +87,22 @@ examples:
       type: json
       data: "{\n  \"success\": false,\n  \"message\": \"Authentication required\"\
         ,\n  \"error\": \"unauthorized\"\n}"
-- name: not found
+- name: conflict
   request:
-    url: '{{base_url}}/api/v1/management/one-off-deals/:pk/receipt/'
-    method: GET
+    url: '{{base_url}}/api/v1/mobile/property-upload/submit/'
+    method: POST
     headers:
     - name: accept
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
-    params: []
   response:
-    status: 404
+    status: 409
     statusText: Error
     headers:
     - name: content-type
       value: application/json
     body:
       type: json
-      data: "{\n  \"success\": false,\n  \"message\": \"Not found\",\n  \"error\"\
-        : \"not_found\"\n}"
+      data: "{\n  \"success\": false,\n  \"message\": \"Conflict\",\n  \"error\":\
+        \ \"conflict\"\n}"

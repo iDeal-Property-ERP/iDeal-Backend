@@ -1,10 +1,10 @@
 info:
-  name: List version
+  name: List config
   type: http
-  seq: 2
+  seq: 1
 http:
   method: GET
-  url: '{{base_url}}/api/v1/mobile/config/version/'
+  url: '{{base_url}}/api/v1/mobile/property-upload/config/'
   auth:
     type: none
 settings:
@@ -12,7 +12,7 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
-docs: '# GET /api/v1/mobile/config/version/
+docs: '# GET /api/v1/mobile/property-upload/config/
 
 
   Authentication: **none**.
@@ -32,7 +32,7 @@ docs: '# GET /api/v1/mobile/config/version/
 examples:
 - name: success
   request:
-    url: '{{base_url}}/api/v1/mobile/config/version/'
+    url: '{{base_url}}/api/v1/mobile/property-upload/config/'
     method: GET
     headers:
     - name: accept
