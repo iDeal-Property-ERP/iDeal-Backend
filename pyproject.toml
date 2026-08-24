@@ -34,6 +34,8 @@ dependencies = [
     "pillow>=12.2.0",
     "firebase-admin>=7.5.0",
     "stripe>=13.0.0",
+    "django-storages[boto3]>=1.14.4",
+    "boto3>=1.35.0",
 ]
 
 [dependency-groups]
