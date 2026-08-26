@@ -443,7 +443,7 @@ class Command(BaseCommand):
     def _seed_property_photos(self, prop):
         if not self.with_images:
             return
-        count = self.rng.randint(5, 15)
+        count = self.rng.randint(5, 12)
         for n, (image, caption) in enumerate(real_estate_photo_set(count, rng=self.rng)):
             PropertyPhoto.objects.create(
                 property=prop,

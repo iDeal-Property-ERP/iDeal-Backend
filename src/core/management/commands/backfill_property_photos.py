@@ -28,7 +28,7 @@ class Command(BaseCommand):
     help = "Attach real-estate stock photos to properties that have no PropertyPhoto rows."
 
     def add_arguments(self, parser):
-        parser.add_argument("--count", type=int, default=0, help="Photos per property (0 = random 5–15).")
+        parser.add_argument("--count", type=int, default=0, help="Photos per property (0 = random 5–12).")
         parser.add_argument(
             "--listed-only",
             action="store_true",
@@ -52,8 +52,8 @@ class Command(BaseCommand):
 
         done = 0
         for prop in properties:
-            count = options["count"] or rng.randint(5, 15)
-            with transaction.atomic():
+            count = options["count"] or rng.randint(5, 12)
+            with transaction.atomic():  # type: ignore[attr-defined] # pyright: ignore
                 for n, (image, caption) in enumerate(real_estate_photo_set(count, rng=rng)):
                     PropertyPhoto.objects.create(
                         property=prop,
@@ -66,4 +66,4 @@ class Command(BaseCommand):
             if done % 10 == 0 or done == total:
                 self.stdout.write(f"  …{done}/{total}")
 
-        self.stdout.write(self.style.SUCCESS(f"Done — added photos to {done} properties."))
+        self.stdout.write(self.style.SUCCESS(f"Done — added photos to {done} properties."))  # type: ignore[attr-defined] # pyright: ignore
