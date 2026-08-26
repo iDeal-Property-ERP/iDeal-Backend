@@ -1,4 +1,3 @@
-# pyright: reportIncompatibleVariableOverride=false, reportGeneralTypeIssues=false, reportAttributeAccessIssue=false
 from typing import Any
 
 from django.core.exceptions import ValidationError

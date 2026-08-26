@@ -3,8 +3,8 @@ from pydantic import ValidationError
 
 from api.v1.management.schemas import OneOffDealCreateInput
 from api.v1.marketplace.schemas import PublicListingSubmitInput
-from api.v1.owner.schemas import OwnerListingCreateInput, OwnerListingUpdateInput, OwnerOnboardingCreateInput
-from api.v1.property.schemas import PropertyCreateInput, PropertyUpdateInput
+from api.v1.owner.schemas import OwnerListingSubmitPayload, OwnerOnboardingCreateInput
+from api.v1.property.schemas import PropertyCreateInput, PropertySubmissionInput, PropertyUpdateInput
 from tests.factories import DistrictFactory, OwnerFactory
 
 
@@ -76,7 +76,7 @@ class TestFloorBoundSchemas:
                 },
             ),
             (
-                OwnerListingCreateInput,
+                OwnerListingSubmitPayload,
                 {
                     "name": "Invalid floors",
                     "district_id": 1,
@@ -84,9 +84,21 @@ class TestFloorBoundSchemas:
                     "area_sqm": 60,
                     "floor": 7,
                     "total_floors": 5,
+                    "monthly_price": 500,
+                    "accept_offer": True,
                 },
             ),
-            (OwnerListingUpdateInput, {"floor": 7, "total_floors": 5}),
+            (
+                PropertySubmissionInput,
+                {
+                    "district_id": 1,
+                    "rooms": 2,
+                    "area_sqm": 60,
+                    "floor": 7,
+                    "total_floors": 5,
+                    "ask_price": 500,
+                },
+            ),
         ],
     )
     def test_schema_rejects_floor_above_total_floors(self, schema, payload):

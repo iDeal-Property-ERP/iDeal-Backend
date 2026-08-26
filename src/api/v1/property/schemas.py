@@ -106,8 +106,8 @@ class PropertyCreateInput(pydantic.BaseModel):
     name: str
     address: str
     district_id: int
-    rooms: int = pydantic.Field(ge=0)
-    area_sqm: int = pydantic.Field(ge=0)
+    rooms: int = pydantic.Field(gt=0)
+    area_sqm: int = pydantic.Field(gt=0)
     floor: int = pydantic.Field(ge=0)
     total_floors: int = pydantic.Field(ge=0)
     owner_id: int
@@ -156,8 +156,8 @@ class PropertyUpdateInput(pydantic.BaseModel):
     name: str | None = None
     address: str | None = None
     district_id: int | None = None
-    rooms: int | None = pydantic.Field(default=None, ge=0)
-    area_sqm: int | None = pydantic.Field(default=None, ge=0)
+    rooms: int | None = pydantic.Field(default=None, gt=0)
+    area_sqm: int | None = pydantic.Field(default=None, gt=0)
     floor: int | None = pydantic.Field(default=None, ge=0)
     total_floors: int | None = pydantic.Field(default=None, ge=0)
     owner_id: int | None = None
@@ -204,18 +204,9 @@ class PropertyUpdateInput(pydantic.BaseModel):
         return v
 
 
-class PropertyDraftCreateInput(PropertyUpdateInput):
-    """A draft may be created with any subset of fields; name defaults so the
-    row is identifiable in the workbench."""
-
-    name: str = "Untitled property"
-
-
-class OneOffDealDraftInput(pydantic.BaseModel):
-    """Draft-safe brokerage terms; lifecycle actions validate completeness."""
-
-    seller_name: str = ""
-    seller_phone: str = ""
+class OneOffDealInput(pydantic.BaseModel):
+    seller_name: str
+    seller_phone: str
     seller_email: str | None = None
     channel: str = "marketplace"
     commission_type: str = "none"
@@ -224,20 +215,47 @@ class OneOffDealDraftInput(pydantic.BaseModel):
     commission_currency: str = "USD"
 
 
-class OneOffPropertyDraftInput(PropertyDraftCreateInput):
-    """Creates the shared property draft and its one-off deal atomically."""
+class PropertySubmissionInput(pydantic.BaseModel):
+    engagement_type: str = "managed"  # 'managed' or 'one_off'
+    name: str | None = None
+    address: str | None = None
+    district_id: int
+    property_type: str = "apartment"
+    rooms: int = pydantic.Field(gt=0)
+    area_sqm: int = pydantic.Field(gt=0)
+    floor: int = pydantic.Field(ge=0)
+    total_floors: int = pydantic.Field(ge=0)
+    furnishing: str = "unfurnished"
+    owner_id: int | None = None
+    description: str | None = None
+    tariff: str = "standard"
+    map_lat: Decimal | None = None
+    map_lon: Decimal | None = None
+    ask_price: Decimal = pydantic.Field(ge=0)
+    ask_currency: str = "USD"
+    owner_guaranteed_price: Decimal | None = None
+    owner_guaranteed_currency: str = "USD"
+    tenant_charge_price: Decimal | None = None
+    tenant_charge_currency: str = "USD"
+    deposit_amount: Decimal = Decimal("0.00")
+    deposit_currency: str = "USD"
+    amenities: list[str] = pydantic.Field(default_factory=list)
+    captions: list[str] = pydantic.Field(default_factory=list)
+    minimum_stay: int = 6
+    price_includes: list[str] = pydantic.Field(default_factory=list)
+    schedule_verification_at: str | None = None
+    brokerage: OneOffDealInput | None = None
 
-    brokerage: OneOffDealDraftInput = pydantic.Field(default_factory=OneOffDealDraftInput)
+    @pydantic.model_validator(mode="after")
+    def validate_bounds(self):
+        validate_floor_bounds(self.floor, self.total_floors)
+        return self
 
 
 class OneOffPropertyUpdateInput(PropertyUpdateInput):
-    """Atomically updates shared property fields and one-off draft terms."""
+    """Atomically updates shared property fields and one-off brokerage terms."""
 
-    brokerage: OneOffDealDraftInput | None = None
-
-
-class PropertyPublishInput(pydantic.BaseModel):
-    schedule_verification_at: datetime | None = None
+    brokerage: OneOffDealInput | None = None
 
 
 class PropertyPhotoReorderItem(pydantic.BaseModel):

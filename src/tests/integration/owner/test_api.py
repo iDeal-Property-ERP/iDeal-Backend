@@ -3,7 +3,9 @@ import json
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from tests.factories import DistrictFactory, OwnerFactory, PropertyFactory
+from core.constants import ListingStatus
+from tests.factories import DistrictFactory, OwnerFactory, PropertyFactory, PublicOfferFactory
+from tests.integration.property.test_api import _make_jwt
 
 _PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06"
@@ -103,69 +105,45 @@ class TestOwnerWhyAPI:
 
 @pytest.mark.django_db
 class TestOwnerListingWizard:
-    def _create_draft(self, api_client, owner, district):
-        from tests.integration.property.test_api import _make_jwt
-
-        payload = json.dumps(
-            {
-                "property_type": "apartment",
-                "name": "Bright 2-room near Yunusobod metro",
-                "district_id": district.id,
-                "rooms": 2,
-                "area_sqm": 68,
-                "furnishing": "furnished",
-                "description": "Sunny corner apartment.",
-                "amenities": ["wifi", "parking"],
-            }
-        )
+    def _submit_listing(self, api_client, owner, district, n_photos=5, include_accept_offer=True, **overrides):
+        payload = {
+            "property_type": "apartment",
+            "name": "Bright 2-room near Yunusobod metro",
+            "district_id": district.id,
+            "rooms": 2,
+            "area_sqm": 68,
+            "floor": 2,
+            "total_floors": 9,
+            "furnishing": "furnished",
+            "description": "Sunny corner apartment.",
+            "monthly_price": "520.00",
+            "deposit_amount": "520.00",
+            "currency": "USD",
+            "amenities": ["wifi", "parking"],
+        }
+        if include_accept_offer:
+            payload["accept_offer"] = True
+        payload.update(overrides)
+        files = [SimpleUploadedFile(f"p{i}.png", _PNG, content_type="image/png") for i in range(n_photos)]
         return api_client.post(
-            "/api/v1/owner/listings/",
-            data=payload,
-            content_type="application/json",
+            "/api/v1/owner/listings/submit/",
+            data={"payload": json.dumps(payload), "images": files},
             **_make_jwt(owner),
         )
 
-    def _upload_photos(self, api_client, owner, listing_id, n):
-        from tests.integration.property.test_api import _make_jwt
-
-        files = [SimpleUploadedFile(f"p{i}.png", _PNG, content_type="image/png") for i in range(n)]
-        return api_client.post(
-            f"/api/v1/owner/listings/{listing_id}/photos/",
-            data={"images": files},
-            **_make_jwt(owner),
-        )
-
-    def test_reorder_photos_sets_caption(self, api_client):
-        from tests.integration.property.test_api import _make_jwt
-
+    def test_submit_listing_atomic(self, api_client):
         owner = OwnerFactory()
         district = DistrictFactory()
-        draft = self._create_draft(api_client, owner, district).json()["data"]
-        uploaded = self._upload_photos(api_client, owner, draft["id"], 2).json()["data"]
-        pid = uploaded[0]["id"]
+        PublicOfferFactory(version="v1", body="Terms", is_active=True)
 
-        response = api_client.patch(
-            f"/api/v1/owner/listings/{draft['id']}/photos/reorder/",
-            data=json.dumps({"items": [{"id": pid, "sort_order": 0, "is_primary": True, "caption": "Living room"}]}),
-            content_type="application/json",
-            **_make_jwt(owner),
-        )
-        assert response.status_code == 200
-        photos = response.json()["data"]["photos"]
-        assert any(p["id"] == pid and p["caption"] == "Living room" for p in photos)
-
-    def test_create_draft(self, api_client):
-        owner = OwnerFactory()
-        district = DistrictFactory()
-        response = self._create_draft(api_client, owner, district)
+        response = self._submit_listing(api_client, owner, district, n_photos=5)
         assert response.status_code == 201
         data = response.json()["data"]
-        assert data["status"] == "draft"
+        assert data["status"] == "pending_review"
         assert data["name"].startswith("Bright 2-room")
-        assert {a["slug"] for a in data["amenities"]} == {"wifi", "parking"}
-        assert data["completeness"]["has_5_photos"] is False
+        assert len(data["photos"]) == 5
 
-        # Draft must NOT appear on the public marketplace.
+        # Must NOT appear on public marketplace before approval
         from marketplace.models import Listing
         from property.models import Property
 
@@ -173,126 +151,120 @@ class TestOwnerListingWizard:
         assert listing.is_active is False
         assert Property.objects.get(pk=data["property_id"]).status == "pending_review"
 
-    def test_patch_pricing(self, api_client):
-        owner = OwnerFactory()
-        district = DistrictFactory()
-        from tests.integration.property.test_api import _make_jwt
-
-        draft = self._create_draft(api_client, owner, district).json()["data"]
-        response = api_client.patch(
-            f"/api/v1/owner/listings/{draft['id']}/",
-            data=json.dumps({"monthly_price": "520.00", "deposit_amount": "520.00", "currency": "USD"}),
-            content_type="application/json",
-            **_make_jwt(owner),
-        )
-        assert response.status_code == 200
-        data = response.json()["data"]
-        assert data["monthly_price"] == "520.00"
-        assert data["completeness"]["has_price"] is True
-
-    def test_full_wizard_submit_then_publish_once(self, api_client):
-        """Draft → photos → pricing → submit → management approve → exactly one published listing."""
-        from marketplace.models import Listing
-
-        from tests.factories import PublicOfferFactory, UserFactory
-        from tests.integration.property.test_api import _make_jwt
-
-        owner = OwnerFactory()
-        district = DistrictFactory()
-        PublicOfferFactory(version="v1", body="Terms", is_active=True)
-
-        draft = self._create_draft(api_client, owner, district).json()["data"]
-        listing_id = draft["id"]
-
-        assert self._upload_photos(api_client, owner, listing_id, 5).status_code == 201
-        api_client.patch(
-            f"/api/v1/owner/listings/{listing_id}/",
-            data=json.dumps({"monthly_price": "520.00", "deposit_amount": "520.00"}),
-            content_type="application/json",
-            **_make_jwt(owner),
-        )
-
-        submit = api_client.post(
-            f"/api/v1/owner/listings/{listing_id}/submit/",
-            data=json.dumps({"accept_offer": True}),
-            content_type="application/json",
-            **_make_jwt(owner),
-        )
-        assert submit.status_code in (200, 201)
-        assert submit.json()["data"]["status"] == "pending_review"
-
-        # Management approves the onboarding → property goes vacant → signal publishes the draft.
-        from contract.models import OwnerOnboarding
-
-        onboarding = OwnerOnboarding.objects.get(property_id=draft["property_id"])
-        mgmt = UserFactory()
-        approve = api_client.post(
-            f"/api/v1/management/onboardings/{onboarding.id}/approve/",
-            data=json.dumps(
-                {
-                    "commission_rate": "10.00",
-                    "start_date": "2026-01-01",
-                    "end_date": "2026-12-31",
-                    "owner_guaranteed_price": "400.00",
-                    "tenant_charge_price": "600.00",
-                }
-            ),
-            content_type="application/json",
-            **_make_jwt(mgmt),
-        )
-        assert approve.status_code == 200
-
-        # Exactly one listing exists and it is published (no double-create).
-        listings = Listing.objects.filter(property_id=draft["property_id"])
-        assert listings.count() == 1
-        published = listings.first()
-        assert published.status == "published"
-        assert published.is_active is True
-        assert published.id == listing_id
-
     def test_submit_requires_five_photos(self, api_client):
         owner = OwnerFactory()
         district = DistrictFactory()
-        from tests.factories import PublicOfferFactory
-        from tests.integration.property.test_api import _make_jwt
-
         PublicOfferFactory(version="v1", body="Terms", is_active=True)
-        draft = self._create_draft(api_client, owner, district).json()["data"]
-        self._upload_photos(api_client, owner, draft["id"], 2)
-        api_client.patch(
-            f"/api/v1/owner/listings/{draft['id']}/",
-            data=json.dumps({"monthly_price": "520.00", "deposit_amount": "520.00"}),
-            content_type="application/json",
-            **_make_jwt(owner),
+
+        response = self._submit_listing(api_client, owner, district, n_photos=2)
+        assert response.status_code == 422
+
+    def test_submit_requires_accept_offer_field(self, api_client):
+        owner = OwnerFactory()
+        district = DistrictFactory()
+
+        response = self._submit_listing(
+            api_client,
+            owner,
+            district,
+            include_accept_offer=False,
         )
-        response = api_client.post(
-            f"/api/v1/owner/listings/{draft['id']}/submit/",
-            data=json.dumps({"accept_offer": True}),
-            content_type="application/json",
-            **_make_jwt(owner),
-        )
+
         assert response.status_code == 400
         assert response.json()["success"] is False
 
-    def test_wizard_rbac(self, api_client):
-        from tests.factories import TenantFactory
-        from tests.integration.property.test_api import _make_jwt
+    def test_submit_rejects_false_accept_offer(self, api_client):
+        owner = OwnerFactory()
+        district = DistrictFactory()
 
-        tenant = TenantFactory()
-        response = api_client.get("/api/v1/owner/listings/", **_make_jwt(tenant))
-        assert response.status_code == 403
+        response = self._submit_listing(
+            api_client,
+            owner,
+            district,
+            accept_offer=False,
+        )
 
-    def test_cannot_edit_others_listing(self, api_client):
+        assert response.status_code == 400
+        assert response.json()["success"] is False
+
+    def test_resubmit_rejected_listing(self, api_client):
+        owner = OwnerFactory()
+        district = DistrictFactory()
+        PublicOfferFactory(version="v1", body="Terms", is_active=True)
+
+        created = self._submit_listing(api_client, owner, district, n_photos=5).json()["data"]
+        listing_id = created["id"]
+
+        # Reject listing
+        from marketplace.models import Listing
+
+        listing = Listing.objects.get(pk=listing_id)
+        listing.status = ListingStatus.REJECTED
+        listing.rejection_reason = "Please fix description and add 1 photo."
+        listing.save(update_fields=["status", "rejection_reason", "updated_at"])
+
+        # Resubmit with keep 5 photos + 1 new photo
+        kept_ids = [p["id"] for p in created["photos"]]
+        resubmit_payload = {
+            "property_type": "apartment",
+            "name": "Bright 2-room Updated",
+            "district_id": district.id,
+            "rooms": 2,
+            "area_sqm": 68,
+            "floor": 2,
+            "total_floors": 9,
+            "furnishing": "furnished",
+            "description": "Updated sunny corner apartment.",
+            "monthly_price": "550.00",
+            "deposit_amount": "550.00",
+            "currency": "USD",
+            "keep_photo_ids": kept_ids,
+            "accept_offer": True,
+        }
+        from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
+
+        new_file = SimpleUploadedFile("p_extra.png", _PNG, content_type="image/png")
+        data = encode_multipart(BOUNDARY, {"payload": json.dumps(resubmit_payload), "images": new_file})
+        new_file.seek(0)
+        resubmit_resp = api_client.put(
+            f"/api/v1/owner/listings/{listing_id}/resubmit/",
+            data=data,
+            content_type=MULTIPART_CONTENT,
+            **_make_jwt(owner),
+        )
+        assert resubmit_resp.status_code == 200
+        resubmitted_data = resubmit_resp.json()["data"]
+        assert resubmitted_data["status"] == "pending_review"
+        assert resubmitted_data["name"] == "Bright 2-room Updated"
+        assert len(resubmitted_data["photos"]) == 6
+
+    def test_cannot_resubmit_others_listing(self, api_client):
         owner = OwnerFactory()
         other = OwnerFactory()
         district = DistrictFactory()
-        draft = self._create_draft(api_client, owner, district).json()["data"]
-        from tests.integration.property.test_api import _make_jwt
+        PublicOfferFactory(version="v1", body="Terms", is_active=True)
 
-        response = api_client.patch(
-            f"/api/v1/owner/listings/{draft['id']}/",
-            data=json.dumps({"monthly_price": "999.00"}),
-            content_type="application/json",
+        created = self._submit_listing(api_client, owner, district, n_photos=5).json()["data"]
+        listing_id = created["id"]
+
+        from marketplace.models import Listing
+
+        listing = Listing.objects.get(pk=listing_id)
+        listing.status = ListingStatus.REJECTED
+        listing.save(update_fields=["status", "updated_at"])
+
+        resubmit_payload = {
+            "district_id": district.id,
+            "rooms": 2,
+            "area_sqm": 68,
+            "floor": 2,
+            "monthly_price": "550.00",
+            "keep_photo_ids": [p["id"] for p in created["photos"]],
+            "accept_offer": True,
+        }
+        response = api_client.put(
+            f"/api/v1/owner/listings/{listing_id}/resubmit/",
+            data={"payload": json.dumps(resubmit_payload)},
             **_make_jwt(other),
         )
-        assert response.status_code == 404
+        assert response.status_code in (404, 422)

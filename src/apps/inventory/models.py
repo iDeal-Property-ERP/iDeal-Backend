@@ -31,7 +31,7 @@ class InventoryAct(TimestampedModel, SoftDeleteModel):
     status = models.CharField(
         max_length=20,
         choices=InventoryActStatus.choices,
-        default=InventoryActStatus.DRAFT,
+        default=InventoryActStatus.FINALIZED,
         verbose_name=_("Status"),
     )
     created_by = models.ForeignKey(

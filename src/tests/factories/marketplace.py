@@ -1,7 +1,7 @@
 import factory
 from marketplace.models import Booking, FavoriteListing, Listing, ViewingRequest
 
-from core.constants import BookingStatus, ViewingRequestStatus
+from core.constants import BookingStatus, ListingStatus, ViewingRequestStatus
 
 from .account import TenantFactory
 from .property import PropertyFactory
@@ -14,10 +14,17 @@ class ListingFactory(factory.django.DjangoModelFactory):
 
     property = factory.SubFactory(PropertyFactory)
     owner_agreement = None
-    is_active = True
+    status = ListingStatus.PUBLISHED
     is_featured = False
     description = factory.Faker("text", max_nb_chars=300)
     listed_price = 500.00
+    monthly_price = 500.00
+    deposit_amount = 500.00
+    minimum_stay = 6
+
+    @factory.lazy_attribute
+    def is_active(self):
+        return self.status == ListingStatus.PUBLISHED
 
 
 class ViewingRequestFactory(factory.django.DjangoModelFactory):

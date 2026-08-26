@@ -6,6 +6,7 @@ from uuid import uuid4
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import models, transaction
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from PIL import Image, ImageFilter, ImageOps
 
@@ -13,6 +14,7 @@ from core.constants import (
     BrokerageCommissionType,
     Currency,
     FurnishingType,
+    ListingStatus,
     OneOffChannel,
     OneOffDealStatus,
     PaymentMethod,
@@ -138,6 +140,30 @@ class Property(TimestampedModel, SoftDeleteModel):
                 ),
                 name="property_floor_lte_total_floors",
             ),
+            models.CheckConstraint(
+                condition=models.Q(rooms__isnull=True) | models.Q(rooms__gt=0),
+                name="property_rooms_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(area_sqm__isnull=True) | models.Q(area_sqm__gt=0),
+                name="property_area_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(ask_price__isnull=True) | models.Q(ask_price__gte=0),
+                name="property_ask_price_nonnegative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(deposit_amount__isnull=True) | models.Q(deposit_amount__gte=0),
+                name="property_deposit_amount_nonnegative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(owner_guaranteed_price__isnull=True) | models.Q(owner_guaranteed_price__gte=0),
+                name="property_owner_guaranteed_price_nonnegative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(tenant_charge_price__isnull=True) | models.Q(tenant_charge_price__gte=0),
+                name="property_tenant_charge_price_nonnegative",
+            ),
         ]
 
     def __str__(self):
@@ -154,8 +180,7 @@ class Property(TimestampedModel, SoftDeleteModel):
             old = type(self).objects.filter(pk=self.pk).values("engagement_type", "status").first()
             if old and old["engagement_type"] != self.engagement_type:
                 has_history = (
-                    old["status"] != PropertyStatus.DRAFT
-                    or OneOffDeal.objects.filter(property_id=self.pk).exists()
+                    OneOffDeal.objects.filter(property_id=self.pk).exists()
                     or self.owner_agreements.exists()
                     or self.leases.exists()
                 )
@@ -180,7 +205,7 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
     status = models.CharField(
         max_length=20,
         choices=OneOffDealStatus.choices,
-        default=OneOffDealStatus.DRAFT,
+        default=OneOffDealStatus.ACTIVE,
         db_index=True,
     )
     commission_type = models.CharField(
@@ -209,22 +234,47 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
         ordering = ["-created_at"]
         db_table = "one_off_deals"
         indexes = [models.Index(fields=["status"]), models.Index(fields=["channel", "status"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (
+                        models.Q(commission_type=BrokerageCommissionType.NONE)
+                        & models.Q(commission_fixed_amount__isnull=True)
+                        & models.Q(commission_percentage__isnull=True)
+                    )
+                    | (
+                        models.Q(commission_type=BrokerageCommissionType.FIXED)
+                        & models.Q(commission_fixed_amount__gt=0)
+                        & models.Q(commission_percentage__isnull=True)
+                    )
+                    | (
+                        models.Q(commission_type=BrokerageCommissionType.PERCENTAGE)
+                        & models.Q(commission_percentage__gt=0)
+                        & models.Q(commission_percentage__lte=100)
+                        & models.Q(commission_fixed_amount__isnull=True)
+                    )
+                ),
+                name="one_off_deal_commission_valid",
+            )
+        ]
 
     def clean(self):
         if self.property_id and self.property.engagement_type != PropertyEngagementType.ONE_OFF:
             raise ValidationError(_("A one-off deal requires a one-off brokerage property."))
-        # Drafts intentionally accept incomplete terms for autosave. The complete
-        # commercial validation runs again at activation and close.
-        if self.status == OneOffDealStatus.DRAFT:
-            return
         if self.commission_type == BrokerageCommissionType.NONE:
             if self.commission_fixed_amount or self.commission_percentage:
                 raise ValidationError(_("No-fee deals cannot carry commission terms."))
         elif self.commission_type == BrokerageCommissionType.FIXED:
-            if not self.commission_fixed_amount or self.commission_fixed_amount <= 0 or self.commission_percentage:
+            if (
+                not self.commission_fixed_amount
+                or Decimal(str(self.commission_fixed_amount)) <= 0
+                or self.commission_percentage
+            ):
                 raise ValidationError(_("A fixed-fee deal requires one positive fixed amount."))
         elif self.commission_type == BrokerageCommissionType.PERCENTAGE:
-            if not self.commission_percentage or not Decimal("0") < self.commission_percentage <= Decimal("100"):
+            if not self.commission_percentage or not Decimal("0") < Decimal(str(self.commission_percentage)) <= Decimal(
+                "100"
+            ):
                 raise ValidationError(_("A percentage commission must be greater than 0 and at most 100."))
             if self.commission_fixed_amount:
                 raise ValidationError(_("A percentage-fee deal cannot carry a fixed amount."))
@@ -246,10 +296,15 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
         if self.channel not in OneOffChannel.values():
             missing.append("channel")
         invalid_commission = (
-            (self.commission_type == BrokerageCommissionType.NONE and (self.commission_fixed_amount or self.commission_percentage))
+            (
+                self.commission_type == BrokerageCommissionType.NONE
+                and (self.commission_fixed_amount or self.commission_percentage)
+            )
             or (
                 self.commission_type == BrokerageCommissionType.FIXED
-                and (not self.commission_fixed_amount or self.commission_fixed_amount <= 0 or self.commission_percentage)
+                and (
+                    not self.commission_fixed_amount or self.commission_fixed_amount <= 0 or self.commission_percentage
+                )
             )
             or (
                 self.commission_type == BrokerageCommissionType.PERCENTAGE
@@ -273,11 +328,8 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
         Listing.objects.filter(property=self.property).update(is_active=False, status="archived")
 
     def activate(self):
-        if self.status not in (OneOffDealStatus.DRAFT, OneOffDealStatus.PAUSED):
-            raise ValidationError(_("Only draft or paused deals can be activated."))
-        missing = self._activation_missing()
-        if missing:
-            raise ValidationError(_("One-off deal is not ready: %(missing)s") % {"missing": ", ".join(missing)})
+        if self.status != OneOffDealStatus.PAUSED:
+            raise ValidationError(_("Only paused deals can be activated."))
         with transaction.atomic():
             self.status = OneOffDealStatus.ACTIVE
             self.save(update_fields=["status", "updated_at"])
@@ -285,6 +337,12 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
             self.property.vacant_since = None
             self.property.vacant_days = 0
             self.property.save(update_fields=["status", "vacant_since", "vacant_days", "updated_at"])
+            if self.channel == OneOffChannel.MARKETPLACE:
+                from marketplace.models import Listing
+
+                Listing.objects.filter(property=self.property).update(
+                    is_active=True, status=ListingStatus.PUBLISHED, updated_at=timezone.now()
+                )
         return self
 
     def pause(self):
@@ -295,7 +353,20 @@ class OneOffDeal(TimestampedModel, SoftDeleteModel):
         self._depublish()
         return self
 
-    def close_won(self, *, renter_name, renter_phone, renter_email, agreed_monthly_rent, agreed_currency, close_date, notes, evidence, closed_by, keep_property_active=False):
+    def close_won(
+        self,
+        *,
+        renter_name,
+        renter_phone,
+        renter_email,
+        agreed_monthly_rent,
+        agreed_currency,
+        close_date,
+        notes,
+        evidence,
+        closed_by,
+        keep_property_active=False,
+    ):
         from finance.utils import convert_amount
 
         if self.status not in (OneOffDealStatus.ACTIVE, OneOffDealStatus.PAUSED):
@@ -378,9 +449,7 @@ class OneOffCommissionReceipt(TimestampedModel):
     received_date = models.DateField()
     method = models.CharField(max_length=20, choices=PaymentMethod.choices)
     reference = models.CharField(max_length=128, blank=True, default="")
-    recorded_by = models.ForeignKey(
-        "account.User", on_delete=models.PROTECT, related_name="recorded_one_off_receipts"
-    )
+    recorded_by = models.ForeignKey("account.User", on_delete=models.PROTECT, related_name="recorded_one_off_receipts")
 
     class Meta:
         verbose_name = _("One-off commission receipt")
@@ -435,6 +504,13 @@ class PropertyPhoto(TimestampedModel):
         verbose_name_plural = _("Property Photos")
         ordering = ["sort_order", "-is_primary"]
         db_table = "property_photos"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["property"],
+                condition=models.Q(is_primary=True),
+                name="unique_primary_photo_per_property",
+            )
+        ]
 
     def __str__(self):
         return f"Photo {self.id} for {self.property.name}"

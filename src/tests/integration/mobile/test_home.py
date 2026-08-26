@@ -57,6 +57,8 @@ def _make_vacant_listing(**listing_kwargs):
     listing = prop.listing
     for field, value in listing_kwargs.items():
         setattr(listing, field, value)
+    if "status" in listing_kwargs and listing_kwargs["status"] != ListingStatus.PUBLISHED:
+        listing.is_active = False
     if listing_kwargs:
         listing.save()
     return listing
@@ -89,6 +91,13 @@ class TestMobileHomeListings:
             is_primary=True,
             sort_order=5,
         )
+        for i in range(1, 4):
+            PropertyPhoto.objects.create(
+                property=listing.property,
+                image=f"properties/photos/extra_card_{i}.jpg",
+                is_primary=False,
+                sort_order=i,
+            )
 
         response = api_client.get(LISTINGS_URL)
 
@@ -248,7 +257,15 @@ class TestMobileHomeListings:
             property=listing.property,
             image="properties/photos/original.jpg",
             is_primary=True,
+            sort_order=0,
         )
+        for i in range(1, 5):
+            PropertyPhoto.objects.create(
+                property=listing.property,
+                image=f"properties/photos/extra{i}.jpg",
+                is_primary=False,
+                sort_order=i,
+            )
         PropertyPhoto.objects.filter(pk=photo.pk).update(
             preview_image="properties/photos/variants/preview.webp",
             display_image="properties/photos/variants/display.webp",
@@ -264,7 +281,7 @@ class TestMobileHomeListings:
 
     def test_published_and_vacancy_gates(self, api_client):
         visible = _make_vacant_listing()
-        draft = _make_vacant_listing(status=ListingStatus.DRAFT)
+        pending = _make_vacant_listing(status=ListingStatus.PENDING_REVIEW)
         archived = _make_vacant_listing(status=ListingStatus.ARCHIVED)
         rented_property = PropertyFactory(status=PropertyStatus.RENTED)
         rented = ListingFactory(property=rented_property, status=ListingStatus.PUBLISHED)
@@ -274,7 +291,7 @@ class TestMobileHomeListings:
         assert response.status_code == 200
         ids = {item["id"] for item in _items(response.json())}
         assert visible.id in ids
-        assert draft.id not in ids
+        assert pending.id not in ids
         assert archived.id not in ids
         assert rented.id not in ids
 
@@ -529,8 +546,8 @@ class TestMobileHomeListingMap:
         mocker.patch("marketplace.services.booking.BookingService.enabled_providers", return_value=["click"])
         visible = _make_vacant_listing()
         self._set_coordinates(visible)
-        draft = _make_vacant_listing(status=ListingStatus.DRAFT)
-        self._set_coordinates(draft)
+        pending = _make_vacant_listing(status=ListingStatus.PENDING_REVIEW)
+        self._set_coordinates(pending)
         archived = _make_vacant_listing(status=ListingStatus.ARCHIVED)
         self._set_coordinates(archived)
         rented_without_agreement_property = PropertyFactory(
@@ -567,7 +584,7 @@ class TestMobileHomeListingMap:
         feed_ids = {item["id"] for item in _items(feed_response.json())}
         assert map_ids == {visible.id, future_managed.id}
         assert map_ids == feed_ids
-        assert draft.id not in map_ids
+        assert pending.id not in map_ids
         assert archived.id not in map_ids
         assert rented_without_agreement.id not in map_ids
 
@@ -578,7 +595,15 @@ class TestMobileHomeListingMap:
             property=listing.property,
             image="properties/photos/map-original.jpg",
             is_primary=True,
+            sort_order=0,
         )
+        for i in range(1, 5):
+            PropertyPhoto.objects.create(
+                property=listing.property,
+                image=f"properties/photos/map-extra{i}.jpg",
+                is_primary=False,
+                sort_order=i,
+            )
         PropertyPhoto.objects.filter(pk=photo.pk).update(
             preview_image="properties/photos/variants/map-preview.webp",
             display_image="properties/photos/variants/map-display.webp",
@@ -766,12 +791,22 @@ class TestMobileHomeListingDetail:
             image="properties/photos/early.jpg",
             sort_order=1,
         )
+        extra1 = PropertyPhotoFactory(
+            property=listing.property,
+            image="properties/photos/extra1.jpg",
+            sort_order=100,
+        )
+        extra2 = PropertyPhotoFactory(
+            property=listing.property,
+            image="properties/photos/extra2.jpg",
+            sort_order=101,
+        )
 
         response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
 
         assert response.status_code == 200
         photos = response.json()["data"]["photos"]
-        assert [photo["id"] for photo in photos] == [primary.id, early.id, late.id]
+        assert [photo["id"] for photo in photos] == [primary.id, early.id, late.id, extra1.id, extra2.id]
         assert all(
             set(photo) == {"id", "image_url", "preview_url", "display_url", "caption", "is_primary", "sort_order"}
             for photo in photos
@@ -818,7 +853,7 @@ class TestMobileHomeListingDetail:
         assert verification == {"is_verified": False, "checklist": []}
 
     def test_detail_marks_unpublished_listing_as_not_messageable(self, api_client):
-        listing = _make_vacant_listing(status=ListingStatus.DRAFT)
+        listing = _make_vacant_listing(status=ListingStatus.PENDING_REVIEW)
 
         response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
 
@@ -849,9 +884,7 @@ class TestMobileHomeListingDetail:
 
     def test_detail_allows_message_for_one_off_listing_without_owner(self, api_client):
         prop = PropertyFactory(engagement_type=PropertyEngagementType.ONE_OFF, owner=None)
-        listing = prop.listing
-        listing.status = ListingStatus.PUBLISHED
-        listing.save(update_fields=["status", "updated_at"])
+        listing = ListingFactory(property=prop, status=ListingStatus.PUBLISHED)
 
         response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
 

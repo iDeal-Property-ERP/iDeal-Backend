@@ -159,6 +159,14 @@ class TestPublicListingAPI:
             is_primary=True,
             sort_order=0,
         )
+        for i in range(1, 5):
+            PropertyPhoto.objects.create(
+                property=listing.property,
+                image=f"properties/photos/test_{i}.jpg",
+                caption=f"Photo {i}",
+                is_primary=False,
+                sort_order=i,
+            )
         response = api_client.get(f"/api/v1/marketplace/listings/{listing.id}/")
         assert response.status_code == 200
         photos = response.json()["data"]["photos"]

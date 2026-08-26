@@ -1,4 +1,3 @@
-# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
 from typing import Any
@@ -23,7 +22,6 @@ _STATUS_DISPLAY = {
     "pending": _("Pending"),
     "rented": _("Rented"),
     "rejected": _("Rejected"),
-    "draft": _("Draft"),
     "archived": _("Archived"),
 }
 
@@ -46,12 +44,10 @@ def normalize_property_status(prop: Property) -> str:
     if listing is not None:
         if listing.status == ListingStatus.PUBLISHED and prop.status == PropertyStatus.VACANT:
             return "approved"
-        if listing.status == ListingStatus.PENDING_REVIEW or prop.status == PropertyStatus.PENDING_REVIEW:
-            return "pending"
         if listing.status == ListingStatus.REJECTED:
             return "rejected"
-        if listing.status == ListingStatus.DRAFT or prop.status == PropertyStatus.DRAFT:
-            return "draft"
+        if listing.status == ListingStatus.PENDING_REVIEW or prop.status == PropertyStatus.PENDING_REVIEW:
+            return "pending"
         if listing.status == ListingStatus.ARCHIVED or prop.status == PropertyStatus.ARCHIVED:
             return "archived"
 
@@ -59,8 +55,6 @@ def normalize_property_status(prop: Property) -> str:
         return "approved"
     if prop.status == PropertyStatus.PENDING_REVIEW:
         return "pending"
-    if prop.status == PropertyStatus.DRAFT:
-        return "draft"
     if prop.status == PropertyStatus.ARCHIVED:
         return "archived"
 
@@ -74,7 +68,6 @@ def calculate_my_listings_stats(properties: list[Property]) -> MobileMyListingsS
         "pending_count": 0,
         "rented_count": 0,
         "rejected_count": 0,
-        "draft_count": 0,
         "archived_count": 0,
     }
     for prop in properties:

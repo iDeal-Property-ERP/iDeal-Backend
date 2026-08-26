@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 import pydantic
 from property.services.validation import validate_floor_bounds
@@ -72,14 +73,14 @@ class OwnerOnboardingCreateInput(pydantic.BaseModel):
     name: str
     address: str
     district_id: int
-    rooms: int
-    area_sqm: int
+    rooms: int = pydantic.Field(gt=0)
+    area_sqm: int = pydantic.Field(gt=0)
     floor: int = pydantic.Field(ge=0)
     total_floors: int | None = pydantic.Field(default=None, ge=0)
     description: str | None = None
     ask_price: Decimal
     ask_currency: str = "USD"
-    accept_offer: bool
+    accept_offer: Literal[True]
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):
@@ -87,20 +88,34 @@ class OwnerOnboardingCreateInput(pydantic.BaseModel):
         return self
 
 
-class OwnerListingCreateInput(pydantic.BaseModel):
-    """Step 1 (Details) of the List-Your-Property wizard. Creates a draft."""
+class OwnerContactInput(pydantic.BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
 
+
+class OwnerListingSubmitPayload(pydantic.BaseModel):
     property_type: str = "apartment"
-    name: str
+    name: str | None = None
     address: str | None = None
     district_id: int
-    rooms: int
-    area_sqm: int
+    rooms: int = pydantic.Field(gt=0)
+    area_sqm: int = pydantic.Field(gt=0)
     floor: int = pydantic.Field(default=1, ge=0)
     total_floors: int | None = pydantic.Field(default=None, ge=0)
     furnishing: str = "unfurnished"
     description: str | None = None
-    amenities: list[str] = []  # amenity slugs
+    tariff: str = "standard"
+    monthly_price: Decimal = pydantic.Field(ge=0)
+    deposit_amount: Decimal = Decimal("0.00")
+    currency: str = "USD"
+    minimum_stay: int = 6
+    price_includes: list[str] = pydantic.Field(default_factory=list)
+    amenities: list[str] = pydantic.Field(default_factory=list)
+    captions: list[str] = pydantic.Field(default_factory=list)
+    contact: OwnerContactInput | None = None
+    accept_offer: Literal[True]
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):
@@ -108,46 +123,8 @@ class OwnerListingCreateInput(pydantic.BaseModel):
         return self
 
 
-class OwnerListingUpdateInput(pydantic.BaseModel):
-    """Partial per-step update. Pricing fields land on the listing; the rest on the property."""
-
-    property_type: str | None = None
-    name: str | None = None
-    address: str | None = None
-    district_id: int | None = None
-    rooms: int | None = None
-    area_sqm: int | None = None
-    floor: int | None = pydantic.Field(default=None, ge=0)
-    total_floors: int | None = pydantic.Field(default=None, ge=0)
-    furnishing: str | None = None
-    tariff: str | None = None
-    description: str | None = None
-    amenities: list[str] | None = None
-    monthly_price: Decimal | None = None
-    deposit_amount: Decimal | None = None
-    currency: str | None = None
-    minimum_stay: int | None = None
-    price_includes: list[str] | None = None
-
-    @pydantic.model_validator(mode="after")
-    def validate_floor_bounds(self):
-        validate_floor_bounds(self.floor, self.total_floors)
-        return self
-
-
-class OwnerListingPhotoReorderItem(pydantic.BaseModel):
-    id: int
-    sort_order: int = 0
-    is_primary: bool = False
-    caption: str | None = None
-
-
-class OwnerListingPhotoReorderInput(pydantic.BaseModel):
-    items: list[OwnerListingPhotoReorderItem]
-
-
-class OwnerListingSubmitInput(pydantic.BaseModel):
-    accept_offer: bool
+class OwnerListingResubmitPayload(OwnerListingSubmitPayload):
+    keep_photo_ids: list[int] = pydantic.Field(default_factory=list)
 
 
 class OwnerOnboardingOutput(pydantic.BaseModel):

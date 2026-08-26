@@ -62,7 +62,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             )
             return
         if message_type == "chat.sync":
-            await self._sync(content.get("after_event_id"))
+            await self._sync_events(content.get("after_event_id"))
             return
         if message_type == "chat.typing.set":
             await self._set_typing(content)
@@ -75,7 +75,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     async def chat_typing(self, event):
         await self.send_json(event["event"])
 
-    async def _sync(self, raw_after_event_id):
+    async def _sync_events(self, raw_after_event_id):
         if not isinstance(raw_after_event_id, int) or raw_after_event_id < 0:
             await self._error("invalid_cursor", "A non-negative event cursor is required.")
             return

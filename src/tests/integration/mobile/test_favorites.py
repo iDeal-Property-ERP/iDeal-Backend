@@ -84,8 +84,9 @@ class TestMobileFavoritesList:
         newest = FavoriteListingFactory(user=tenant, listing=_visible_listing())
 
         hidden_listing = _visible_listing()
-        hidden_listing.status = ListingStatus.DRAFT
-        hidden_listing.save(update_fields=["status", "updated_at"])
+        hidden_listing.status = ListingStatus.PENDING_REVIEW
+        hidden_listing.is_active = False
+        hidden_listing.save(update_fields=["status", "is_active", "updated_at"])
         FavoriteListingFactory(user=tenant, listing=hidden_listing)
 
         future_property = PropertyFactory(
@@ -133,8 +134,9 @@ class TestMobileFavoritesList:
         visible = FavoriteListingFactory(user=tenant, listing=_visible_listing())
 
         draft_listing = _visible_listing()
-        draft_listing.status = ListingStatus.DRAFT
-        draft_listing.save(update_fields=["status", "updated_at"])
+        draft_listing.status = ListingStatus.PENDING_REVIEW
+        draft_listing.is_active = False
+        draft_listing.save(update_fields=["status", "is_active", "updated_at"])
         draft_favorite = FavoriteListingFactory(user=tenant, listing=draft_listing)
 
         rented_listing = ListingFactory(
@@ -452,8 +454,9 @@ class TestMobileFavoriteToggle:
     def test_put_rejects_unavailable_listing(self, api_client):
         tenant = TenantFactory()
         hidden_listing = _visible_listing()
-        hidden_listing.status = ListingStatus.DRAFT
-        hidden_listing.save(update_fields=["status", "updated_at"])
+        hidden_listing.status = ListingStatus.PENDING_REVIEW
+        hidden_listing.is_active = False
+        hidden_listing.save(update_fields=["status", "is_active", "updated_at"])
 
         response = api_client.put(
             f"{FAVORITES_URL}{hidden_listing.id}/",

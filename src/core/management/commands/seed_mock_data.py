@@ -638,19 +638,19 @@ class Command(BaseCommand):
         for entry in leased:
             if self.rng.random() < 0.4:
                 continue
-            finalized = self.rng.random() < 0.6
+            is_ack = self.rng.random() < 0.6
             act = InventoryAct.objects.create(
                 property=entry["obj"],
                 lease=entry["lease"],
                 act_type=InventoryActType.HANDOVER,
-                status=InventoryActStatus.FINALIZED if finalized else InventoryActStatus.DRAFT,
+                status=InventoryActStatus.FINALIZED,
                 created_by=self.rng.choice(mgmt),
                 notes=self.faker.sentence(),
-                finalized_at=timezone.now() if finalized else None,
+                finalized_at=timezone.now(),
                 acknowledged_by_name=(
-                    f"{entry['tenant'].first_name} {entry['tenant'].last_name or ''}".strip() if finalized else None
+                    f"{entry['tenant'].first_name} {entry['tenant'].last_name or ''}".strip() if is_ack else None
                 ),
-                acknowledged_at=timezone.now() if finalized else None,
+                acknowledged_at=timezone.now() if is_ack else None,
             )
             areas = self.rng.sample(INVENTORY_AREAS, k=self.rng.randint(3, len(INVENTORY_AREAS)))
             for order, area in enumerate(areas):

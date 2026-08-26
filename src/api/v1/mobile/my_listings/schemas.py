@@ -9,7 +9,6 @@ class MobileMyListingsStatsOutput(pydantic.BaseModel):
     pending_count: int = 0
     rented_count: int = 0
     rejected_count: int = 0
-    draft_count: int = 0
     archived_count: int = 0
 
 

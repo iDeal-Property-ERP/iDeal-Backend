@@ -78,6 +78,20 @@ class TestPropertyCreate:
         assert body["success"] is False
         assert "error" in body
 
+    @pytest.mark.parametrize(("field", "value"), [("rooms", 0), ("rooms", -1), ("area_sqm", 0), ("area_sqm", -1)])
+    def test_create_property_rejects_non_positive_rooms_and_area(self, api_client, management, owner, field, value):
+        district = DistrictFactory()
+
+        response = api_client.post(
+            "/api/v1/properties/",
+            _create_payload(district, owner, **{field: value}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+
+        assert response.status_code == 400
+        assert response.json()["success"] is False
+
     def test_create_property_nonexistent_district(self, api_client, management, owner):
         district = DistrictFactory()
         response = api_client.post(
@@ -154,6 +168,22 @@ class TestPropertyUpdate:
         assert body["success"] is True
         assert body["data"]["name"] == "New Name"
         assert body["data"]["status"] == "maintenance"
+
+    @pytest.mark.parametrize(("field", "value"), [("rooms", 0), ("rooms", -1), ("area_sqm", 0), ("area_sqm", -1)])
+    def test_partial_update_rejects_non_positive_rooms_and_area(
+        self, api_client, management, property_obj, field, value
+    ):
+        response = api_client.patch(
+            f"/api/v1/properties/{property_obj.id}/",
+            json.dumps({field: value}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+
+        assert response.status_code == 400
+        assert response.json()["success"] is False
+        property_obj.refresh_from_db()
+        assert getattr(property_obj, field) > 0
 
     def test_partial_update_nonexistent_district(self, api_client, management, property_obj):
         payload = json.dumps({"district_id": 99999})

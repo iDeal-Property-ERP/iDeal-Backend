@@ -1,18 +1,17 @@
+import json
 from decimal import Decimal
 from http import HTTPStatus
+from io import BytesIO
 
 import pydantic
 from django.db.models import Sum
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
-from property.services.validation import validate_floor_bounds
+from property.services.submission import PropertySubmissionError, PropertySubmissionService
 
 from api.v1.owner.schemas import (
-    OwnerListingCreateInput,
-    OwnerListingPhotoReorderInput,
-    OwnerListingSubmitInput,
-    OwnerListingUpdateInput,
+    OwnerListingResubmitPayload,
+    OwnerListingSubmitPayload,
     OwnerOnboardingCreateInput,
     OwnerOnboardingOutput,
     OwnerPropertyOutput,
@@ -21,7 +20,7 @@ from api.v1.owner.schemas import (
 )
 from core.api.permissions import RoleAuth
 from core.api.views import BaseController, GenericController, ListAPIView, ListQuery
-from core.constants import ListingStatus, PayoutStatus, PriceIncluded, PropertyStatus, UserRole
+from core.constants import ListingStatus, PayoutStatus, PropertyStatus, UserRole
 
 MIN_PHOTOS = 5
 
@@ -51,8 +50,12 @@ class OwnerEarningsView(BaseController):
         payouts = PayoutSchedule.objects.filter(owner=user)
         total_guaranteed = settlements.aggregate(total=Sum("owner_payout_amount"))["total"] or Decimal("0.00")
         total_paid = payouts.filter(status=PayoutStatus.PAID).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        total_pending = payouts.filter(status=PayoutStatus.SCHEDULED).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        above = settlements.aggregate(total=Sum("owner_payout_amount") - Sum("gross_floor_amount"))["total"] or Decimal("0.00")
+        total_pending = payouts.filter(status=PayoutStatus.SCHEDULED).aggregate(total=Sum("amount"))[
+            "total"
+        ] or Decimal("0.00")
+        above = settlements.aggregate(total=Sum("owner_payout_amount") - Sum("gross_floor_amount"))["total"] or Decimal(
+            "0.00"
+        )
         next_payout = payouts.filter(status=PayoutStatus.SCHEDULED).order_by("scheduled_date").first()
         return self.ok(
             {
@@ -98,8 +101,10 @@ class OwnerSettlementListView(ListAPIView):
     def get_queryset(self):
         from finance.models import OwnerSettlement
 
-        return OwnerSettlement.objects.filter(owner=self.request.user).select_related("owner_agreement__property").prefetch_related(
-            "payouts"
+        return (
+            OwnerSettlement.objects.filter(owner=self.request.user)
+            .select_related("owner_agreement__property")
+            .prefetch_related("payouts")
         )
 
     def to_output(self, settlement):
@@ -231,9 +236,9 @@ class OwnerListingBaseView(GenericController):
         return listing
 
     def _require_editable(self, listing):
-        if listing.status not in (ListingStatus.DRAFT, ListingStatus.REJECTED):
+        if listing.status != ListingStatus.REJECTED:
             return self.fail(
-                error=str(_("Only draft or rejected listings can be edited")),
+                error=str(_("Only rejected listings can be edited/resubmitted")),
                 message=str(_("Listing is not editable")),
             )
 
@@ -292,7 +297,7 @@ class OwnerListingBaseView(GenericController):
         prop.amenities.set(Amenity.objects.filter(slug__in=slugs, is_active=True))
 
 
-class OwnerListingListCreateView(OwnerListingBaseView):
+class OwnerListingListView(OwnerListingBaseView):
     def get(self, parsed_query: Query[ListQuery]) -> dict:
         listings = self._owner_listings().order_by("-created_at")
         items = [self._build_output(listing) for listing in listings]
@@ -302,43 +307,35 @@ class OwnerListingListCreateView(OwnerListingBaseView):
             return self.ok(build_paginated_response(items, parsed_query.page, parsed_query.per_page))
         return self.ok(items)
 
-    def post(self, parsed_body: Body[dict]) -> dict:
-        from marketplace.models import Listing
-        from property.models import District, Property
 
-        data = self._validate_body(OwnerListingCreateInput, parsed_body)
-        amenities = data.pop("amenities", [])
-        district = District.objects.filter(pk=data["district_id"]).first()
-        if district is None:
-            return self.fail(error=str(_("District not found")), status_code=HTTPStatus.NOT_FOUND)
+class OwnerListingSubmitView(OwnerListingBaseView):
+    def post(self) -> dict:
+        payload_raw = self.request.POST.get("payload")
+        if not payload_raw:
+            return self.fail(error=str(_("Missing payload data")))
 
-        prop = Property.objects.create(
-            name=data["name"],
-            address=data.get("address") or district.name,
-            district_id=data["district_id"],
-            property_type=data["property_type"],
-            rooms=data["rooms"],
-            area_sqm=data["area_sqm"],
-            floor=data["floor"],
-            total_floors=data.get("total_floors"),
-            furnishing=data["furnishing"],
-            owner=self.request.user,
-            status=PropertyStatus.PENDING_REVIEW,
-            description=data.get("description"),
-            # Placeholder pricing — set at the Pricing step and finalized by management.
-            ask_price=Decimal("0"),
-            owner_guaranteed_price=Decimal("0"),
-            tenant_charge_price=Decimal("0"),
-        )
-        if amenities:
-            self._set_amenities(prop, amenities)
-        # Property is PENDING_REVIEW so the auto-listing signal does not fire — create the draft.
-        listing = Listing.objects.create(
-            property=prop,
-            status=ListingStatus.DRAFT,
-            is_active=False,
-            description=data.get("description"),
-        )
+        payload_str = str(payload_raw) if not isinstance(payload_raw, str) else payload_raw
+
+        try:
+            data = json.loads(payload_str)
+            validated = OwnerListingSubmitPayload.model_validate(data)
+        except (json.JSONDecodeError, pydantic.ValidationError) as err:
+            return self.fail(error=str(err), message=str(_("Invalid payload")))
+
+        raw_files = self.request.FILES.getlist("images") if hasattr(self.request, "FILES") else []
+        files = list(raw_files) if isinstance(raw_files, (list, tuple)) else []
+
+        try:
+            listing = PropertySubmissionService.submit_owner_listing(
+                user=self.request.user,
+                data=validated.model_dump(mode="json"),
+                files=files,
+            )
+        except PropertySubmissionError as err:
+            return self.fail(error=str(err), status_code=HTTPStatus.UNPROCESSABLE_ENTITY)
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Failed to submit listing")))
+
         return self.ok(self._build_output(listing), status_code=HTTPStatus.CREATED)
 
 
@@ -347,167 +344,71 @@ class OwnerListingDetailView(OwnerListingBaseView):
         listing = self._get_owned_listing(parsed_path.pk)
         return self.ok(self._build_output(listing))
 
-    def patch(self, parsed_path: Path[OwnerListingPath], parsed_body: Body[dict]) -> dict:
-        listing = self._get_owned_listing(parsed_path.pk)
-        self._require_editable(listing)
-        data = self._validate_body(OwnerListingUpdateInput, parsed_body, exclude_unset=True)
-        prop = listing.property
 
-        property_fields = {
-            "property_type": "property_type",
-            "name": "name",
-            "address": "address",
-            "district_id": "district_id",
-            "rooms": "rooms",
-            "area_sqm": "area_sqm",
-            "floor": "floor",
-            "total_floors": "total_floors",
-            "furnishing": "furnishing",
-            "tariff": "tariff",
-            "description": "description",
-        }
-        for key, attr in property_fields.items():
-            if key in data:
-                setattr(prop, attr, data[key])
+class OwnerListingResubmitView(OwnerListingBaseView):
+    def put(self, parsed_path: Path[OwnerListingPath]) -> dict:
+        listing = self._get_owned_listing(parsed_path.pk)
+        if listing.status != ListingStatus.REJECTED:
+            return self.fail(
+                error=str(_("Only rejected listings can be resubmitted")),
+                message=str(_("Invalid status")),
+                status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+            )
+
+        payload_raw = None
+        raw_files = []
+        ct = self.request.META.get("CONTENT_TYPE", "") or getattr(self.request, "content_type", "")
+        if "multipart" in ct.lower():
+            try:
+                from django.core.files.uploadhandler import MemoryFileUploadHandler
+                from django.http.multipartparser import MultiPartParser
+
+                meta = dict(self.request.META)
+                body_bytes = self.request.body
+                meta["CONTENT_LENGTH"] = str(len(body_bytes))
+                handlers = [MemoryFileUploadHandler(self.request)]
+                post, files_dict = MultiPartParser(meta, BytesIO(body_bytes), handlers).parse()
+                payload_raw = post.get("payload")
+                raw_files = files_dict.getlist("images")
+                if not raw_files:
+                    for k in files_dict:
+                        raw_files.extend(files_dict.getlist(k))
+            except Exception as parse_err:
+                print("MULTIPART EXCEPTION:", repr(parse_err))
+        elif hasattr(self.request, "data") and isinstance(self.request.data, dict):
+            payload_raw = self.request.data.get("payload")
+            raw_files = (
+                self.request.data.getlist("images")
+                if hasattr(self.request.data, "getlist")
+                else self.request.data.get("images", [])
+            )
+        elif hasattr(self.request, "POST"):
+            payload_raw = self.request.POST.get("payload")
+            raw_files = self.request.FILES.getlist("images") if hasattr(self.request, "FILES") else []
+
+        if not payload_raw:
+            return self.fail(error=str(_("Missing payload data")))
+
+        payload_str = str(payload_raw) if not isinstance(payload_raw, str) else payload_raw
 
         try:
-            validate_floor_bounds(prop.floor, prop.total_floors)
-        except ValueError as err:
-            return self.fail(error=str(err), message=str(_("Validation error")))
+            data = json.loads(payload_str)
+            validated = OwnerListingResubmitPayload.model_validate(data)
+        except (json.JSONDecodeError, pydantic.ValidationError) as err:
+            return self.fail(error=str(err), message=str(_("Invalid payload")))
 
-        # Pricing (step 3) mirrors onto the property's pricing columns.
-        if "monthly_price" in data and data["monthly_price"] is not None:
-            price = data["monthly_price"]
-            listing.monthly_price = price
-            listing.listed_price = price
-            prop.ask_price = price
-            prop.tenant_charge_price = price
-            prop.owner_guaranteed_price = price
-        if "deposit_amount" in data:
-            listing.deposit_amount = data["deposit_amount"]
-            prop.deposit_amount = data["deposit_amount"]
-        if "currency" in data and data["currency"]:
-            listing.currency = data["currency"]
-            prop.ask_currency = data["currency"]
-        if "minimum_stay" in data:
-            listing.minimum_stay = data["minimum_stay"]
-        if "price_includes" in data and data["price_includes"] is not None:
-            valid = set(PriceIncluded.values())
-            listing.price_includes = [slug for slug in data["price_includes"] if slug in valid]
+        files = list(raw_files) if isinstance(raw_files, (list, tuple)) else ([raw_files] if raw_files else [])
 
-        prop.save()
-        if "amenities" in data and data["amenities"] is not None:
-            self._set_amenities(prop, data["amenities"])
-        listing.save()
-        return self.ok(self._build_output(listing))
-
-
-class OwnerListingPhotosView(OwnerListingBaseView):
-    def post(self, parsed_path: Path[OwnerListingPath]) -> dict:
-        from property.models import PropertyPhoto
-
-        from core.utils.uploads import UploadError, save_uploaded_images
-
-        listing = self._get_owned_listing(parsed_path.pk)
-        self._require_editable(listing)
-        files = self.request.FILES.getlist("images")
-        if not files:
-            return self.fail(error=str(_("No images provided")))
-
-        prop = listing.property
-        existing = prop.photos.count()
         try:
-            created = save_uploaded_images(PropertyPhoto, "property", prop, files)
-        except UploadError as err:
-            return self.fail(error=str(err))
+            listing = PropertySubmissionService.resubmit_rejected_listing(
+                user=self.request.user,
+                listing=listing,
+                data=validated.model_dump(mode="json"),
+                files=files,
+            )
+        except PropertySubmissionError as err:
+            return self.fail(error=str(err), status_code=HTTPStatus.UNPROCESSABLE_ENTITY)
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Failed to resubmit listing")))
 
-        # Ensure exactly one primary + stable ordering.
-        for idx, photo in enumerate(created):
-            photo.sort_order = existing + idx
-            photo.is_primary = existing == 0 and idx == 0
-            photo.save(update_fields=["sort_order", "is_primary", "updated_at"])
-
-        data = [
-            {
-                "id": p.id,
-                "image_url": _photo_url(p, self.request),
-                "caption": p.caption or None,
-                "is_primary": p.is_primary,
-                "sort_order": p.sort_order,
-            }
-            for p in created
-        ]
-        return self.ok(data, status_code=HTTPStatus.CREATED)
-
-
-class OwnerListingPhotoReorderView(OwnerListingBaseView):
-    def patch(self, parsed_path: Path[OwnerListingPath], parsed_body: Body[OwnerListingPhotoReorderInput]) -> dict:
-        listing = self._get_owned_listing(parsed_path.pk)
-        self._require_editable(listing)
-        prop = listing.property
-        photo_map = {p.id: p for p in prop.photos.all()}
-        for item in parsed_body.items:
-            photo = photo_map.get(item.id)
-            if photo is None:
-                continue
-            photo.sort_order = item.sort_order
-            photo.is_primary = item.is_primary
-            fields = ["sort_order", "is_primary", "updated_at"]
-            if item.caption is not None:
-                photo.caption = item.caption
-                fields.append("caption")
-            photo.save(update_fields=fields)
-        listing.refresh_from_db()
-        return self.ok(self._build_output(listing))
-
-
-class OwnerListingPhotoDeleteView(OwnerListingBaseView):
-    def delete(self, parsed_path: Path[OwnerListingPhotoPath]) -> dict:
-        listing = self._get_owned_listing(parsed_path.pk)
-        self._require_editable(listing)
-        photo = listing.property.photos.filter(pk=parsed_path.photo_id).first()
-        if photo is None:
-            return self.fail(error=str(_("Photo not found")), status_code=HTTPStatus.NOT_FOUND)
-        was_primary = photo.is_primary
-        photo.delete()
-        # If the cover photo was removed, promote the next remaining photo so the
-        # listing never ends up with no primary image.
-        if was_primary:
-            successor = listing.property.photos.order_by("sort_order", "id").first()
-            if successor is not None and not successor.is_primary:
-                successor.is_primary = True
-                successor.save(update_fields=["is_primary"])
-        return self.ok({"deleted": True})
-
-
-class OwnerListingSubmitView(OwnerListingBaseView):
-    def post(self, parsed_path: Path[OwnerListingPath], parsed_body: Body[OwnerListingSubmitInput]) -> dict:
-        from contract.models import OwnerOnboarding, PublicOffer
-
-        listing = self._get_owned_listing(parsed_path.pk)
-        self._require_editable(listing)
-
-        if not parsed_body.accept_offer:
-            return self.fail(error=str(_("You must accept the public offer to publish")))
-
-        prop = listing.property
-        errors = []
-        if prop.photos.count() < MIN_PHOTOS:
-            errors.append(str(_("At least 5 photos are required")))
-        if listing.monthly_price is None:
-            errors.append(str(_("A monthly price is required")))
-        if listing.deposit_amount is None:
-            errors.append(str(_("A deposit amount is required")))
-        if errors:
-            return self.fail(error=errors, message=str(_("Listing is incomplete")))
-
-        # Reuse the onboarding flow (public-offer acceptance) if not already onboarded.
-        if not OwnerOnboarding.objects.filter(property=prop).exists():
-            onboarding = OwnerOnboarding(owner=self.request.user, property=prop)
-            onboarding.accept_offer(PublicOffer.get_active())
-            onboarding.save()
-
-        listing.status = ListingStatus.PENDING_REVIEW
-        listing.submitted_at = timezone.now()
-        listing.save(update_fields=["status", "submitted_at", "updated_at"])
-        return self.ok(self._build_output(listing))
+        return self.ok(self._build_output(listing), status_code=HTTPStatus.OK)

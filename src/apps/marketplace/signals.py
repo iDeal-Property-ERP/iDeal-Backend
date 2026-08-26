@@ -42,15 +42,15 @@ def _one_off_is_off_market(instance):
 
 @receiver(post_save, sender=Property)
 def manage_listing_on_property_change(sender, instance, created, update_fields, **kwargs):
-    """Keep a property's Listing in sync with its status and metadata.
+    """Keep an existing Listing in sync with property status and metadata."""
+    if instance.engagement_type == PropertyEngagementType.ONE_OFF:
+        return
 
-    Idempotent + status-aware so the wizard's draft/review lifecycle is never bypassed:
-    - On property→VACANT we only publish an *existing* listing when it has passed review
-      (status == PENDING_REVIEW). Drafts / rejected / archived listings are left untouched.
-    - Auto-create only happens for the legacy path where a VACANT property has no listing
-      at all (e.g. management-created properties that never went through the wizard).
-    """
-    if _one_off_is_off_market(instance):
+    if created and instance.status == PropertyStatus.VACANT:
+        _create_published_listing(instance)
+        return
+
+    if created:
         return
 
     if not created:
@@ -71,13 +71,6 @@ def manage_listing_on_property_change(sender, instance, created, update_fields, 
         except Listing.DoesNotExist:
             pass
 
-    if created and instance.status == PropertyStatus.VACANT:
-        _create_published_listing(instance)
-        return
-
-    if created:
-        return
-
     status_in_update = update_fields is None or "status" in update_fields
     if not status_in_update:
         return
@@ -86,12 +79,11 @@ def manage_listing_on_property_change(sender, instance, created, update_fields, 
         try:
             listing = instance.listing
         except Listing.DoesNotExist:
-            _create_published_listing(instance)
             return
         # Only publish if the listing has been reviewed/approved, or was already published.
         if listing.status in (ListingStatus.PENDING_REVIEW, ListingStatus.PUBLISHED):
             _publish(listing, instance)
-        # DRAFT / REJECTED / ARCHIVED listings are intentionally not resurrected here.
+        # REJECTED / ARCHIVED listings are intentionally not resurrected here.
     elif instance.status == PropertyStatus.RENTED:
         try:
             listing = instance.listing

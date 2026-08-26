@@ -368,7 +368,13 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [config("REDIS_URL", default="redis://localhost:6379/0")],
+            "hosts": [
+                {
+                    "address": config("REDIS_URL", default="redis://localhost:6379/0"),
+                    "socket_timeout": config("CHANNEL_REDIS_SOCKET_TIMEOUT", default=10, cast=int),
+                    "socket_connect_timeout": config("CHANNEL_REDIS_CONNECT_TIMEOUT", default=5, cast=int),
+                }
+            ],
             "capacity": config("CHAT_CHANNEL_CAPACITY", default=200, cast=int),
             "expiry": config("CHAT_CHANNEL_EXPIRY_SECONDS", default=60, cast=int),
         },

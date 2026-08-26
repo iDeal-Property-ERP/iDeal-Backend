@@ -43,8 +43,9 @@ def test_open_or_get_is_idempotent_and_requires_published_listing():
     # A Property post_save signal auto-creates a PUBLISHED listing, and
     # ListingFactory uses django_get_or_create=("property",), so a `status`
     # kwarg on the factory is silently discarded. Force the state explicitly.
-    listing.status = ListingStatus.DRAFT
-    listing.save(update_fields=["status", "updated_at"])
+    listing.status = ListingStatus.PENDING_REVIEW
+    listing.is_active = False
+    listing.save(update_fields=["status", "is_active", "updated_at"])
 
     with pytest.raises(ChatUnavailableError):
         open_or_get(listing, user)

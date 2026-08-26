@@ -54,6 +54,20 @@ class Listing(TimestampedModel, SoftDeleteModel):
             models.Index(fields=["is_featured"]),
             models.Index(fields=["status"]),
         ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(monthly_price__isnull=True) | models.Q(monthly_price__gte=0),
+                name="listing_monthly_price_nonnegative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(deposit_amount__isnull=True) | models.Q(deposit_amount__gte=0),
+                name="listing_deposit_amount_nonnegative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(is_active=False) | models.Q(status=ListingStatus.PUBLISHED),
+                name="listing_is_active_parity",
+            ),
+        ]
 
     def __str__(self):
         return f"Listing #{self.id} — {self.property.name}"

@@ -14,7 +14,7 @@ class InventoryActFactory(factory.django.DjangoModelFactory):
     property = factory.SubFactory(PropertyFactory)
     lease = None
     act_type = InventoryActType.GENERAL
-    status = InventoryActStatus.DRAFT
+    status = InventoryActStatus.FINALIZED
     created_by = factory.SubFactory(UserFactory)
     notes = factory.Faker("text", max_nb_chars=120)
 

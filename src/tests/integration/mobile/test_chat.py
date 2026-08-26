@@ -69,8 +69,9 @@ class TestMobileChatOpenAndListAPI:
     def test_unpublished_listing_is_unavailable_and_open_requires_auth(self, api_client):
         user = TenantFactory()
         listing = _published_listing()
-        listing.status = ListingStatus.DRAFT
-        listing.save(update_fields=["status", "updated_at"])
+        listing.status = ListingStatus.PENDING_REVIEW
+        listing.is_active = False
+        listing.save(update_fields=["status", "is_active", "updated_at"])
 
         rejected = _post(
             api_client,
@@ -94,7 +95,15 @@ class TestMobileChatOpenAndListAPI:
             property=listing.property,
             image="properties/photos/original.jpg",
             is_primary=True,
+            sort_order=0,
         )
+        for i in range(1, 5):
+            PropertyPhoto.objects.create(
+                property=listing.property,
+                image=f"properties/photos/extra{i}.jpg",
+                is_primary=False,
+                sort_order=i,
+            )
         PropertyPhoto.objects.filter(pk=photo.pk).update(
             preview_image="properties/photos/variants/preview.webp",
             display_image="properties/photos/variants/display.webp",

@@ -5,13 +5,15 @@ class ConstantChoicesMeta(type):
     """Metaclass to make ConstantChoices classes iterable"""
 
     def __iter__(cls):
-        if hasattr(cls, "CHOICES"):
-            return iter(cls.CHOICES)
+        choices = getattr(cls, "CHOICES", None)
+        if choices is not None:
+            return iter(choices)
         return iter([])
 
     def __len__(cls):
-        if hasattr(cls, "CHOICES"):
-            return len(cls.CHOICES)
+        choices = getattr(cls, "CHOICES", None)
+        if choices is not None:
+            return len(choices)
         return 0
 
 
@@ -20,7 +22,7 @@ class ConstantChoices(metaclass=ConstantChoicesMeta):
 
     @classmethod
     def choices(cls):
-        return cls.CHOICES if hasattr(cls, "CHOICES") else []
+        return getattr(cls, "CHOICES", [])
 
     @classmethod
     def values(cls):
@@ -41,14 +43,12 @@ class UserRole(ConstantChoices):
 
 
 class PropertyStatus(ConstantChoices):
-    DRAFT = "draft"
     RENTED = "rented"
     VACANT = "vacant"
     MAINTENANCE = "maintenance"
     PENDING_REVIEW = "pending_review"
     ARCHIVED = "archived"
     CHOICES = [
-        (DRAFT, _("Draft")),
         (RENTED, _("Rented")),
         (VACANT, _("Vacant")),
         (MAINTENANCE, _("Maintenance")),
@@ -76,14 +76,12 @@ class OneOffChannel(ConstantChoices):
 
 
 class OneOffDealStatus(ConstantChoices):
-    DRAFT = "draft"
     ACTIVE = "active"
     PAUSED = "paused"
     CLOSED_WON = "closed_won"
     CLOSED_LOST = "closed_lost"
     ARCHIVED = "archived"
     CHOICES = [
-        (DRAFT, _("Draft")),
         (ACTIVE, _("Active")),
         (PAUSED, _("Paused")),
         (CLOSED_WON, _("Closed won")),
@@ -365,13 +363,11 @@ class ViewingTimeSlot(ConstantChoices):
 
 
 class ListingStatus(ConstantChoices):
-    DRAFT = "draft"
     PENDING_REVIEW = "pending_review"
     PUBLISHED = "published"
     REJECTED = "rejected"
     ARCHIVED = "archived"
     CHOICES = [
-        (DRAFT, _("Draft")),
         (PENDING_REVIEW, _("Pending Review")),
         (PUBLISHED, _("Published")),
         (REJECTED, _("Rejected")),
@@ -435,10 +431,8 @@ class OnboardingStatus(ConstantChoices):
 
 
 class InventoryActStatus(ConstantChoices):
-    DRAFT = "draft"
     FINALIZED = "finalized"
     CHOICES = [
-        (DRAFT, _("Draft")),
         (FINALIZED, _("Finalized")),
     ]
 

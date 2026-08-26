@@ -6,6 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
 from property.models import PropertyPhoto
 
+from core.constants import PropertyStatus
 from tests.factories import PropertyFactory
 
 
@@ -27,7 +28,9 @@ def _uploaded_exif_oriented_image(name):
 @pytest.mark.django_db
 class TestPropertyPhotoVariants:
     def test_new_original_creates_webp_variants_without_changing_original(self):
-        photo = PropertyPhoto.objects.create(property=PropertyFactory(), image=_uploaded_image("original.png"))
+        photo = PropertyPhoto.objects.create(
+            property=PropertyFactory(status=PropertyStatus.MAINTENANCE), image=_uploaded_image("original.png")
+        )
         original_name = photo.image.name
         photo.refresh_from_db()
 
@@ -42,7 +45,9 @@ class TestPropertyPhotoVariants:
             assert display.width == 1280
 
     def test_replacing_original_regenerates_variants(self):
-        photo = PropertyPhoto.objects.create(property=PropertyFactory(), image=_uploaded_image("first.png"))
+        photo = PropertyPhoto.objects.create(
+            property=PropertyFactory(status=PropertyStatus.MAINTENANCE), image=_uploaded_image("first.png")
+        )
         old_original = photo.image.name
         old_preview = photo.preview_image.name
         old_display = photo.display_image.name
@@ -63,7 +68,7 @@ class TestPropertyPhotoVariants:
 
     def test_variants_transpose_exif_and_never_upscale(self):
         photo = PropertyPhoto.objects.create(
-            property=PropertyFactory(),
+            property=PropertyFactory(status=PropertyStatus.MAINTENANCE),
             image=_uploaded_exif_oriented_image("rotated.jpg"),
         )
         photo.refresh_from_db()
@@ -74,7 +79,7 @@ class TestPropertyPhotoVariants:
             assert display.size == (100, 400)
 
         small = PropertyPhoto.objects.create(
-            property=PropertyFactory(),
+            property=PropertyFactory(status=PropertyStatus.MAINTENANCE),
             image=_uploaded_image("small.png", size=(32, 16)),
         )
         small.refresh_from_db()
@@ -86,7 +91,7 @@ class TestPropertyPhotoVariants:
     def test_legacy_path_row_does_not_generate_variants(self):
         with patch.object(PropertyPhoto, "_generate_variants") as generate_variants:
             photo = PropertyPhoto.objects.create(
-                property=PropertyFactory(),
+                property=PropertyFactory(status=PropertyStatus.MAINTENANCE),
                 image="properties/photos/legacy.jpg",
             )
 
@@ -96,7 +101,9 @@ class TestPropertyPhotoVariants:
         assert not photo.display_image.name
 
     def test_metadata_only_save_does_not_regenerate_variants(self):
-        photo = PropertyPhoto.objects.create(property=PropertyFactory(), image=_uploaded_image("original.png"))
+        photo = PropertyPhoto.objects.create(
+            property=PropertyFactory(status=PropertyStatus.MAINTENANCE), image=_uploaded_image("original.png")
+        )
         original = photo.image.name
         preview = photo.preview_image.name
         display = photo.display_image.name
@@ -113,7 +120,9 @@ class TestPropertyPhotoVariants:
 
     def test_generation_failure_keeps_original_and_clears_variants(self):
         with patch.object(PropertyPhoto, "_variant_contents", side_effect=OSError("Pillow unavailable")):
-            photo = PropertyPhoto.objects.create(property=PropertyFactory(), image=_uploaded_image("original.png"))
+            photo = PropertyPhoto.objects.create(
+                property=PropertyFactory(status=PropertyStatus.MAINTENANCE), image=_uploaded_image("original.png")
+            )
 
         photo.refresh_from_db()
         assert photo.image.name.startswith("properties/photos/original")

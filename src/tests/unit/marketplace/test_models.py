@@ -183,28 +183,17 @@ class TestListingSignals:
         listing.refresh_from_db()
         assert listing.is_active is True
 
-    def test_create_listing_if_missing_when_property_becomes_vacant(self):
-        district = DistrictFactory()
-        owner = OwnerFactory()
-        prop = PropertyFactory(district=district, owner=owner, status=PropertyStatus.RENTED)
-        assert not hasattr(prop, "listing") or Listing.objects.filter(property=prop).count() == 0
-        prop.status = PropertyStatus.VACANT
-        prop.save(update_fields=["status", "updated_at"])
-        listing = prop.listing
-        assert listing is not None
-        assert listing.is_active is True
-
-    def test_draft_listing_not_published_on_vacant(self):
-        """A wizard DRAFT listing must NOT be auto-published when the property goes vacant."""
+    def test_rejected_listing_not_published_on_vacant(self):
+        """A REJECTED listing must NOT be auto-published when the property goes vacant."""
         from core.constants import ListingStatus
 
         owner = OwnerFactory()
         prop = PropertyFactory(owner=owner, status=PropertyStatus.PENDING_REVIEW)
-        listing = Listing.objects.create(property=prop, status=ListingStatus.DRAFT, is_active=False)
+        listing = Listing.objects.create(property=prop, status=ListingStatus.REJECTED, is_active=False)
         prop.status = PropertyStatus.VACANT
         prop.save(update_fields=["status", "updated_at"])
         listing.refresh_from_db()
-        assert listing.status == ListingStatus.DRAFT
+        assert listing.status == ListingStatus.REJECTED
         assert listing.is_active is False
 
     def test_pending_review_listing_published_on_vacant(self):

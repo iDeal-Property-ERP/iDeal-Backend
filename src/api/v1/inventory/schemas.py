@@ -88,6 +88,8 @@ class InventoryActListOutput(pydantic.BaseModel):
     lease_id: int | None
     act_type: str
     status: str
+    acknowledged_by_name: str | None
+    acknowledged_at: datetime | None
     item_count: int
     photo_count: int
     created_at: datetime
@@ -105,24 +107,13 @@ class InventoryActListOutput(pydantic.BaseModel):
             "lease_id": v.lease_id,
             "act_type": v.act_type,
             "status": v.status,
+            "acknowledged_by_name": v.acknowledged_by_name,
+            "acknowledged_at": v.acknowledged_at,
             "item_count": v.items.count(),
             "photo_count": v.photos.count(),
             "created_at": v.created_at,
             "updated_at": v.updated_at,
         }
-
-
-class InventoryActCreateInput(pydantic.BaseModel):
-    property_id: int
-    lease_id: int | None = None
-    act_type: str = InventoryActType.GENERAL
-    notes: str | None = None
-
-
-class InventoryActUpdateInput(pydantic.BaseModel):
-    act_type: str | None = None
-    notes: str | None = None
-    lease_id: int | None = None
 
 
 class InventoryActItemInput(pydantic.BaseModel):
@@ -132,10 +123,18 @@ class InventoryActItemInput(pydantic.BaseModel):
     sort_order: int = 0
 
 
-class InventoryActItemsBulkInput(pydantic.BaseModel):
-    items: list[InventoryActItemInput]
-
-
-class InventoryActFinalizeInput(pydantic.BaseModel):
+class InventoryActSubmitPayload(pydantic.BaseModel):
+    property_id: int
+    lease_id: int | None = None
+    act_type: str = InventoryActType.GENERAL
+    notes: str | None = None
+    items: list[InventoryActItemInput] = pydantic.Field(min_length=1)
+    photo_item_map: dict[str, int] = pydantic.Field(default_factory=dict)
+    captions: list[str] = pydantic.Field(default_factory=list)
     acknowledged_by_name: str | None = None
+    acknowledgment_note: str | None = None
+
+
+class InventoryActAcknowledgeInput(pydantic.BaseModel):
+    acknowledged_by_name: str
     acknowledgment_note: str | None = None

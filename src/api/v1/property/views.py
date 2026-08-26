@@ -1,6 +1,9 @@
+import json
+from collections import Counter
 from http import HTTPStatus
 from uuid import uuid4
 
+import pydantic
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -8,22 +11,22 @@ from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 from dmr.pagination import Paginated
 from property.models import OneOffDeal, Property, VerificationVisit
+from property.services.submission import PropertySubmissionError, PropertySubmissionService
 from property.services.validation import validate_floor_bounds
 
 from api.v1.property.schemas import (
-    OneOffPropertyDraftInput,
     OneOffPropertyUpdateInput,
     PropertyCreateInput,
-    PropertyDraftCreateInput,
     PropertyOutput,
     PropertyPhotoReorderInput,
-    PropertyPublishInput,
+    PropertySubmissionInput,
     PropertyUpdateInput,
     VerificationVisitCreateInput,
 )
 from core.api.permissions import require_role
 from core.api.schemas import DeleteData
 from core.api.views import (
+    BaseController,
     CreateAPIView,
     DeleteAPIView,
     DetailPath,
@@ -33,21 +36,7 @@ from core.api.views import (
     PartialUpdateAPIView,
     RetrieveAPIView,
 )
-from core.constants import OneOffDealStatus, PropertyEngagementType, PropertyStatus, UserRole, VerificationVisitStatus
-
-# Fields that must be present before a draft can be published (go VACANT).
-PUBLISH_REQUIRED_FIELDS = (
-    "district",
-    "owner",
-    "rooms",
-    "area_sqm",
-    "floor",
-    "total_floors",
-    "ask_price",
-    "owner_guaranteed_price",
-    "tenant_charge_price",
-)
-MIN_PUBLISH_PHOTOS = 5
+from core.constants import ListingStatus, OneOffDealStatus, PropertyEngagementType, UserRole, VerificationVisitStatus
 
 
 def _photo_url(photo, request):
@@ -112,8 +101,7 @@ def _base_property_qs(user):
         "photos", "verification_visits"
     )
     if user.role == UserRole.OWNER:
-        # Owners never see draft properties (not yet published under management).
-        return qs.filter(owner=user).exclude(status=PropertyStatus.DRAFT)
+        return qs.filter(owner=user)
     return qs.all()
 
 
@@ -198,24 +186,52 @@ class PropertyDetailView(RetrieveAPIView, PartialUpdateAPIView, DeleteAPIView):
         return self.ok({"deleted": True})
 
 
-class PropertyDraftCreateView(CreateAPIView):
-    model = Property
-    output_schema = PropertyOutput
-    create_schema = PropertyDraftCreateInput
-
-    def to_output(self, instance):
-        return _property_output(instance, self.request)
-
-    def perform_create(self, validated_data):
-        # Drafts save only the fields the user has touched; None values fall back
-        # to model defaults (e.g. score, vacant_days) instead of violating NOT NULL.
-        data = {k: v for k, v in validated_data.items() if v is not None}
-        data["status"] = PropertyStatus.DRAFT
-        return Property.objects.create(**data)
+class PropertySubmitView(BaseController):
+    """Atomic multipart submission endpoint for staff management."""
 
     @require_role(UserRole.MANAGEMENT)
-    def post(self, parsed_body: Body[PropertyDraftCreateInput]) -> PropertyOutput:
-        return super().post(parsed_body)
+    def post(self) -> dict:
+        payload_raw = self.request.POST.get("payload")
+        if not payload_raw:
+            return self.fail(error=str(_("Missing payload data")))
+
+        payload_str = str(payload_raw) if not isinstance(payload_raw, str) else payload_raw
+
+        try:
+            data = json.loads(payload_str)
+            validated = PropertySubmissionInput.model_validate(data)
+        except (json.JSONDecodeError, pydantic.ValidationError) as err:
+            return self.fail(error=str(err), message=str(_("Invalid payload")))
+
+        raw_files = self.request.FILES.getlist("images") if hasattr(self.request, "FILES") else []
+        files = list(raw_files) if isinstance(raw_files, (list, tuple)) else []
+
+        val_dict = validated.model_dump(mode="json")
+        engagement = val_dict.get("engagement_type", PropertyEngagementType.MANAGED)
+
+        try:
+            if engagement == PropertyEngagementType.ONE_OFF:
+                brokerage_data = val_dict.pop("brokerage", {}) or {}
+                prop = PropertySubmissionService.submit_one_off_by_management(
+                    user=self.request.user,
+                    data=val_dict,
+                    brokerage=brokerage_data,
+                    files=files,
+                )
+            else:
+                schedule_dt = val_dict.pop("schedule_verification_at", None)
+                prop = PropertySubmissionService.submit_managed_by_management(
+                    user=self.request.user,
+                    data=val_dict,
+                    files=files,
+                    schedule_verification_at=schedule_dt,
+                )
+        except PropertySubmissionError as err:
+            return self.fail(error=str(err), status_code=HTTPStatus.UNPROCESSABLE_ENTITY)
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Failed to submit property")))
+
+        return self.ok(_property_output(prop, self.request), status_code=HTTPStatus.CREATED)
 
 
 ONE_OFF_MANAGED_ONLY_FIELDS = {
@@ -253,33 +269,8 @@ def _apply_one_off_property_data(prop, data):
         setattr(prop, field, value)
 
 
-class OneOffPropertyDraftView(GenericController):
-    """Creates a draft property and its draft brokerage deal in one transaction."""
-
-    output_schema = PropertyOutput
-
-    @require_role(UserRole.MANAGEMENT)
-    def post(self, parsed_body: Body[OneOffPropertyDraftInput]) -> PropertyOutput:
-        data = parsed_body.model_dump(exclude_unset=True)
-        brokerage = data.pop("brokerage", {})
-        if set(data) & ONE_OFF_DISALLOWED_FIELDS:
-            return self.fail(error=str(_("Managed-only or lifecycle fields are not available for one-off properties")))
-        try:
-            with transaction.atomic():
-                prop = Property.objects.create(
-                    name=data.pop("name", "Untitled property"),
-                    status=PropertyStatus.DRAFT,
-                    engagement_type=PropertyEngagementType.ONE_OFF,
-                    **data,
-                )
-                OneOffDeal.objects.create(property=prop, **brokerage)
-        except (ValidationError, ValueError) as err:
-            return self.fail(error=str(err), message=str(_("Validation error")))
-        return self.ok(_property_output(prop, self.request), status_code=HTTPStatus.CREATED)
-
-
 class OneOffPropertyUpdateView(GenericController):
-    """Atomically updates a one-off property and draft brokerage terms."""
+    """Atomically updates a one-off property and brokerage terms."""
 
     output_schema = PropertyOutput
 
@@ -341,49 +332,6 @@ class ManagementPropertyView(GenericController):
             self.fail(error=str(_("Closed one-off brokerage properties are read-only")))
 
 
-class PropertyPublishView(ManagementPropertyView):
-    @require_role(UserRole.MANAGEMENT)
-    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[PropertyPublishInput]) -> dict:
-        prop = self.get_object(pk=parsed_path.pk)
-        self.ensure_mutable(prop)
-        if prop.status != PropertyStatus.DRAFT:
-            return self.fail(
-                error=str(_("Only draft properties can be published")),
-                message=str(_("Invalid status transition")),
-            )
-        missing = [
-            field
-            for field in PUBLISH_REQUIRED_FIELDS
-            if getattr(prop, f"{field}_id", getattr(prop, field, None)) is None
-        ]
-        # address is blank="" (not null) on a draft — treat empty as missing.
-        if not (prop.address or "").strip():
-            missing.insert(0, "address")
-        if prop.photos.count() < MIN_PUBLISH_PHOTOS:
-            missing.append("photos")
-        if missing:
-            return self.fail(
-                error={"code": "incomplete", "missing": missing},
-                message=str(_("Property is not ready to publish")),
-                status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-            )
-        with transaction.atomic():
-            prop.status = PropertyStatus.VACANT
-            prop.vacant_since = timezone.now().date()
-            prop.vacant_days = 0
-            prop.save(update_fields=["status", "vacant_since", "vacant_days", "updated_at"])
-            if (
-                parsed_body.schedule_verification_at is not None
-                and prop.engagement_type != PropertyEngagementType.ONE_OFF
-            ):
-                VerificationVisit.objects.create(
-                    property=prop,
-                    scheduled_for=parsed_body.schedule_verification_at,
-                    scheduled_by=self.request.user,
-                )
-        return self.ok(self.to_output(prop), status_code=HTTPStatus.OK)
-
-
 class PropertyPhotosView(ManagementPropertyView):
     @require_role(UserRole.MANAGEMENT)
     def post(self, parsed_path: Path[DetailPath]) -> dict:
@@ -414,17 +362,42 @@ class PropertyPhotoReorderView(ManagementPropertyView):
         prop = self.get_object(pk=parsed_path.pk)
         self.ensure_mutable(prop, allow_closed_metadata=True)
         photo_map = {p.id: p for p in prop.photos.all()}
-        for item in parsed_body.items:
-            photo = photo_map.get(item.id)
-            if photo is None:
-                continue
-            photo.sort_order = item.sort_order
-            photo.is_primary = item.is_primary
-            fields = ["sort_order", "is_primary", "updated_at"]
-            if item.caption is not None:
-                photo.caption = item.caption
-                fields.append("caption")
-            photo.save(update_fields=fields)
+        photo_ids = [item.id for item in parsed_body.items]
+        duplicate_ids = sorted(photo_id for photo_id, count in Counter(photo_ids).items() if count > 1)
+        if duplicate_ids:
+            return self.fail(
+                error={"code": "duplicate_photo_ids", "photo_ids": duplicate_ids},
+                message=str(_("Photo IDs must be unique")),
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+
+        primary_count = sum(item.is_primary for item in parsed_body.items)
+        if primary_count != 1:
+            return self.fail(
+                error={"code": "exactly_one_primary_photo_required"},
+                message=str(_("Photo reorder requires exactly one primary photo")),
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+
+        invalid_ids = sorted(set(photo_ids) - set(photo_map))
+        if invalid_ids:
+            return self.fail(
+                error={"code": "invalid_property_photo_ids", "photo_ids": invalid_ids},
+                message=str(_("All photo IDs must belong to the property")),
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            prop.photos.update(is_primary=False)
+            for item in parsed_body.items:
+                photo = photo_map[item.id]
+                photo.sort_order = item.sort_order
+                photo.is_primary = item.is_primary
+                fields = ["sort_order", "is_primary", "updated_at"]
+                if item.caption is not None:
+                    photo.caption = item.caption
+                    fields.append("caption")
+                photo.save(update_fields=fields)
         prop.refresh_from_db()
         return self.ok(self.to_output(prop))
 
@@ -441,6 +414,20 @@ class PropertyPhotoDeleteView(ManagementPropertyView):
         photo = prop.photos.filter(pk=parsed_path.photo_id).first()
         if photo is None:
             return self.fail(error=str(_("Photo not found")), status_code=HTTPStatus.NOT_FOUND)
+
+        # Enforce minimum photos for marketplace listings
+        try:
+            listing = prop.listing
+            has_listing = listing.status in (ListingStatus.PUBLISHED, ListingStatus.PENDING_REVIEW)
+        except Exception:
+            has_listing = False
+
+        if has_listing and prop.photos.count() <= 5:
+            return self.fail(
+                error=str(_("Cannot delete photo: marketplace listings require at least 5 photos.")),
+                status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+            )
+
         was_primary = photo.is_primary
         photo.delete()
         # Never leave a property with photos but no cover — promote the next one.

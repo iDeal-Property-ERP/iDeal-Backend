@@ -1,26 +1,25 @@
+import json
 from http import HTTPStatus
 
 import pydantic
+from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
 from dmr.pagination import Paginated
-from inventory.models import InventoryAct, InventoryActItem, InventoryActPhoto
+from inventory.models import InventoryAct
+from inventory.services.submission import InventorySubmissionError, InventorySubmissionService
 
 from api.v1.inventory.schemas import (
-    InventoryActCreateInput,
-    InventoryActFinalizeInput,
-    InventoryActItemsBulkInput,
+    InventoryActAcknowledgeInput,
     InventoryActListOutput,
     InventoryActOutput,
-    InventoryActPhotoOutput,
-    InventoryActUpdateInput,
+    InventoryActSubmitPayload,
 )
-from core.api.permissions import RoleAuth, require_role
+from core.api.permissions import RoleAuth
 from core.api.views import BaseController, DetailPath, GenericController
 from core.constants import InventoryActStatus, UserRole
 from core.utils.pagination import build_paginated_response
-from core.utils.uploads import UploadError, save_uploaded_images
 
 
 class InventoryActFilterQuery(pydantic.BaseModel):
@@ -42,7 +41,6 @@ def _awaiting_ack_q():
 class InventoryActListCreateView(GenericController):
     model = InventoryAct
     output_schema = InventoryActListOutput
-    create_schema = InventoryActCreateInput
     auth = (RoleAuth(UserRole.MANAGEMENT, UserRole.AGENT),)
 
     def get_queryset(self):
@@ -65,10 +63,34 @@ class InventoryActListCreateView(GenericController):
             return self.ok(build_paginated_response(items, parsed_query.page, parsed_query.per_page))
         return self.ok(items)
 
-    def post(self, parsed_body: Body[InventoryActCreateInput]) -> InventoryActOutput:
-        data = parsed_body.model_dump()
-        act = InventoryAct.objects.create(created_by=self.request.user, **data)
-        return self.ok(InventoryActOutput.model_validate(act).model_dump(mode="json"))
+    def post(self) -> dict:
+        payload_raw = self.request.POST.get("payload")
+        if not payload_raw:
+            return self.fail(error=str(_("Missing payload data")))
+
+        payload_str = str(payload_raw) if not isinstance(payload_raw, str) else payload_raw
+
+        try:
+            data = json.loads(payload_str)
+            validated = InventoryActSubmitPayload.model_validate(data)
+        except (json.JSONDecodeError, pydantic.ValidationError) as err:
+            return self.fail(error=str(err), message=str(_("Invalid payload")))
+
+        raw_files = self.request.FILES.getlist("images") if hasattr(self.request, "FILES") else []
+        files = list(raw_files) if isinstance(raw_files, (list, tuple)) else []
+
+        try:
+            act = InventorySubmissionService.submit_act(
+                user=self.request.user,
+                data=validated.model_dump(mode="json"),
+                files=files,
+            )
+        except InventorySubmissionError as err:
+            return self.fail(error=str(err), status_code=HTTPStatus.UNPROCESSABLE_ENTITY)
+        except Exception as err:
+            return self.fail(error=str(err), message=str(_("Failed to submit inventory act")))
+
+        return self.ok(InventoryActOutput.model_validate(act).model_dump(mode="json"), status_code=HTTPStatus.CREATED)
 
 
 class InventoryActStatsView(BaseController):
@@ -81,7 +103,6 @@ class InventoryActStatsView(BaseController):
         return self.ok(
             {
                 "counts": {
-                    "draft": base.filter(status=InventoryActStatus.DRAFT).count(),
                     "finalized": base.filter(status=InventoryActStatus.FINALIZED).count(),
                     "awaiting_ack": base.filter(_awaiting_ack_q()).count(),
                     "all": base.count(),
@@ -91,7 +112,7 @@ class InventoryActStatsView(BaseController):
 
 
 class InventoryActDetailView(GenericController):
-    """Detail + draft-only edit. Management/agent always; tenant only on their lease."""
+    """Detail view. Management/agent always; tenant only on their lease."""
 
     model = InventoryAct
     output_schema = InventoryActOutput
@@ -115,116 +136,44 @@ class InventoryActDetailView(GenericController):
             )
         return self.ok(InventoryActOutput.model_validate(act).model_dump(mode="json"))
 
-    @require_role(UserRole.MANAGEMENT, UserRole.AGENT)
-    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[InventoryActUpdateInput]) -> InventoryActOutput:
-        act = self.get_object(pk=parsed_path.pk)
-        if act.status != InventoryActStatus.DRAFT:
-            return self.fail(
-                error=str(_("Only draft acts can be edited")),
-                message=str(_("Act is finalized")),
-            )
-        for attr, value in parsed_body.model_dump(exclude_unset=True).items():
-            setattr(act, attr, value)
-        act.save()
-        return self.ok(InventoryActOutput.model_validate(act).model_dump(mode="json"))
 
-
-class InventoryActItemsView(GenericController):
+class InventoryActAcknowledgeView(GenericController):
     model = InventoryAct
-    auth = (RoleAuth(UserRole.MANAGEMENT, UserRole.AGENT),)
+    output_schema = InventoryActOutput
 
     def get_queryset(self):
-        return InventoryAct.objects.prefetch_related("items", "photos").all()
+        return InventoryAct.objects.select_related("property", "lease").prefetch_related("items", "photos").all()
 
-    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[InventoryActItemsBulkInput]) -> InventoryActOutput:
+    def post(
+        self, parsed_path: Path[DetailPath], parsed_body: Body[InventoryActAcknowledgeInput]
+    ) -> InventoryActOutput:
         act = self.get_object(pk=parsed_path.pk)
-        if act.status != InventoryActStatus.DRAFT:
-            return self.fail(
-                error=str(_("Only draft acts can be edited")),
-                message=str(_("Act is finalized")),
-            )
-        # Replace the act's items with the provided set.
-        act.items.all().delete()
-        InventoryActItem.objects.bulk_create(
-            [
-                InventoryActItem(
-                    act=act,
-                    area=item.area,
-                    condition=item.condition,
-                    notes=item.notes,
-                    sort_order=item.sort_order,
+        user = self.request.user
+        if user.role == UserRole.TENANT:
+            if act.lease_id is None or act.lease.tenant_id != user.id:
+                return self.fail(
+                    error=str(_("You do not have access to this inventory act")),
+                    status_code=HTTPStatus.FORBIDDEN,
                 )
-                for item in parsed_body.items
-            ]
-        )
-        act.refresh_from_db()
-        return self.ok(
-            InventoryActOutput.model_validate(act).model_dump(mode="json"),
-            status_code=HTTPStatus.OK,
-        )
-
-
-class InventoryActPhotosView(BaseController):
-    """Multipart photo upload. Reads request.FILES directly (no Pydantic body)."""
-
-    auth = (RoleAuth(UserRole.MANAGEMENT, UserRole.AGENT),)
-
-    def post(self, parsed_path: Path[DetailPath]) -> dict:
-        act = InventoryAct.objects.filter(pk=parsed_path.pk).first()
-        if act is None:
-            return self.fail(error=str(_("Inventory act not found")), status_code=HTTPStatus.NOT_FOUND)
-        if act.status != InventoryActStatus.DRAFT:
+        elif user.role not in (UserRole.MANAGEMENT, UserRole.AGENT):
             return self.fail(
-                error=str(_("Only draft acts can be edited")),
-                message=str(_("Act is finalized")),
+                error=str(_("You do not have permission to access this endpoint")),
+                status_code=HTTPStatus.FORBIDDEN,
             )
 
-        files = self.request.FILES.getlist("images")
-        if not files:
-            return self.fail(error=str(_("No images provided")))
+        with transaction.atomic():
+            act = InventoryAct.objects.select_for_update().get(pk=act.pk)
+            if act.acknowledged_at is not None:
+                return self.fail(
+                    error={"code": "inventory_act_already_acknowledged"},
+                    message=str(_("Inventory act has already been acknowledged")),
+                    status_code=HTTPStatus.CONFLICT,
+                )
 
-        item_id = self.request.POST.get("item_id")
-        extra = {"item_id": int(item_id)} if item_id else {}
-        try:
-            created = save_uploaded_images(InventoryActPhoto, "act", act, files, extra=extra)
-        except UploadError as err:
-            return self.fail(error=str(err))
-
-        data = [InventoryActPhotoOutput.model_validate(p).model_dump(mode="json") for p in created]
-        return self.ok(data, status_code=HTTPStatus.CREATED)
-
-
-class InventoryActFinalizeView(GenericController):
-    model = InventoryAct
-    auth = (RoleAuth(UserRole.MANAGEMENT, UserRole.AGENT),)
-
-    def get_queryset(self):
-        return InventoryAct.objects.prefetch_related("items", "photos").all()
-
-    def post(self, parsed_path: Path[DetailPath], parsed_body: Body[InventoryActFinalizeInput]) -> InventoryActOutput:
-        act = self.get_object(pk=parsed_path.pk)
-        if act.status == InventoryActStatus.FINALIZED:
-            return self.fail(
-                error=str(_("Act is already finalized")),
-                message=str(_("Invalid status transition")),
-            )
-        act.status = InventoryActStatus.FINALIZED
-        act.finalized_at = timezone.now()
-        if parsed_body.acknowledged_by_name:
             act.acknowledged_by_name = parsed_body.acknowledged_by_name
             act.acknowledged_at = timezone.now()
-        act.acknowledgment_note = parsed_body.acknowledgment_note
-        act.save(
-            update_fields=[
-                "status",
-                "finalized_at",
-                "acknowledged_by_name",
-                "acknowledged_at",
-                "acknowledgment_note",
-                "updated_at",
-            ]
-        )
-        return self.ok(
-            InventoryActOutput.model_validate(act).model_dump(mode="json"),
-            status_code=HTTPStatus.OK,
-        )
+            if parsed_body.acknowledgment_note is not None:
+                act.acknowledgment_note = parsed_body.acknowledgment_note
+            act.save(update_fields=["acknowledged_by_name", "acknowledged_at", "acknowledgment_note", "updated_at"])
+
+        return self.ok(InventoryActOutput.model_validate(act).model_dump(mode="json"), status_code=HTTPStatus.OK)

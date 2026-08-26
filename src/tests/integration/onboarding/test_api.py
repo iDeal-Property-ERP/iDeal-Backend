@@ -5,9 +5,10 @@ import pytest
 from contract.models import OwnerAgreement, OwnerOnboarding
 from notification.models import Notification
 
-from core.constants import NotificationType, OnboardingStatus, PropertyStatus
+from core.constants import ListingStatus, NotificationType, OnboardingStatus, PropertyStatus
 from tests.factories import (
     DistrictFactory,
+    ListingFactory,
     OwnerFactory,
     OwnerOnboardingFactory,
     PropertyFactory,
@@ -89,6 +90,21 @@ class TestOwnerOnboardingSubmit:
         assert response.status_code == 400
         assert response.json()["success"] is False
 
+    @pytest.mark.parametrize(("field", "value"), [("rooms", 0), ("rooms", -1), ("area_sqm", 0), ("area_sqm", -1)])
+    def test_submit_rejects_non_positive_rooms_and_area(self, api_client, field, value):
+        owner = OwnerFactory()
+        district = DistrictFactory()
+
+        response = api_client.post(
+            "/api/v1/owner/onboarding/",
+            data=self._payload(district, **{field: value}),
+            content_type="application/json",
+            **_make_jwt(owner),
+        )
+
+        assert response.status_code == 400
+        assert response.json()["success"] is False
+
     def test_submit_rbac(self, api_client):
         tenant = TenantFactory()
         district = DistrictFactory()
@@ -120,6 +136,7 @@ class TestManagementOnboardingReview:
         mgmt = UserFactory()
         owner = OwnerFactory()
         prop = PropertyFactory(owner=owner, status=PropertyStatus.PENDING_REVIEW)
+        ListingFactory(property=prop, status=ListingStatus.PENDING_REVIEW, is_active=False)
         onboarding = OwnerOnboardingFactory(owner=owner, property=prop)
 
         payload = {

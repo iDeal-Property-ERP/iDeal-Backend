@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 from http import HTTPStatus
+from typing import Any
 
 from django.db import transaction
 from django.db.models import Case, Count, F, IntegerField, Max, Min, Q, Sum, Value, When
@@ -76,6 +77,24 @@ from core.utils.pagination import build_paginated_response
 
 def _d(value):
     return str(value.quantize(Decimal("0.01")))
+
+
+def _safe_int(val: Any, default: int | None = None) -> int | None:
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except ValueError, TypeError:
+        return default
+
+
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except ValueError, TypeError:
+        return default
 
 
 def _month_end(today: date) -> date:
@@ -446,7 +465,7 @@ class PnLSummaryView(ManagementView):
         today = date.today()
         params = self.request.GET
         year_raw = params.get("year") or ""
-        year = int(year_raw) if year_raw.isdigit() else today.year
+        year = _safe_int(year_raw, today.year) or today.year
         currency = (params.get("currency") or "USD").upper()
         if currency not in ("USD", "UZS"):
             currency = "USD"
@@ -455,7 +474,7 @@ class PnLSummaryView(ManagementView):
         def _convert(amount, from_currency, to_currency):
             if from_currency == to_currency:
                 return Decimal(str(amount))
-            if float(amount) == 0:
+            if _safe_float(amount) == 0:
                 return Decimal("0.00")
             try:
                 return convert_amount(amount, from_currency, to_currency)
@@ -704,7 +723,7 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
         from django.db.models import Prefetch
         from property.models import Property
 
-        from core.constants import LeaseStatus, PropertyStatus
+        from core.constants import LeaseStatus
 
         qs = (
             Property.objects.select_related("district", "owner")
@@ -724,8 +743,7 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
         engagement_type = self.request.GET.get("engagement_type")
         search = self.request.GET.get("search")
 
-        # Drafts live behind their own saved-view tab, not the default portfolio.
-        qs = qs.filter(status=status) if status else qs.exclude(status=PropertyStatus.DRAFT)
+        qs = qs.filter(status=status) if status else qs
         if district_id:
             qs = qs.filter(district_id=district_id)
         if tariff:
@@ -772,6 +790,8 @@ class OneOffDealListCreateView(ManagementView, ListAPIView):
     def post(self, parsed_body: Body[OneOffDealCreateInput]) -> dict:
         from property.models import OneOffDeal, Property
 
+        from core.constants import PropertyStatus
+
         data = parsed_body.model_dump()
         seller = data.pop("seller")
         try:
@@ -795,7 +815,7 @@ class OneOffDealListCreateView(ManagementView, ListAPIView):
                 ask_price=data["ask_price"],
                 ask_currency=data["ask_currency"],
                 engagement_type=PropertyEngagementType.ONE_OFF,
-                status="draft",
+                status=PropertyStatus.VACANT,
             )
             deal = OneOffDeal.objects.create(
                 property=prop,
@@ -803,6 +823,7 @@ class OneOffDealListCreateView(ManagementView, ListAPIView):
                 seller_phone=seller["phone"],
                 seller_email=seller.get("email"),
                 channel=data["channel"],
+                status=OneOffDealStatus.ACTIVE,
                 commission_type=data["commission_type"],
                 commission_fixed_amount=data["commission_fixed_amount"],
                 commission_percentage=data["commission_percentage"],
@@ -829,9 +850,13 @@ class OneOffDealDetailView(ManagementView, GenericController):
 
     def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[OneOffDealUpdateInput]) -> dict:
         deal = self.get_object(pk=parsed_path.pk)
-        if deal.status != OneOffDealStatus.DRAFT:
+        if deal.status in {
+            OneOffDealStatus.CLOSED_WON,
+            OneOffDealStatus.CLOSED_LOST,
+            OneOffDealStatus.ARCHIVED,
+        }:
             return self.fail(
-                error=str(_("Only draft one-off deals can be edited")),
+                error=str(_("Closed one-off deals cannot be edited")),
                 message=str(_("Invalid status transition")),
             )
         data = parsed_body.model_dump(exclude_unset=True)
@@ -1009,12 +1034,11 @@ class ManagementPropertyMapView(ManagementView):
         from django.db.models import Prefetch
         from property.models import Property
 
-        from core.constants import LeaseStatus, PropertyStatus
+        from core.constants import LeaseStatus
 
         params = self.request.GET
         qs = (
             Property.objects.select_related("district", "owner")
-            .exclude(status=PropertyStatus.DRAFT)
             .exclude(Q(map_lat__isnull=True) | Q(map_lon__isnull=True))
             .prefetch_related(
                 Prefetch(
@@ -1162,12 +1186,15 @@ class LeaseListView(ManagementView, ListAPIView):
                 | Q(tenant__last_name__icontains=search)
                 | Q(property__name__icontains=search)
             )
-            if search.isdigit():
-                cond |= Q(id=int(search))
+            parsed_id = _safe_int(search)
+            if parsed_id is not None:
+                cond |= Q(id=parsed_id)
             qs = qs.filter(cond)
-        if ends_within and ends_within.isdigit():
-            today = date.today()
-            qs = qs.filter(end_date__gte=today, end_date__lte=today + timedelta(days=int(ends_within)))
+        if ends_within:
+            days = _safe_int(ends_within)
+            if days is not None:
+                today = date.today()
+                qs = qs.filter(end_date__gte=today, end_date__lte=today + timedelta(days=days))
         return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
@@ -1199,9 +1226,11 @@ class OwnerAgreementListView(ManagementView, ListAPIView):
                 | Q(owner__last_name__icontains=search)
                 | Q(agreement_number__icontains=search)
             )
-        if ends_within and ends_within.isdigit():
-            today = date.today()
-            qs = qs.filter(end_date__gte=today, end_date__lte=today + timedelta(days=int(ends_within)))
+        if ends_within:
+            days = _safe_int(ends_within)
+            if days is not None:
+                today = date.today()
+                qs = qs.filter(end_date__gte=today, end_date__lte=today + timedelta(days=days))
         return qs
 
     def get(self, parsed_query: Query[ListQuery]) -> dict:
@@ -1263,8 +1292,9 @@ class PaymentListView(ManagementView, ListAPIView):
                 | Q(tenant__last_name__icontains=search)
                 | Q(lease__property__name__icontains=search)
             )
-            if search.isdigit():
-                cond |= Q(id=int(search)) | Q(lease_id=int(search))
+            parsed_id = _safe_int(search)
+            if parsed_id is not None:
+                cond |= Q(id=parsed_id) | Q(lease_id=parsed_id)
             qs = qs.filter(cond)
         if overdue in ("true", "1"):
             qs = qs.filter(overdue_q(date.today()))
@@ -1310,8 +1340,9 @@ class PayoutListView(ManagementView, ListAPIView):
                 | Q(owner__last_name__icontains=search)
                 | Q(owner_agreement__property__name__icontains=search)
             )
-            if search.isdigit():
-                cond |= Q(id=int(search))
+            parsed_id = _safe_int(search)
+            if parsed_id is not None:
+                cond |= Q(id=parsed_id)
             qs = qs.filter(cond)
         if scheduled_from:
             qs = qs.filter(scheduled_date__gte=scheduled_from)
@@ -1367,8 +1398,9 @@ class PaymentStatsView(ManagementView):
                 | Q(tenant__last_name__icontains=search)
                 | Q(lease__property__name__icontains=search)
             )
-            if search.isdigit():
-                cond |= Q(id=int(search)) | Q(lease_id=int(search))
+            parsed_id = _safe_int(search)
+            if parsed_id is not None:
+                cond |= Q(id=parsed_id) | Q(lease_id=parsed_id)
             base = base.filter(cond)
 
         overdue = overdue_q(today)
@@ -1495,8 +1527,9 @@ class ManagementServiceRequestListView(ManagementView, ListAPIView):
                 | Q(tenant__first_name__icontains=search)
                 | Q(tenant__last_name__icontains=search)
             )
-            if search.isdigit():
-                cond |= Q(id=int(search))
+            parsed_id = _safe_int(search)
+            if parsed_id is not None:
+                cond |= Q(id=parsed_id)
             qs = qs.filter(cond)
         if order == "priority":
             qs = qs.annotate(_prank=_service_priority_rank()).order_by("_prank", "-created_at")
@@ -1666,8 +1699,9 @@ class ManagementOnboardingListView(ManagementView, ListAPIView):
                 | Q(owner__last_name__icontains=search)
                 | Q(property__name__icontains=search)
             )
-            if search.isdigit():
-                cond |= Q(id=int(search))
+            parsed_id = _safe_int(search)
+            if parsed_id is not None:
+                cond |= Q(id=parsed_id)
             qs = qs.filter(cond)
         return qs
 
@@ -2063,8 +2097,9 @@ def _lead_viewing_qs(tab, search):
             | Q(email__icontains=search)
             | Q(listing__property__name__icontains=search)
         )
-        if search.isdigit():
-            cond |= Q(id=int(search))
+        parsed_id = _safe_int(search)
+        if parsed_id is not None:
+            cond |= Q(id=parsed_id)
         qs = qs.filter(cond)
     return qs
 
@@ -2083,8 +2118,9 @@ def _lead_booking_qs(tab, search):
             | Q(tenant__last_name__icontains=search)
             | Q(property__name__icontains=search)
         )
-        if search.isdigit():
-            cond |= Q(id=int(search))
+        parsed_id = _safe_int(search)
+        if parsed_id is not None:
+            cond |= Q(id=parsed_id)
         qs = qs.filter(cond)
     return qs
 
@@ -2264,8 +2300,9 @@ class ManagementVASOrderListView(_VASOrderView, ListAPIView):
                 | Q(tenant__last_name__icontains=search)
                 | Q(property__name__icontains=search)
             )
-            if search.isdigit():
-                cond |= Q(id=int(search))
+            parsed_id = _safe_int(search)
+            if parsed_id is not None:
+                cond |= Q(id=parsed_id)
             qs = qs.filter(cond)
         order = params.get("order")
         if order in _VAS_ORDER_ORDERINGS:

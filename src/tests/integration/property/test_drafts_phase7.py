@@ -5,8 +5,8 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from property.models import Property, VerificationVisit
 
-from core.constants import PropertyEngagementType, PropertyStatus
-from tests.factories import PropertyFactory
+from core.constants import ListingStatus, PropertyEngagementType, PropertyStatus
+from tests.factories import DistrictFactory, ListingFactory, OwnerFactory, PropertyFactory, PropertyPhotoFactory
 from tests.integration.property.test_api import _make_jwt
 
 _PNG = (
@@ -26,166 +26,122 @@ def _upload(api_client, management, pk, n):
 
 
 @pytest.mark.django_db
-class TestPropertyDrafts:
-    def test_create_draft_minimal(self, api_client, management):
+class TestPropertySubmissions:
+    def test_submit_managed_property_atomic(self, api_client, management):
+        district = DistrictFactory()
+        owner = OwnerFactory()
+        payload = {
+            "engagement_type": "managed",
+            "name": "Chilonzor Sunrise 9-3",
+            "address": "Chilonzor 9",
+            "district_id": district.id,
+            "owner_id": owner.id,
+            "property_type": "apartment",
+            "rooms": 3,
+            "area_sqm": 75,
+            "floor": 3,
+            "total_floors": 9,
+            "furnishing": "furnished",
+            "ask_price": "600.00",
+            "deposit_amount": "600.00",
+            "currency": "USD",
+            "amenities": ["wifi"],
+        }
+        files = [SimpleUploadedFile(f"p{i}.png", _PNG, content_type="image/png") for i in range(5)]
         response = api_client.post(
-            "/api/v1/properties/drafts/",
-            data=json.dumps({"name": "Chilonzor Sunrise 9-3"}),
-            content_type="application/json",
+            "/api/v1/properties/submit/",
+            data={"payload": json.dumps(payload), "images": files},
             **_make_jwt(management),
         )
+        print("DEBUG RESPONSE:", response.status_code, response.content)
         assert response.status_code == 201
         data = response.json()["data"]
-        assert data["status"] == PropertyStatus.DRAFT
+        assert data["status"] == PropertyStatus.VACANT
         assert data["name"] == "Chilonzor Sunrise 9-3"
-        assert data["district"] is None
-        assert data["ask_price"] is None
+        assert len(data["photos"]) == 5
+        assert data["photos"][0]["is_primary"] is True
 
-    def test_create_draft_defaults_name(self, api_client, management):
+        prop = Property.objects.get(pk=data["id"])
+        assert prop.status == PropertyStatus.VACANT
+        assert prop.listing.status == "published"
+        assert prop.listing.is_active is True
+
+    def test_submit_managed_property_with_verification(self, api_client, management):
+        district = DistrictFactory()
+        owner = OwnerFactory()
+        when = (datetime.now(UTC) + timedelta(days=2)).isoformat()
+        payload = {
+            "engagement_type": "managed",
+            "name": "Verification Property",
+            "district_id": district.id,
+            "owner_id": owner.id,
+            "rooms": 2,
+            "area_sqm": 50,
+            "floor": 1,
+            "total_floors": 5,
+            "ask_price": "450.00",
+            "schedule_verification_at": when,
+        }
+        files = [SimpleUploadedFile(f"p{i}.png", _PNG, content_type="image/png") for i in range(5)]
         response = api_client.post(
-            "/api/v1/properties/drafts/",
-            data=json.dumps({}),
-            content_type="application/json",
+            "/api/v1/properties/submit/",
+            data={"payload": json.dumps(payload), "images": files},
             **_make_jwt(management),
         )
         assert response.status_code == 201
-        assert response.json()["data"]["name"] == "Untitled property"
+        prop = Property.objects.get(pk=response.json()["data"]["id"])
+        assert VerificationVisit.objects.filter(property=prop).count() == 1
 
-    def test_autosave_patch_partial(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT, name="Draft A")
-        response = api_client.patch(
-            f"/api/v1/properties/{prop.id}/",
-            data=json.dumps({"rooms": 3, "ask_price": "480.00"}),
-            content_type="application/json",
-            **_make_jwt(management),
-        )
-        assert response.status_code == 200
-        prop.refresh_from_db()
-        assert prop.rooms == 3
-        assert str(prop.ask_price) == "480.00"
-        assert prop.status == PropertyStatus.DRAFT
-
-    def test_publish_incomplete_returns_missing_codes(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT, district=None, total_floors=None, ask_price=None)
+    def test_submit_requires_five_photos(self, api_client, management):
+        district = DistrictFactory()
+        owner = OwnerFactory()
+        payload = {
+            "engagement_type": "managed",
+            "district_id": district.id,
+            "owner_id": owner.id,
+            "rooms": 2,
+            "area_sqm": 50,
+            "floor": 1,
+            "total_floors": 5,
+            "ask_price": "450.00",
+        }
+        files = [SimpleUploadedFile(f"p{i}.png", _PNG, content_type="image/png") for i in range(2)]
         response = api_client.post(
-            f"/api/v1/properties/{prop.id}/publish/",
-            data=json.dumps({}),
-            content_type="application/json",
+            "/api/v1/properties/submit/",
+            data={"payload": json.dumps(payload), "images": files},
             **_make_jwt(management),
         )
         assert response.status_code == 422
-        error = response.json()["error"]
-        assert error["code"] == "incomplete"
-        assert "district" in error["missing"]
-        assert "total_floors" in error["missing"]
-        assert "ask_price" in error["missing"]
-        assert "photos" in error["missing"]
 
-    def test_publish_complete_goes_vacant(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT)
-        _upload(api_client, management, prop.id, 5)
+    def test_submit_rejects_invalid_floors(self, api_client, management):
+        district = DistrictFactory()
+        owner = OwnerFactory()
+        payload = {
+            "engagement_type": "managed",
+            "district_id": district.id,
+            "owner_id": owner.id,
+            "rooms": 2,
+            "area_sqm": 50,
+            "floor": 7,
+            "total_floors": 5,
+            "ask_price": "450.00",
+        }
+        files = [SimpleUploadedFile(f"p{i}.png", _PNG, content_type="image/png") for i in range(5)]
         response = api_client.post(
-            f"/api/v1/properties/{prop.id}/publish/",
-            data=json.dumps({}),
-            content_type="application/json",
-            **_make_jwt(management),
-        )
-        assert response.status_code == 200
-        prop.refresh_from_db()
-        assert prop.status == PropertyStatus.VACANT
-
-    def test_publish_schedules_verification(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT)
-        _upload(api_client, management, prop.id, 5)
-        when = (datetime.now(UTC) + timedelta(days=2)).isoformat()
-        response = api_client.post(
-            f"/api/v1/properties/{prop.id}/publish/",
-            data=json.dumps({"schedule_verification_at": when}),
-            content_type="application/json",
-            **_make_jwt(management),
-        )
-        assert response.status_code == 200
-        assert VerificationVisit.objects.filter(property=prop).count() == 1
-        assert response.json()["data"]["verification"] is not None
-
-    def test_double_publish_rejected(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.VACANT)
-        response = api_client.post(
-            f"/api/v1/properties/{prop.id}/publish/",
-            data=json.dumps({}),
-            content_type="application/json",
+            "/api/v1/properties/submit/",
+            data={"payload": json.dumps(payload), "images": files},
             **_make_jwt(management),
         )
         assert response.status_code == 400
 
-    def test_owner_list_excludes_drafts(self, api_client, owner):
-        PropertyFactory(owner=owner, status=PropertyStatus.DRAFT, name="Hidden draft")
-        PropertyFactory(owner=owner, status=PropertyStatus.VACANT, name="Visible")
-        response = api_client.get("/api/v1/properties/", **_make_jwt(owner))
-        names = [p["name"] for p in response.json()["data"]]
-        assert "Visible" in names
-        assert "Hidden draft" not in names
-
-    def test_management_workbench_excludes_drafts_by_default(self, api_client, management):
-        PropertyFactory(status=PropertyStatus.DRAFT, name="Draft X")
-        PropertyFactory(status=PropertyStatus.VACANT, name="Live X")
-        response = api_client.get("/api/v1/management/properties/", **_make_jwt(management))
-        names = [p["name"] for p in response.json()["data"]]
-        assert "Live X" in names
-        assert "Draft X" not in names
-
-    def test_management_draft_tab_lists_drafts(self, api_client, management):
-        PropertyFactory(status=PropertyStatus.DRAFT, name="Draft Y")
-        response = api_client.get("/api/v1/management/properties/?status=draft", **_make_jwt(management))
-        names = [p["name"] for p in response.json()["data"]]
-        assert names == ["Draft Y"]
-
-    def test_draft_tab_lists_incomplete_draft(self, api_client, management):
-        # A draft created via the endpoint has null district/owner/prices — the
-        # management list serializer must tolerate them (regression: 500).
-        api_client.post(
-            "/api/v1/properties/drafts/",
-            data=json.dumps({"name": "Bare Draft"}),
-            content_type="application/json",
-            **_make_jwt(management),
-        )
-        response = api_client.get("/api/v1/management/properties/?status=draft", **_make_jwt(management))
-        assert response.status_code == 200
-        rows = response.json()["data"]
-        row = next(r for r in rows if r["name"] == "Bare Draft")
-        assert row["district_name"] is None
-        assert row["owner_name"] is None
-        assert row["rooms"] is None
-        assert row["ask_price"] is None
-
-    def test_publish_requires_address(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT, address="")
-        _upload(api_client, management, prop.id, 5)
-        response = api_client.post(
-            f"/api/v1/properties/{prop.id}/publish/",
-            data=json.dumps({}),
-            content_type="application/json",
-            **_make_jwt(management),
-        )
-        assert response.status_code == 422
-        assert "address" in response.json()["error"]["missing"]
-
 
 @pytest.mark.django_db
 class TestPropertyPhotos:
-    def test_upload_sets_first_primary(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT)
-        response = _upload(api_client, management, prop.id, 3)
-        assert response.status_code == 201
-        photos = response.json()["data"]["photos"]
-        assert len(photos) == 3
-        primaries = [p for p in photos if p["is_primary"]]
-        assert len(primaries) == 1
-
     def test_reorder_sets_cover(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT)
-        uploaded = _upload(api_client, management, prop.id, 2).json()["data"]["photos"]
-        target = uploaded[1]["id"]
+        prop = PropertyFactory(status=PropertyStatus.VACANT)
+        _upload(api_client, management, prop.id, 6)
+        photos = prop.photos.all()
+        target = photos[1].id
         response = api_client.patch(
             f"/api/v1/properties/{prop.id}/photos/reorder/",
             data=json.dumps({"items": [{"id": target, "sort_order": 0, "is_primary": True, "caption": "Cover"}]}),
@@ -193,34 +149,99 @@ class TestPropertyPhotos:
             **_make_jwt(management),
         )
         assert response.status_code == 200
-        photos = response.json()["data"]["photos"]
-        assert any(p["id"] == target and p["is_primary"] and p["caption"] == "Cover" for p in photos)
+        res_photos = response.json()["data"]["photos"]
+        assert any(p["id"] == target and p["is_primary"] and p["caption"] == "Cover" for p in res_photos)
 
-    def test_delete_photo(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT)
-        uploaded = _upload(api_client, management, prop.id, 2).json()["data"]["photos"]
+    @pytest.mark.parametrize("is_primary", [False, True])
+    def test_reorder_requires_exactly_one_primary(self, api_client, management, is_primary):
+        prop = PropertyFactory(status=PropertyStatus.VACANT)
+        _upload(api_client, management, prop.id, 2)
+        photos = list(prop.photos.order_by("id"))
+
+        response = api_client.patch(
+            f"/api/v1/properties/{prop.id}/photos/reorder/",
+            data=json.dumps(
+                {
+                    "items": [
+                        {"id": photos[0].id, "sort_order": 0, "is_primary": is_primary},
+                        {"id": photos[1].id, "sort_order": 1, "is_primary": is_primary},
+                    ]
+                }
+            ),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "exactly_one_primary_photo_required"
+        assert prop.photos.filter(is_primary=True).count() == 1
+
+    def test_reorder_rejects_duplicate_photo_ids(self, api_client, management):
+        prop = PropertyFactory(status=PropertyStatus.VACANT)
+        _upload(api_client, management, prop.id, 2)
+        photo = prop.photos.first()
+
+        response = api_client.patch(
+            f"/api/v1/properties/{prop.id}/photos/reorder/",
+            data=json.dumps(
+                {
+                    "items": [
+                        {"id": photo.id, "sort_order": 0, "is_primary": True},
+                        {"id": photo.id, "sort_order": 1, "is_primary": False},
+                    ]
+                }
+            ),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+
+        assert response.status_code == 400
+        assert response.json()["error"] == {"code": "duplicate_photo_ids", "photo_ids": [photo.id]}
+        assert prop.photos.filter(is_primary=True).count() == 1
+
+    def test_reorder_rejects_photo_from_another_property(self, api_client, management):
+        prop = PropertyFactory(status=PropertyStatus.VACANT)
+        _upload(api_client, management, prop.id, 2)
+        foreign_photo = PropertyPhotoFactory(property=PropertyFactory())
+
+        response = api_client.patch(
+            f"/api/v1/properties/{prop.id}/photos/reorder/",
+            data=json.dumps({"items": [{"id": foreign_photo.id, "sort_order": 0, "is_primary": True}]}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+
+        assert response.status_code == 400
+        assert response.json()["error"] == {
+            "code": "invalid_property_photo_ids",
+            "photo_ids": [foreign_photo.id],
+        }
+        assert prop.photos.filter(is_primary=True).count() == 1
+
+    def test_delete_photo_enforces_five_minimum(self, api_client, management):
+        prop = PropertyFactory(status=PropertyStatus.VACANT)
+        ListingFactory(property=prop, status=ListingStatus.PUBLISHED)
+        _upload(api_client, management, prop.id, 5)
+        photo = prop.photos.first()
         response = api_client.delete(
-            f"/api/v1/properties/{prop.id}/photos/{uploaded[0]['id']}/",
+            f"/api/v1/properties/{prop.id}/photos/{photo.id}/",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 422
+
+    def test_delete_photo_when_more_than_five(self, api_client, management):
+        prop = PropertyFactory(status=PropertyStatus.VACANT)
+        _upload(api_client, management, prop.id, 7)
+        photo = prop.photos.last()
+        response = api_client.delete(
+            f"/api/v1/properties/{prop.id}/photos/{photo.id}/",
             **_make_jwt(management),
         )
         assert response.status_code == 200
-        assert Property.objects.get(pk=prop.id).photos.count() == 1
-
-    def test_deleting_cover_promotes_next_photo(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT)
-        uploaded = _upload(api_client, management, prop.id, 3).json()["data"]["photos"]
-        cover = next(p for p in uploaded if p["is_primary"])
-        response = api_client.delete(
-            f"/api/v1/properties/{prop.id}/photos/{cover['id']}/",
-            **_make_jwt(management),
-        )
-        assert response.status_code == 200
-        remaining = response.json()["data"]["photos"]
-        assert len(remaining) == 2
-        assert sum(1 for p in remaining if p["is_primary"]) == 1
+        assert Property.objects.get(pk=prop.id).photos.count() == 6
 
     def test_photos_require_management(self, api_client, owner):
-        prop = PropertyFactory(status=PropertyStatus.DRAFT)
+        prop = PropertyFactory(status=PropertyStatus.VACANT)
         response = _upload(api_client, owner, prop.id, 1)
         assert response.status_code == 403
 

@@ -26,7 +26,7 @@ dependencies = [
     "requests>=2.32.5",
     "sentry-sdk>=2.34.1",
     "sqlparse>=0.5.3",
-    "uvicorn>=0.37.0",
+    "uvicorn[websockets]>=0.37.0",
     "channels>=4.3.2",
     "channels-redis>=4.3.0",
     "django-q2>=1.7.5",
@@ -36,6 +36,7 @@ dependencies = [
     "stripe>=13.0.0",
     "django-storages[boto3]>=1.14.4",
     "boto3>=1.35.0",
+    "websockets>=17.0.1",
 ]
 
 [dependency-groups]

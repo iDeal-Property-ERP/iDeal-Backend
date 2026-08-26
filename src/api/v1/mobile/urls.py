@@ -1,4 +1,3 @@
-# pyright: reportMissingImports=false
 from django.urls import include, path
 
 app_name = "mobile"

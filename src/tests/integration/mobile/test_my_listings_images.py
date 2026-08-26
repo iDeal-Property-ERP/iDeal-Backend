@@ -19,7 +19,15 @@ def test_my_listings_returns_all_cover_image_tiers(api_client):
         preview_image="properties/photos/preview.webp",
         display_image="properties/photos/display.webp",
         is_primary=True,
+        sort_order=0,
     )
+    for i in range(1, 5):
+        PropertyPhotoFactory(
+            property=property_obj,
+            image=f"properties/photos/p{i}.jpg",
+            is_primary=False,
+            sort_order=i,
+        )
 
     response = api_client.get(MY_LISTINGS_URL, **_make_jwt(owner))
 

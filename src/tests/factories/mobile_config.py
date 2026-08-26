@@ -1,4 +1,3 @@
-# pyright: reportIncompatibleVariableOverride=false
 import factory
 from mobile_config.models import MobileCriticalUpdateRange, MobileUpdatePolicy
 

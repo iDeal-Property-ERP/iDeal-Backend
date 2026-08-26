@@ -1,19 +1,15 @@
-# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
 import json
-from decimal import Decimal
 from http import HTTPStatus
 from typing import cast
 
 import pydantic
 from account.models import User
-from contract.models import OwnerOnboarding, PublicOffer
-from django.db import transaction
-from django.utils import timezone
+from contract.models import PublicOffer
 from django.utils.translation import gettext_lazy as _
-from marketplace.models import Listing
-from property.models import Amenity, District, Property, PropertyPhoto
+from property.models import Amenity, District
+from property.services.submission import PropertySubmissionError, PropertySubmissionService
 
 from api.v1.mobile.home.views import get_optional_authenticated_user
 from api.v1.mobile.property_upload.schemas import (
@@ -31,14 +27,10 @@ from core.api.views import BaseController
 from core.constants import (
     Currency,
     FurnishingType,
-    ListingStatus,
     MinimumStay,
     PriceIncluded,
-    PropertyStatus,
     PropertyType,
-    UserRole,
 )
-from core.utils.uploads import UploadError, save_uploaded_images
 
 MIN_PHOTOS = 5
 
@@ -128,90 +120,22 @@ class MobilePropertyUploadSubmitView(BaseController):
             return self.fail(error=str(_("District not found")), status_code=HTTPStatus.NOT_FOUND)
 
         user = cast(User, self.request.user)  # type: ignore[attr-defined]
-        if validated.contact:
-            contact = validated.contact
-            if contact.first_name:
-                user.first_name = contact.first_name
-            if contact.last_name:
-                user.last_name = contact.last_name
-            if contact.email:
-                user.email = contact.email
-            if contact.phone:
-                user.phone = contact.phone
-
-        if user.role != UserRole.OWNER and not user.is_staff and not user.is_superuser:
-            user.role = UserRole.OWNER
-        user.save()
-
-        prop_name = (
-            validated.name.strip()
-            if validated.name and validated.name.strip()
-            else f"{validated.rooms}-room {validated.property_type.replace('_', ' ').title()} in {district.name}"
-        )
 
         try:
-            with transaction.atomic():  # type: ignore[attr-defined]
-                prop = Property.objects.create(
-                    name=prop_name,
-                    address=district.name,
-                    district=district,
-                    property_type=validated.property_type,
-                    rooms=validated.rooms,
-                    area_sqm=validated.area_sqm,
-                    floor=validated.floor,
-                    total_floors=validated.total_floors,
-                    furnishing=validated.furnishing,
-                    owner=user,
-                    status=PropertyStatus.PENDING_REVIEW,
-                    description=validated.description,
-                    ask_price=validated.monthly_price,
-                    ask_currency=validated.currency,
-                    owner_guaranteed_price=validated.monthly_price,
-                    owner_guaranteed_currency=validated.currency,
-                    tenant_charge_price=validated.monthly_price,
-                    tenant_charge_currency=validated.currency,
-                    deposit_amount=validated.deposit_amount or Decimal("0"),
-                )
-
-                if validated.amenities:
-                    prop.amenities.set(Amenity.objects.filter(slug__in=validated.amenities, is_active=True))
-
-                listing = Listing.objects.create(
-                    property=prop,
-                    status=ListingStatus.PENDING_REVIEW,
-                    is_active=False,
-                    description=validated.description,
-                    monthly_price=validated.monthly_price,
-                    listed_price=validated.monthly_price,
-                    deposit_amount=validated.deposit_amount,
-                    currency=validated.currency,
-                    minimum_stay=validated.minimum_stay,
-                    price_includes=validated.price_includes,
-                    submitted_at=timezone.now(),
-                )
-
-                active_offer = PublicOffer.get_active()
-                onboarding = OwnerOnboarding(owner=user, property=prop)
-                if active_offer:
-                    onboarding.accept_offer(active_offer)
-                onboarding.save()
-
-                try:
-                    created_photos = save_uploaded_images(PropertyPhoto, "property", prop, files)
-                    for idx, photo in enumerate(created_photos):
-                        photo.sort_order = idx
-                        photo.is_primary = idx == 0
-                        photo.save(update_fields=["sort_order", "is_primary", "updated_at"])
-                except UploadError as err:
-                    raise ValueError(str(err)) from err
-
+            listing = PropertySubmissionService.submit_owner_listing(
+                user=user,
+                data=validated.model_dump(mode="json"),
+                files=files,
+            )
+        except PropertySubmissionError as err:
+            return self.fail(error=str(err), status_code=HTTPStatus.UNPROCESSABLE_ENTITY)
         except Exception as err:
             return self.fail(error=str(err), message=str(_("Failed to process property upload")))
 
         return self.ok(
             MobilePropertyUploadOutput(
                 id=listing.id,
-                property_id=prop.id,
+                property_id=listing.property_id,
                 status=listing.status,
                 message=str(_("Listing submitted for review")),
             ).model_dump(mode="json"),

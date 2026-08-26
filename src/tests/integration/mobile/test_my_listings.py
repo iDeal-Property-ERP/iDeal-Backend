@@ -49,7 +49,6 @@ class TestMobileMyListingsStats:
             "pending_count": 0,
             "rented_count": 0,
             "rejected_count": 0,
-            "draft_count": 0,
             "archived_count": 0,
         }
 
@@ -70,7 +69,9 @@ class TestMobileMyListingsStats:
         ListingFactory(property=p_rented, status=ListingStatus.PUBLISHED, is_active=False)
 
         # 4. Rejected listing
-        p_rejected = PropertyFactory(owner=owner, district=district, status=PropertyStatus.DRAFT, ask_price=450)
+        p_rejected = PropertyFactory(
+            owner=owner, district=district, status=PropertyStatus.PENDING_REVIEW, ask_price=450
+        )
         ListingFactory(
             property=p_rejected,
             status=ListingStatus.REJECTED,
