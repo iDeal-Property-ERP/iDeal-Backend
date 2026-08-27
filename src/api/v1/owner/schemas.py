@@ -80,6 +80,7 @@ class OwnerOnboardingCreateInput(pydantic.BaseModel):
     description: str | None = None
     ask_price: Decimal
     ask_currency: str = "USD"
+    content_locale: Literal["en", "uz", "ru"] | None = None
     accept_offer: Literal[True]
 
     @pydantic.model_validator(mode="after")
@@ -114,6 +115,7 @@ class OwnerListingSubmitPayload(pydantic.BaseModel):
     price_includes: list[str] = pydantic.Field(default_factory=list)
     amenities: list[str] = pydantic.Field(default_factory=list)
     captions: list[str] = pydantic.Field(default_factory=list)
+    content_locale: Literal["en", "uz", "ru"] | None = None
     contact: OwnerContactInput | None = None
     accept_offer: Literal[True]
 

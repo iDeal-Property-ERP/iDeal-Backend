@@ -8,10 +8,6 @@ http:
   auth:
     type: bearer
     token: '{{access_token}}'
-  body:
-    type: json
-    data: "{\n  \"property_id\": 1,\n  \"lease_id\": 1,\n  \"act_type\": \"general\"\
-      ,\n  \"notes\": \"fixture-value\"\n}"
 settings:
   encodeUrl: true
   timeout: 0
@@ -29,23 +25,6 @@ docs: '# POST /api/v1/inventory/acts/
   No path or query parameters.
 
 
-  | Body field | Required | Nullable | Notes |
-
-  |---|---:|---:|---|
-
-  | `property_id` | yes | no | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `lease_id` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `act_type` | no | no | default=''general''; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `notes` | no | yes | fixture value; replace fixture values with domain-valid data
-  before runtime execution. |
-
-
   ## Saved examples
 
 
@@ -61,10 +40,6 @@ examples:
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
-    body:
-      type: json
-      data: "{\n  \"property_id\": 1,\n  \"lease_id\": 1,\n  \"act_type\": \"general\"\
-        ,\n  \"notes\": \"fixture-value\"\n}"
   response:
     status: 201
     statusText: OK
@@ -83,10 +58,6 @@ examples:
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
-    body:
-      type: json
-      data: "{\n  \"property_id\": 1,\n  \"lease_id\": 1,\n  \"act_type\": \"general\"\
-        ,\n  \"notes\": \"fixture-value\"\n}"
   response:
     status: 400
     statusText: Error
@@ -106,10 +77,6 @@ examples:
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
-    body:
-      type: json
-      data: "{\n  \"property_id\": 1,\n  \"lease_id\": 1,\n  \"act_type\": \"general\"\
-        ,\n  \"notes\": \"fixture-value\"\n}"
   response:
     status: 401
     statusText: Error
@@ -129,10 +96,6 @@ examples:
       value: application/json
     - name: authorization
       value: Bearer {{access_token}}
-    body:
-      type: json
-      data: "{\n  \"property_id\": 1,\n  \"lease_id\": 1,\n  \"act_type\": \"general\"\
-        ,\n  \"notes\": \"fixture-value\"\n}"
   response:
     status: 409
     statusText: Error

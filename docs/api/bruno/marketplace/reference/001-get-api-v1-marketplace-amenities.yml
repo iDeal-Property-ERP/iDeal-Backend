@@ -1,5 +1,5 @@
 info:
-  name: List amenities
+  name: List amenities marketplace reference
   type: http
   seq: 1
 http:

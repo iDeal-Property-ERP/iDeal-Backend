@@ -58,8 +58,11 @@ class TestTransitFinanceSignal:
         mgmt = UserFactory()
         agreement = OwnerAgreementFactory(start_date=date(2026, 6, 1), end_date=date(2026, 6, 30))
         payment = PaymentFactory(
-            lease__owner_agreement=agreement, status=PaymentStatus.PENDING,
-            due_date=date(2026, 6, 1), payment_date=date(2026, 6, 10), rental_period=date(2026, 6, 1),
+            lease__owner_agreement=agreement,
+            status=PaymentStatus.PENDING,
+            due_date=date(2026, 6, 1),
+            payment_date=date(2026, 6, 10),
+            rental_period=date(2026, 6, 1),
         )
 
         response = api_client.post(f"/api/v1/finance/payments/{payment.id}/mark-paid/", **_make_jwt(mgmt))
@@ -73,8 +76,11 @@ class TestTransitFinanceSignal:
     def test_paid_payment_does_not_double_accrue_on_resave(self, api_client):
         agreement = OwnerAgreementFactory(start_date=date(2026, 6, 1), end_date=date(2026, 6, 30))
         payment = PaymentFactory(
-            lease__owner_agreement=agreement, status=PaymentStatus.PAID,
-            due_date=date(2026, 6, 1), payment_date=date(2026, 6, 10), rental_period=date(2026, 6, 1),
+            lease__owner_agreement=agreement,
+            status=PaymentStatus.PAID,
+            due_date=date(2026, 6, 1),
+            payment_date=date(2026, 6, 10),
+            rental_period=date(2026, 6, 1),
         )
         # Re-save the already-paid payment; signal must not create a second payout.
         payment.save()
@@ -179,7 +185,12 @@ class TestPaymentBulkAndRemind:
     def test_bulk_mark_paid_allocates_settlements(self, api_client):
         mgmt = UserFactory()
         agreement = OwnerAgreementFactory(start_date=date(2026, 6, 1), end_date=date(2026, 6, 30))
-        defaults = {"lease__owner_agreement": agreement, "due_date": date(2026, 6, 1), "payment_date": date(2026, 6, 10), "rental_period": date(2026, 6, 1)}
+        defaults = {
+            "lease__owner_agreement": agreement,
+            "due_date": date(2026, 6, 1),
+            "payment_date": date(2026, 6, 10),
+            "rental_period": date(2026, 6, 1),
+        }
         p1 = PaymentFactory(status=PaymentStatus.PENDING, **defaults)
         p2 = PaymentFactory(status=PaymentStatus.OVERDUE, **defaults)
         paid = PaymentFactory(status=PaymentStatus.PAID, **defaults)

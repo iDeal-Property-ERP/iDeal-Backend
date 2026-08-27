@@ -1,12 +1,32 @@
-from __future__ import annotations
-
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 import pydantic
 from django.utils.translation import gettext_lazy as _
 from property.services.validation import validate_floor_bounds
 from pydantic import field_validator
+
+
+class PropertyTranslationItem(pydantic.BaseModel):
+    name: str | None = None
+    description: str | None = None
+
+
+class PropertyTranslationMap(pydantic.BaseModel):
+    en: PropertyTranslationItem | None = None
+    uz: PropertyTranslationItem | None = None
+    ru: PropertyTranslationItem | None = None
+
+
+class PropertyPhotoTranslationItem(pydantic.BaseModel):
+    caption: str | None = None
+
+
+class PropertyPhotoTranslationMap(pydantic.BaseModel):
+    en: PropertyPhotoTranslationItem | None = None
+    uz: PropertyPhotoTranslationItem | None = None
+    ru: PropertyPhotoTranslationItem | None = None
 
 
 class DistrictOutput(pydantic.BaseModel):
@@ -31,6 +51,7 @@ class PropertyPhotoOutput(pydantic.BaseModel):
     caption: str | None = None
     is_primary: bool
     sort_order: int
+    translations: PropertyPhotoTranslationMap | None = None
 
     model_config = pydantic.ConfigDict(from_attributes=True)
 
@@ -89,6 +110,7 @@ class PropertyOutput(pydantic.BaseModel):
     tenant_charge_currency: str
     vacant_since: date | None
     vacant_days: int
+    translations: PropertyTranslationMap | None = pydantic.Field(default=None, validation_alias="_translations")
     # Injected by the view (reverse managers can't be validated from attributes);
     # aliased so `model_validate(property)` doesn't try to read the manager.
     photos: list[PropertyPhotoOutput] = pydantic.Field(default=[], validation_alias="_photos")
@@ -125,6 +147,7 @@ class PropertyCreateInput(pydantic.BaseModel):
     tenant_charge_currency: str = "USD"
     vacant_since: date | None = None
     vacant_days: int = pydantic.Field(default=0, ge=0)
+    translations: PropertyTranslationMap | None = None
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):
@@ -175,6 +198,7 @@ class PropertyUpdateInput(pydantic.BaseModel):
     tenant_charge_currency: str | None = None
     vacant_since: date | None = None
     vacant_days: int | None = pydantic.Field(default=None, ge=0)
+    translations: PropertyTranslationMap | None = None
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):
@@ -243,6 +267,8 @@ class PropertySubmissionInput(pydantic.BaseModel):
     captions: list[str] = pydantic.Field(default_factory=list)
     minimum_stay: int = 6
     price_includes: list[str] = pydantic.Field(default_factory=list)
+    content_locale: Literal["en", "uz", "ru"] | None = None
+    translations: PropertyTranslationMap | None = None
     schedule_verification_at: str | None = None
     brokerage: OneOffDealInput | None = None
 
@@ -263,6 +289,7 @@ class PropertyPhotoReorderItem(pydantic.BaseModel):
     sort_order: int = 0
     is_primary: bool = False
     caption: str | None = None
+    translations: PropertyPhotoTranslationMap | None = None
 
 
 class PropertyPhotoReorderInput(pydantic.BaseModel):

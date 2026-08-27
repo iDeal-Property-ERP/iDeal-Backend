@@ -20,6 +20,7 @@ AMENITIES = [
     {"slug": "gym", "name": "Gym", "icon": "dumbbell", "sort_order": 120},
 ]
 
+
 class Command(BaseCommand):
     help = "Prefills the database with common property amenities."
 
@@ -42,4 +43,6 @@ class Command(BaseCommand):
             else:
                 updated_count += 1
 
-        self.stdout.write(self.style.SUCCESS(f"Successfully created {created_count} amenities and updated {updated_count} amenities."))
+        self.stdout.write(
+            self.style.SUCCESS(f"Successfully created {created_count} amenities and updated {updated_count} amenities.")
+        )

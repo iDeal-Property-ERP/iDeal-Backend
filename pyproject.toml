@@ -37,6 +37,7 @@ dependencies = [
     "django-storages[boto3]>=1.14.4",
     "boto3>=1.35.0",
     "websockets>=17.0.1",
+    "django-modeltranslation>=0.20.3",
 ]
 
 [dependency-groups]

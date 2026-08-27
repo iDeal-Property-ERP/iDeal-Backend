@@ -8,7 +8,6 @@ import core.constants
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contract", "0006_remove_owneragreement_owner_guaranteed_amount_and_more"),
         ("finance", "0003_payoutschedule_method_payoutschedule_status_reason"),

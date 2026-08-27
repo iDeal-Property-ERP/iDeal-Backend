@@ -154,7 +154,7 @@ class TestPropertyPhotos:
 
     @pytest.mark.parametrize("is_primary", [False, True])
     def test_reorder_requires_exactly_one_primary(self, api_client, management, is_primary):
-        prop = PropertyFactory(status=PropertyStatus.VACANT)
+        prop = PropertyFactory(status=PropertyStatus.PENDING_REVIEW)
         _upload(api_client, management, prop.id, 2)
         photos = list(prop.photos.order_by("id"))
 
@@ -177,7 +177,7 @@ class TestPropertyPhotos:
         assert prop.photos.filter(is_primary=True).count() == 1
 
     def test_reorder_rejects_duplicate_photo_ids(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.VACANT)
+        prop = PropertyFactory(status=PropertyStatus.PENDING_REVIEW)
         _upload(api_client, management, prop.id, 2)
         photo = prop.photos.first()
 
@@ -200,9 +200,9 @@ class TestPropertyPhotos:
         assert prop.photos.filter(is_primary=True).count() == 1
 
     def test_reorder_rejects_photo_from_another_property(self, api_client, management):
-        prop = PropertyFactory(status=PropertyStatus.VACANT)
+        prop = PropertyFactory(status=PropertyStatus.PENDING_REVIEW)
         _upload(api_client, management, prop.id, 2)
-        foreign_photo = PropertyPhotoFactory(property=PropertyFactory())
+        foreign_photo = PropertyPhotoFactory(property=PropertyFactory(status=PropertyStatus.PENDING_REVIEW))
 
         response = api_client.patch(
             f"/api/v1/properties/{prop.id}/photos/reorder/",

@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("marketplace", "0007_alter_booking_status_bookingquote_paymentcheckout_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

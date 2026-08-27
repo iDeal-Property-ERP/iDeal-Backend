@@ -14,7 +14,13 @@ class NotificationFactory(factory.django.DjangoModelFactory):
     type = NotificationType.GENERAL
     audience = NotificationAudience.BOTH
     title = factory.Faker("sentence", nb_words=4)
+    title_en = factory.LazyAttribute(lambda o: o.title)
+    title_uz = factory.LazyAttribute(lambda o: o.title)
+    title_ru = factory.LazyAttribute(lambda o: o.title)
     body = factory.Faker("text", max_nb_chars=200)
+    body_en = factory.LazyAttribute(lambda o: o.body)
+    body_uz = factory.LazyAttribute(lambda o: o.body)
+    body_ru = factory.LazyAttribute(lambda o: o.body)
     is_read = False
 
 

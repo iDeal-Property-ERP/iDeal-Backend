@@ -20,17 +20,31 @@ def notify(
     related_object_type=None,
     related_object_id=None,
     audience: str = NotificationAudience.BOTH,
+    translations: dict | None = None,
 ):
     """Create an in-app notification for ``recipient`` and dispatch mobile push when applicable."""
-    notification = Notification.objects.create(
+    title_str = str(title)
+    body_str = str(body) if body is not None else None
+    notification = Notification(
         recipient=recipient,
         type=type,
         audience=audience,
-        title=title,
-        body=body,
+        title=title_str,
+        title_en=title_str,
+        title_uz=title_str,
+        title_ru=title_str,
+        body=body_str,
+        body_en=body_str,
+        body_uz=body_str,
+        body_ru=body_str,
         related_object_type=related_object_type,
         related_object_id=related_object_id,
     )
+    if translations:
+        from core.services.localization import LocalizedContentService
+
+        LocalizedContentService().apply_translations(notification, translations, ["title", "body"])
+    notification.save()
 
     if audience in (NotificationAudience.MOBILE, NotificationAudience.BOTH) and _should_enqueue_mobile_push(
         notification

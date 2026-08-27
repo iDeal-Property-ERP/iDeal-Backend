@@ -57,6 +57,9 @@ class PublicOfferFactory(factory.django.DjangoModelFactory):
 
     version = factory.Sequence(lambda n: f"v{n}")
     body = factory.Faker("text", max_nb_chars=500)
+    body_en = factory.LazyAttribute(lambda o: o.body)
+    body_uz = factory.LazyAttribute(lambda o: o.body)
+    body_ru = factory.LazyAttribute(lambda o: o.body)
     is_active = True
 
 

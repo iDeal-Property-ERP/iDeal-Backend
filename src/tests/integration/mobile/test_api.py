@@ -482,9 +482,7 @@ class TestPhoneChangeAPI:
 
         assert response.status_code == 200
         assert response.json()["data"] == {"channel": "telegram", "expires_in": 300, "resend_after": 60}
-        assert account_views.otp_service.get_otp(
-            "+998901234567", purpose=f"phone-change:{user.pk}"
-        ) == "999999"
+        assert account_views.otp_service.get_otp("+998901234567", purpose=f"phone-change:{user.pk}") == "999999"
         assert account_views.otp_service.get_otp("+998901234567") is None
 
     def test_request_rejects_invalid_current_and_occupied_numbers_before_dispatch(

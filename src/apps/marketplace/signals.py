@@ -23,6 +23,9 @@ def _create_published_listing(instance):
         status=ListingStatus.PUBLISHED,
         is_active=True,
         description=instance.description,
+        description_en=getattr(instance, "description_en", instance.description),
+        description_uz=getattr(instance, "description_uz", instance.description),
+        description_ru=getattr(instance, "description_ru", instance.description),
         listed_price=instance.ask_price,
         monthly_price=instance.ask_price,
         published_at=timezone.now(),
@@ -61,6 +64,12 @@ def manage_listing_on_property_change(sender, instance, created, update_fields, 
             if listing.description != instance.description:
                 listing.description = instance.description
                 sync_fields.append("description")
+            for lang in ("en", "uz", "ru"):
+                prop_val = getattr(instance, f"description_{lang}", None)
+                list_val = getattr(listing, f"description_{lang}", None)
+                if list_val != prop_val:
+                    setattr(listing, f"description_{lang}", prop_val)
+                    sync_fields.append(f"description_{lang}")
             if listing.monthly_price != instance.ask_price:
                 listing.monthly_price = instance.ask_price
                 listing.listed_price = instance.ask_price

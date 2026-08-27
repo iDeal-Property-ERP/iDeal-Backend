@@ -8,7 +8,6 @@ import core.constants
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("property", "0007_alter_property_address_alter_property_area_sqm_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

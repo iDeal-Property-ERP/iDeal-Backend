@@ -12,17 +12,6 @@ http:
   - name: pk
     value: '{{pk}}'
     type: path
-  body:
-    type: json
-    data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-      \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\": 1,\n\
-      \  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-      ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-      : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n  \"\
-      ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-      : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-      : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-      : 1\n}"
 settings:
   encodeUrl: true
   timeout: 0
@@ -45,77 +34,6 @@ docs: '# PATCH /api/v1/properties/<int:pk>/
   when running. |
 
 
-  | Body field | Required | Nullable | Notes |
-
-  |---|---:|---:|---|
-
-  | `name` | no | yes | fixture value; replace fixture values with domain-valid data
-  before runtime execution. |
-
-  | `address` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `district_id` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `rooms` | no | yes | fixture value; replace fixture values with domain-valid data
-  before runtime execution. |
-
-  | `area_sqm` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `floor` | no | yes | fixture value; replace fixture values with domain-valid data
-  before runtime execution. |
-
-  | `total_floors` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `owner_id` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `status` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `score` | no | yes | fixture value; replace fixture values with domain-valid data
-  before runtime execution. |
-
-  | `map_lat` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `map_lon` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `description` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `tariff` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `ask_price` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `ask_currency` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `owner_guaranteed_price` | no | yes | fixture value; replace fixture values with
-  domain-valid data before runtime execution. |
-
-  | `owner_guaranteed_currency` | no | yes | fixture value; replace fixture values
-  with domain-valid data before runtime execution. |
-
-  | `tenant_charge_price` | no | yes | fixture value; replace fixture values with
-  domain-valid data before runtime execution. |
-
-  | `tenant_charge_currency` | no | yes | fixture value; replace fixture values with
-  domain-valid data before runtime execution. |
-
-  | `vacant_since` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `vacant_days` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-
   ## Saved examples
 
 
@@ -132,17 +50,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1\n}"
   response:
     status: 200
     statusText: OK
@@ -162,17 +69,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1\n}"
   response:
     status: 400
     statusText: Error
@@ -193,17 +89,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1\n}"
   response:
     status: 401
     statusText: Error
@@ -224,17 +109,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1\n}"
   response:
     status: 404
     statusText: Error
@@ -255,17 +129,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1\n}"
   response:
     status: 409
     statusText: Error

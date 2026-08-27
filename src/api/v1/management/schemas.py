@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 import pydantic
 from property.services.validation import validate_floor_bounds
@@ -1159,3 +1160,133 @@ class ManagementLeadOutput(pydantic.BaseModel):
                 "updated_at": b.updated_at,
             }
         )
+
+
+# =============================================================================
+# Localized Content Management Schemas
+# =============================================================================
+
+
+class DistrictTranslationItem(pydantic.BaseModel):
+    name: str
+    city: str
+
+
+class DistrictTranslationMap(pydantic.BaseModel):
+    en: DistrictTranslationItem
+    uz: DistrictTranslationItem
+    ru: DistrictTranslationItem
+
+
+class ManagementDistrictOutput(pydantic.BaseModel):
+    id: int
+    name: str
+    city: str
+    translations: DistrictTranslationMap
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ManagementDistrictInput(pydantic.BaseModel):
+    translations: DistrictTranslationMap
+
+
+class AmenityTranslationItem(pydantic.BaseModel):
+    name: str
+
+
+class AmenityTranslationMap(pydantic.BaseModel):
+    en: AmenityTranslationItem
+    uz: AmenityTranslationItem
+    ru: AmenityTranslationItem
+
+
+class ManagementAmenityOutput(pydantic.BaseModel):
+    id: int
+    slug: str
+    name: str
+    icon: str
+    sort_order: int
+    is_active: bool
+    translations: AmenityTranslationMap
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ManagementAmenityInput(pydantic.BaseModel):
+    slug: str | None = None
+    icon: str = ""
+    sort_order: int = 0
+    is_active: bool = True
+    translations: AmenityTranslationMap
+
+
+class FaqTranslationItem(pydantic.BaseModel):
+    question: str
+    answer: str
+
+
+class FaqTranslationMap(pydantic.BaseModel):
+    en: FaqTranslationItem
+    uz: FaqTranslationItem
+    ru: FaqTranslationItem
+
+
+class ManagementFaqOutput(pydantic.BaseModel):
+    id: int
+    question: str
+    answer: str
+    sort_order: int
+    is_active: bool
+    translations: FaqTranslationMap
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ManagementFaqInput(pydantic.BaseModel):
+    sort_order: int = 0
+    is_active: bool = True
+    translations: FaqTranslationMap
+
+
+class PublicOfferTranslationItem(pydantic.BaseModel):
+    body: str
+
+
+class PublicOfferTranslationMap(pydantic.BaseModel):
+    en: PublicOfferTranslationItem
+    uz: PublicOfferTranslationItem
+    ru: PublicOfferTranslationItem
+
+
+class ManagementPublicOfferOutput(pydantic.BaseModel):
+    id: int
+    version: str
+    body: str
+    is_active: bool
+    translations: PublicOfferTranslationMap
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ManagementPublicOfferInput(pydantic.BaseModel):
+    version: str
+    is_active: bool = True
+    translations: PublicOfferTranslationMap
+
+
+class LocalizationStatusOutput(pydantic.BaseModel):
+    properties: dict[str, Any]
+    districts: dict[str, Any]
+    amenities: dict[str, Any]
+    faqs: dict[str, Any]
+    public_offers: dict[str, Any]
+    vas_catalog_items: dict[str, Any]

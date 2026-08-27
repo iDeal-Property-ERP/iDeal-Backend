@@ -703,25 +703,19 @@ class TestMobileHomeListingDetail:
         listing.property.score = 4.7
         listing.property.deposit_amount = 300
         listing.property.description = "A bright home near the city center."
-        listing.property.save(update_fields=["score", "deposit_amount", "description", "updated_at"])
+        listing.property.save()
         # Saving the property re-fires manage_listing_on_property_change, which mirrors
         # ask_price/description onto the listing — so set the listing's own values after it.
         listing.refresh_from_db()
         listing.monthly_price = 850
         listing.listed_price = 900
         listing.description = None
+        listing.description_en = None
+        listing.description_uz = None
+        listing.description_ru = None
         listing.deposit_amount = None
         listing.price_includes = ["utilities"]
-        listing.save(
-            update_fields=[
-                "monthly_price",
-                "listed_price",
-                "description",
-                "deposit_amount",
-                "price_includes",
-                "updated_at",
-            ]
-        )
+        listing.save()
 
         response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
 
@@ -754,7 +748,6 @@ class TestMobileHomeListingDetail:
             "deposit_amount",
             "minimum_stay",
             "price_includes",
-            "response_time",
             "created_at",
             "photos",
             "amenities",

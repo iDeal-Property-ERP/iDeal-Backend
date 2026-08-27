@@ -25,10 +25,14 @@ def _annotated_agent_qs():
     from django.db.models import Count, Q, Sum
 
     year = timezone.now().year
-    return Agent.objects.select_related("user").annotate(
-        deals_ytd=Count("deals", filter=Q(deals__created_at__year=year), distinct=True),
-        pending_commission_total=Sum("deals__commission_amount", filter=Q(deals__status=AgentDealStatus.PENDING)),
-    ).order_by("id")
+    return (
+        Agent.objects.select_related("user")
+        .annotate(
+            deals_ytd=Count("deals", filter=Q(deals__created_at__year=year), distinct=True),
+            pending_commission_total=Sum("deals__commission_amount", filter=Q(deals__status=AgentDealStatus.PENDING)),
+        )
+        .order_by("id")
+    )
 
 
 class AgentListQuery(pydantic.BaseModel):

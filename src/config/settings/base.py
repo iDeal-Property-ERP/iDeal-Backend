@@ -4,6 +4,7 @@ from pathlib import Path
 # pi-lens-ignore: reportMissingImports
 import dj_database_url
 from decouple import config
+from django.utils.translation import gettext_lazy as _
 from dmr.openapi.config import OpenAPIConfig
 from dmr.parsers import JsonParser
 from dmr.renderers import JsonRenderer
@@ -17,6 +18,10 @@ SECRET_KEY = _secret_key
 _allowed_hosts_raw = str(config("ALLOWED_HOSTS", default="localhost,127.0.0.1"))
 ALLOWED_HOSTS = [h for h in _allowed_hosts_raw.split(",") if h]
 DATABASE_URL = f"postgres://{config('POSTGRES_USER')}:{config('POSTGRES_PASSWORD')}@{config('POSTGRES_HOST')}/{config('POSTGRES_DB')}"
+
+MODELTRANSLATION_APPS = [
+    "modeltranslation",
+]
 
 UNFOLD_APPS = [
     "unfold",
@@ -67,13 +72,14 @@ LOCAL_APPS = [
     "mobile_config",
 ]
 
-INSTALLED_APPS = UNFOLD_APPS + DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+INSTALLED_APPS = MODELTRANSLATION_APPS + UNFOLD_APPS + DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -129,7 +135,21 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "en"
+LANGUAGES = (
+    ("en", _("English")),
+    ("uz", _("Uzbek")),
+    ("ru", _("Russian")),
+)
+MODELTRANSLATION_LANGUAGES = ("en", "uz", "ru")
+MODELTRANSLATION_DEFAULT_LANGUAGE = "en"
+MODELTRANSLATION_FALLBACK_LANGUAGES = {
+    "default": ("en", "uz", "ru"),
+    "uz": ("en", "ru"),
+    "ru": ("en", "uz"),
+}
+MODELTRANSLATION_AUTO_POPULATE = False
+
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True

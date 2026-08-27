@@ -213,6 +213,7 @@ class PhoneChangeConfirmView(BaseController):
         otp_service.clear_otp_attempts(phone, purpose=purpose)
         return self.ok(serialize_mobile_user(self.request, locked_user), status_code=HTTPStatus.OK)
 
+
 class AccountDeletionOTPRequestView(BaseController):
     @rate_limit(requests=3, window_seconds=3600)
     def post(self, parsed_body: Body[AccountDeletionOTPRequestInput]) -> dict:

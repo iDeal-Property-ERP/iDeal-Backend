@@ -27,6 +27,7 @@ class OwnerAgreement(TimestampedModel, SoftDeleteModel):
     end_date = models.DateField()
     status = models.CharField(max_length=20, choices=OwnerAgreementStatus.choices, default=OwnerAgreementStatus.ACTIVE)
     terms = models.TextField(null=True, blank=True)
+    accepted_locale = models.CharField(max_length=10, default="en", blank=True, verbose_name=_("Accepted Locale"))
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2)
     # Agreement economics are the legal source of truth. Property pricing is
     # market/listing data and must never change an existing settlement.
@@ -200,9 +201,7 @@ class Lease(TimestampedModel, SoftDeleteModel):
 
 class LeaseAgreementSegment(TimestampedModel, SoftDeleteModel):
     lease = models.ForeignKey(Lease, on_delete=models.PROTECT, related_name="agreement_segments")
-    owner_agreement = models.ForeignKey(
-        OwnerAgreement, on_delete=models.PROTECT, related_name="lease_segments"
-    )
+    owner_agreement = models.ForeignKey(OwnerAgreement, on_delete=models.PROTECT, related_name="lease_segments")
     start_date = models.DateField()
     end_date = models.DateField()
 
@@ -264,6 +263,9 @@ class OwnerOnboarding(TimestampedModel, SoftDeleteModel):
     )
     offer_version = models.CharField(max_length=20, null=True, blank=True, verbose_name=_("Offer Version"))
     offer_terms_snapshot = models.TextField(null=True, blank=True, verbose_name=_("Offer Terms Snapshot"))
+    offer_accepted_locale = models.CharField(
+        max_length=10, default="en", blank=True, verbose_name=_("Offer Accepted Locale")
+    )
     offer_accepted_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Offer Accepted At"))
     reviewed_by = models.ForeignKey(
         "account.User",
@@ -328,6 +330,7 @@ class OwnerOnboarding(TimestampedModel, SoftDeleteModel):
                 end_date=end_date,
                 status=OwnerAgreementStatus.ACTIVE,
                 terms=terms or self.offer_terms_snapshot,
+                accepted_locale=self.offer_accepted_locale or "en",
                 commission_rate=commission_rate,
                 gross_floor_amount=prop.ask_price or Decimal("0.00"),
                 currency=prop.ask_currency,
@@ -367,9 +370,14 @@ class OwnerOnboarding(TimestampedModel, SoftDeleteModel):
             related_object_id=self.id,
         )
 
-    def accept_offer(self, offer):
+    def accept_offer(self, offer, locale: str = "en"):
         self.offer_version = offer.version if offer else None
-        self.offer_terms_snapshot = offer.body if offer else None
+        if offer:
+            self.offer_terms_snapshot = getattr(offer, f"body_{locale}", None) or offer.body
+            self.offer_accepted_locale = locale
+        else:
+            self.offer_terms_snapshot = None
+            self.offer_accepted_locale = locale
         self.offer_accepted_at = timezone.now()
 
 

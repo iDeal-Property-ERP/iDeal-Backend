@@ -228,7 +228,6 @@ class MobileListingDetail(APIModel):
     deposit_amount: float | None
     minimum_stay: int | None
     price_includes: list[str]
-    response_time: str
     created_at: str
     photos: list[MobileListingPhoto]
     amenities: list[MobileListingAmenity]
@@ -242,7 +241,7 @@ class MobileListingDetail(APIModel):
         from django.conf import settings
         from marketplace.services.booking import BookingService
         from marketplace.services.listings import ordered_photos, photo_url, photo_variant_url
-        from marketplace.services.presentation import RESPONSE_TIME, verification_checklist
+        from marketplace.services.presentation import verification_checklist
 
         prop = listing.property
         monthly_price = listing.monthly_price if listing.monthly_price is not None else listing.listed_price
@@ -277,7 +276,6 @@ class MobileListingDetail(APIModel):
             deposit_amount=_safe_float(deposit),
             minimum_stay=listing.minimum_stay,
             price_includes=listing.price_includes or [],
-            response_time=str(RESPONSE_TIME),
             created_at=listing.created_at.isoformat(),
             photos=[
                 MobileListingPhoto(

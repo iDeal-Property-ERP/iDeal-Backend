@@ -56,6 +56,9 @@ docs: '# PATCH /api/v1/properties/<int:pk>/photos/reorder/
   | `items[].caption` | no | yes | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
+  | `items[].translations` | no | yes | fixture value; replace fixture values with
+  domain-valid data before runtime execution. |
+
 
   ## Saved examples
 

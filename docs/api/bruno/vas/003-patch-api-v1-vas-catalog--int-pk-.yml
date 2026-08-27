@@ -12,12 +12,6 @@ http:
   - name: pk
     value: '{{pk}}'
     type: path
-  body:
-    type: json
-    data: "{\n  \"service_type\": \"fixture-value\",\n  \"name\": \"fixture-value\"\
-      ,\n  \"partner_name\": \"fixture-value\",\n  \"description\": \"fixture-value\"\
-      ,\n  \"base_price\": 1,\n  \"currency\": \"USD\",\n  \"commission_rate\": 1,\n\
-      \  \"cashback_rate\": 1,\n  \"is_active\": true\n}"
 settings:
   encodeUrl: true
   timeout: 0
@@ -40,38 +34,6 @@ docs: '# PATCH /api/v1/vas/catalog/<int:pk>/
   when running. |
 
 
-  | Body field | Required | Nullable | Notes |
-
-  |---|---:|---:|---|
-
-  | `service_type` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `name` | no | yes | fixture value; replace fixture values with domain-valid data
-  before runtime execution. |
-
-  | `partner_name` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `description` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `base_price` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `currency` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `commission_rate` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `cashback_rate` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-  | `is_active` | no | yes | fixture value; replace fixture values with domain-valid
-  data before runtime execution. |
-
-
   ## Saved examples
 
 
@@ -88,12 +50,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"service_type\": \"fixture-value\",\n  \"name\": \"fixture-value\"\
-        ,\n  \"partner_name\": \"fixture-value\",\n  \"description\": \"fixture-value\"\
-        ,\n  \"base_price\": 1,\n  \"currency\": \"USD\",\n  \"commission_rate\":\
-        \ 1,\n  \"cashback_rate\": 1,\n  \"is_active\": true\n}"
   response:
     status: 200
     statusText: OK
@@ -113,12 +69,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"service_type\": \"fixture-value\",\n  \"name\": \"fixture-value\"\
-        ,\n  \"partner_name\": \"fixture-value\",\n  \"description\": \"fixture-value\"\
-        ,\n  \"base_price\": 1,\n  \"currency\": \"USD\",\n  \"commission_rate\":\
-        \ 1,\n  \"cashback_rate\": 1,\n  \"is_active\": true\n}"
   response:
     status: 400
     statusText: Error
@@ -139,12 +89,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"service_type\": \"fixture-value\",\n  \"name\": \"fixture-value\"\
-        ,\n  \"partner_name\": \"fixture-value\",\n  \"description\": \"fixture-value\"\
-        ,\n  \"base_price\": 1,\n  \"currency\": \"USD\",\n  \"commission_rate\":\
-        \ 1,\n  \"cashback_rate\": 1,\n  \"is_active\": true\n}"
   response:
     status: 401
     statusText: Error
@@ -165,12 +109,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"service_type\": \"fixture-value\",\n  \"name\": \"fixture-value\"\
-        ,\n  \"partner_name\": \"fixture-value\",\n  \"description\": \"fixture-value\"\
-        ,\n  \"base_price\": 1,\n  \"currency\": \"USD\",\n  \"commission_rate\":\
-        \ 1,\n  \"cashback_rate\": 1,\n  \"is_active\": true\n}"
   response:
     status: 404
     statusText: Error
@@ -191,12 +129,6 @@ examples:
     - name: authorization
       value: Bearer {{access_token}}
     params: []
-    body:
-      type: json
-      data: "{\n  \"service_type\": \"fixture-value\",\n  \"name\": \"fixture-value\"\
-        ,\n  \"partner_name\": \"fixture-value\",\n  \"description\": \"fixture-value\"\
-        ,\n  \"base_price\": 1,\n  \"currency\": \"USD\",\n  \"commission_rate\":\
-        \ 1,\n  \"cashback_rate\": 1,\n  \"is_active\": true\n}"
   response:
     status: 409
     statusText: Error

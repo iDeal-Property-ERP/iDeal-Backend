@@ -344,7 +344,10 @@ class SettlementAllocationsView(GenericController):
     def get(self, parsed_path: Path[DetailPath]) -> list[SettlementAllocationOutput]:
         settlement = get_object_or_404(OwnerSettlement, pk=parsed_path.pk)
         return self.ok(
-            [SettlementAllocationOutput.model_validate(row).model_dump(mode="json") for row in settlement.receipt_allocations.all()]
+            [
+                SettlementAllocationOutput.model_validate(row).model_dump(mode="json")
+                for row in settlement.receipt_allocations.all()
+            ]
         )
 
 

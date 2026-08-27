@@ -7,7 +7,9 @@ app_name = "management"
 urlpatterns = [
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("pnl/", views.PnLSummaryView.as_view(), name="pnl"),
-    path("brokerage-commissions/stats/", views.BrokerageCommissionStatsView.as_view(), name="brokerage-commission-stats"),
+    path(
+        "brokerage-commissions/stats/", views.BrokerageCommissionStatsView.as_view(), name="brokerage-commission-stats"
+    ),
     path("users/", views.ManagementUserListView.as_view(), name="user-list"),
     path("users/invite/", views.ManagementUserInviteView.as_view(), name="user-invite"),
     path("users/<int:pk>/", views.ManagementUserDetailUpdateView.as_view(), name="user-detail"),
@@ -93,4 +95,13 @@ urlpatterns = [
     path("vas-orders/<int:pk>/status/", views.ManagementVASOrderStatusView.as_view(), name="vas-order-status"),
     path("vas-partners/", views.ManagementVASPartnersView.as_view(), name="vas-partners"),
     path("vacancy/", views.ManagementVacancyView.as_view(), name="vacancy"),
+    path("districts/", views.ManagementDistrictListView.as_view(), name="district-list"),
+    path("districts/<int:pk>/", views.ManagementDistrictDetailView.as_view(), name="district-detail"),
+    path("amenities/", views.ManagementAmenityListView.as_view(), name="amenity-list"),
+    path("amenities/<int:pk>/", views.ManagementAmenityDetailView.as_view(), name="amenity-detail"),
+    path("faqs/", views.ManagementFaqListView.as_view(), name="faq-list"),
+    path("faqs/<int:pk>/", views.ManagementFaqDetailView.as_view(), name="faq-detail"),
+    path("public-offers/", views.ManagementPublicOfferListView.as_view(), name="public-offer-list"),
+    path("public-offers/<int:pk>/", views.ManagementPublicOfferDetailView.as_view(), name="public-offer-detail"),
+    path("localization/status/", views.ManagementLocalizationStatusView.as_view(), name="localization-status"),
 ]

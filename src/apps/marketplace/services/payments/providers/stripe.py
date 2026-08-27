@@ -46,7 +46,7 @@ class StripeProvider(PaymentProvider):
                 request.headers.get("Stripe-Signature", ""),
                 settings.STRIPE_WEBHOOK_SECRET,
             )
-        except (ValueError, stripe.error.SignatureVerificationError):
+        except ValueError, stripe.error.SignatureVerificationError:
             return JsonResponse({"error": "invalid_signature"}, status=400)
 
         event_type = event["type"]

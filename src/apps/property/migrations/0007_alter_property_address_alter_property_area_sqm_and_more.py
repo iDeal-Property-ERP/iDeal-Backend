@@ -8,7 +8,6 @@ import core.constants
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("property", "0006_seed_property_ratings"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

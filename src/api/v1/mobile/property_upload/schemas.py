@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 from decimal import Decimal
+from typing import Literal
 
 import pydantic
 from property.services.validation import validate_floor_bounds
@@ -71,6 +70,7 @@ class MobilePropertyUploadInput(pydantic.BaseModel):
     currency: str = "USD"
     minimum_stay: int | None = None
     price_includes: list[str] = pydantic.Field(default_factory=list)
+    content_locale: Literal["en", "uz", "ru"] | None = None
     accept_offer: bool
     contact: MobilePropertyContactInput | None = None
 

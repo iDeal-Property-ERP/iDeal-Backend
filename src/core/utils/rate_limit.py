@@ -12,6 +12,7 @@ def rate_limit(requests: int, window_seconds: int):
     Limits the number of requests per IP address within the given time window.
     Assumes it wraps a method of a BaseController (e.g., post(self)).
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -34,7 +35,7 @@ def rate_limit(requests: int, window_seconds: int):
                 return self.fail(
                     error="rate_limit_exceeded",
                     message=str(_("Too many requests. Please try again later.")),
-                    status_code=HTTPStatus.TOO_MANY_REQUESTS
+                    status_code=HTTPStatus.TOO_MANY_REQUESTS,
                 )
             else:
                 cache.incr(cache_key)
@@ -45,4 +46,5 @@ def rate_limit(requests: int, window_seconds: int):
         # method globals. Keep those controller imports available on wrapper.
         wrapper.__globals__.update(func.__globals__)
         return wrapper
+
     return decorator

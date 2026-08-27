@@ -12,7 +12,7 @@ from marketplace.services.listings import (
     photo_url,
     published_listings_queryset,
 )
-from marketplace.services.presentation import RESPONSE_TIME, verification_checklist
+from marketplace.services.presentation import verification_checklist
 from property.models import District, Property
 
 from api.v1.marketplace.schemas import (
@@ -119,7 +119,6 @@ def _build_listing_detail(listing, request=None):
                 "currency": listing.currency or prop.ask_currency,
                 "minimum_stay": listing.minimum_stay,
                 "price_includes": listing.price_includes or [],
-                "response_time": str(RESPONSE_TIME),
             },
             "verification": {
                 "is_verified": prop.is_verified,

@@ -9,7 +9,6 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
-from dmr.pagination import Paginated
 from property.models import OneOffDeal, Property, VerificationVisit
 from property.services.submission import PropertySubmissionError, PropertySubmissionService
 from property.services.validation import validate_floor_bounds
@@ -45,9 +44,11 @@ def _photo_url(photo, request):
 
 
 def _property_output(prop, request) -> dict:
-    """Build the property output dict, injecting absolute photo URLs and the
-    next scheduled verification visit (the generic reverse managers cannot be
-    validated straight through pydantic)."""
+    """Build the property output dict, injecting absolute photo URLs, translations, and the
+    next scheduled verification visit."""
+    from core.services.localization import LocalizedContentService
+
+    loc_service = LocalizedContentService()
     photos = [
         {
             "id": p.id,
@@ -55,6 +56,7 @@ def _property_output(prop, request) -> dict:
             "caption": p.caption or None,
             "is_primary": p.is_primary,
             "sort_order": p.sort_order,
+            "translations": loc_service.extract_translations(p, ["caption"]),
         }
         for p in sorted(prop.photos.all(), key=lambda p: (not p.is_primary, p.sort_order))
     ]
@@ -63,6 +65,7 @@ def _property_output(prop, request) -> dict:
     )
     data = PropertyOutput.model_validate(prop).model_dump(mode="json")
     data["engagement_type"] = prop.engagement_type
+    data["translations"] = loc_service.extract_translations(prop, ["name", "description"])
     if prop.engagement_type == PropertyEngagementType.ONE_OFF:
         try:
             deal = prop.one_off_deal
@@ -117,12 +120,22 @@ class PropertyListCreateView(CreateAPIView, ListAPIView):
     def to_output(self, instance):
         return _property_output(instance, self.request)
 
+    def perform_create(self, validated_data: dict):
+        from core.services.localization import LocalizedContentService
+
+        translations = validated_data.pop("translations", None)
+        prop = super().perform_create(validated_data)
+        if translations:
+            LocalizedContentService().apply_translations(prop, translations, ["name", "description"])
+            prop.save()
+        return prop
+
     @require_role(UserRole.MANAGEMENT)
-    def post(self, parsed_body: Body[PropertyCreateInput]) -> PropertyOutput:
+    def post(self, parsed_body: Body[dict]) -> dict:
         return super().post(parsed_body)
 
     @require_role(UserRole.MANAGEMENT, UserRole.OWNER)
-    def get(self, parsed_query: Query[ListQuery]) -> list[PropertyOutput] | Paginated[PropertyOutput]:
+    def get(self, parsed_query: Query[ListQuery]) -> dict:
         return super().get(parsed_query)
 
 
@@ -139,6 +152,8 @@ class PropertyDetailView(RetrieveAPIView, PartialUpdateAPIView, DeleteAPIView):
         return _property_output(instance, self.request)
 
     def perform_update(self, instance, validated_data):
+        from core.services.localization import LocalizedContentService
+
         try:
             validate_floor_bounds(
                 validated_data.get("floor", instance.floor),
@@ -146,14 +161,21 @@ class PropertyDetailView(RetrieveAPIView, PartialUpdateAPIView, DeleteAPIView):
             )
         except ValueError as err:
             return self.fail(error=str(err), message=str(_("Validation error")))
-        return super().perform_update(instance, validated_data)
+
+        translations = validated_data.pop("translations", None)
+        result = super().perform_update(instance, validated_data)
+        if translations:
+            LocalizedContentService().apply_translations(instance, translations, ["name", "description"])
+            instance.save()
+            LocalizedContentService().sync_property_listing_translations(instance)
+        return result
 
     @require_role(UserRole.MANAGEMENT, UserRole.OWNER)
-    def get(self, parsed_path: Path[DetailPath]) -> PropertyOutput:
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
         return super().get(parsed_path)
 
     @require_role(UserRole.MANAGEMENT)
-    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[PropertyUpdateInput]) -> PropertyOutput:
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
         prop = self.get_object(pk=parsed_path.pk)
         if prop.engagement_type == PropertyEngagementType.ONE_OFF:
             try:
@@ -165,7 +187,7 @@ class PropertyDetailView(RetrieveAPIView, PartialUpdateAPIView, DeleteAPIView):
             except Exception:
                 locked = False
             if locked:
-                changed = set(parsed_body.model_dump(exclude_unset=True))
+                changed = set(parsed_body.keys())
                 if changed - ONE_OFF_CLOSED_EDITABLE_FIELDS:
                     return self.fail(error=str(_("Closed one-off commercial terms are read-only")))
         return super().patch(parsed_path, parsed_body)
@@ -282,6 +304,7 @@ class OneOffPropertyUpdateView(GenericController):
         prop = self.get_object(pk=parsed_path.pk)
         data = parsed_body.model_dump(exclude_unset=True)
         brokerage = data.pop("brokerage", None)
+        translations = data.pop("translations", None)
         deal = prop.one_off_deal
         if set(data) & ONE_OFF_DISALLOWED_FIELDS:
             return self.fail(error=str(_("Managed-only or lifecycle fields are not available for one-off properties")))
@@ -296,7 +319,13 @@ class OneOffPropertyUpdateView(GenericController):
             with transaction.atomic():
                 _apply_one_off_property_data(prop, data)
                 validate_floor_bounds(prop.floor, prop.total_floors)
+                if translations:
+                    from core.services.localization import LocalizedContentService
+
+                    LocalizedContentService().apply_translations(prop, translations, ["name", "description"])
                 prop.save()
+                if translations:
+                    LocalizedContentService().sync_property_listing_translations(prop)
                 if brokerage is not None:
                     for field, value in brokerage.items():
                         setattr(deal, field, value)
@@ -397,6 +426,11 @@ class PropertyPhotoReorderView(ManagementPropertyView):
                 if item.caption is not None:
                     photo.caption = item.caption
                     fields.append("caption")
+                if item.translations:
+                    from core.services.localization import LocalizedContentService
+
+                    LocalizedContentService().apply_translations(photo, item.translations.model_dump(), ["caption"])
+                    fields.extend(["caption_en", "caption_uz", "caption_ru"])
                 photo.save(update_fields=fields)
         prop.refresh_from_db()
         return self.ok(self.to_output(prop))

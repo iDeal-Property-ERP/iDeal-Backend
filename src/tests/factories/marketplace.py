@@ -1,5 +1,5 @@
 import factory
-from marketplace.models import Booking, FavoriteListing, Listing, ViewingRequest
+from marketplace.models import Booking, FaqItem, FavoriteListing, Listing, ViewingRequest
 
 from core.constants import BookingStatus, ListingStatus, ViewingRequestStatus
 
@@ -17,6 +17,9 @@ class ListingFactory(factory.django.DjangoModelFactory):
     status = ListingStatus.PUBLISHED
     is_featured = False
     description = factory.Faker("text", max_nb_chars=300)
+    description_en = factory.LazyAttribute(lambda o: o.description)
+    description_uz = factory.LazyAttribute(lambda o: o.description)
+    description_ru = factory.LazyAttribute(lambda o: o.description)
     listed_price = 500.00
     monthly_price = 500.00
     deposit_amount = 500.00
@@ -25,6 +28,22 @@ class ListingFactory(factory.django.DjangoModelFactory):
     @factory.lazy_attribute
     def is_active(self):
         return self.status == ListingStatus.PUBLISHED
+
+
+class FaqItemFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = FaqItem
+
+    question = factory.Sequence(lambda n: f"Question {n}?")
+    question_en = factory.LazyAttribute(lambda o: o.question)
+    question_uz = factory.LazyAttribute(lambda o: o.question)
+    question_ru = factory.LazyAttribute(lambda o: o.question)
+    answer = factory.Faker("text", max_nb_chars=200)
+    answer_en = factory.LazyAttribute(lambda o: o.answer)
+    answer_uz = factory.LazyAttribute(lambda o: o.answer)
+    answer_ru = factory.LazyAttribute(lambda o: o.answer)
+    sort_order = 0
+    is_active = True
 
 
 class ViewingRequestFactory(factory.django.DjangoModelFactory):

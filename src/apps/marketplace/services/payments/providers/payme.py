@@ -18,11 +18,7 @@ class PaymeProvider(PaymentProvider):
     settlement_currency = "UZS"
 
     def create_hosted_checkout(self, checkout: PaymentCheckout) -> HostedCheckout:
-        params = (
-            f"m={settings.PAYME_MERCHANT_ID};"
-            f"ac.checkout={checkout.public_token};"
-            f"a={self.amount_minor(checkout)}"
-        )
+        params = f"m={settings.PAYME_MERCHANT_ID};ac.checkout={checkout.public_token};a={self.amount_minor(checkout)}"
         encoded = base64.b64encode(params.encode()).decode()
         return HostedCheckout(url=f"{settings.PAYME_CHECKOUT_URL.rstrip('/')}/{encoded}")
 
@@ -31,7 +27,7 @@ class PaymeProvider(PaymentProvider):
             return self._error(None, -32504, "Insufficient privilege")
         try:
             body = json.loads(request.body)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return self._error(None, -32700, "Parse error")
 
         request_id = body.get("id")
@@ -68,7 +64,7 @@ class PaymeProvider(PaymentProvider):
         try:
             scheme, encoded = request.headers.get("Authorization", "").split(" ", 1)
             login, key = base64.b64decode(encoded).decode().split(":", 1)
-        except (ValueError, UnicodeDecodeError):
+        except ValueError, UnicodeDecodeError:
             return False
         return scheme.lower() == "basic" and login == "Paycom" and hmac.compare_digest(key, settings.PAYME_KEY)
 
@@ -84,7 +80,7 @@ class PaymeProvider(PaymentProvider):
             return False
         try:
             return self.amount_minor(checkout) == int(params.get("amount", -1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
 
     def _check_perform(self, request_id, params, body) -> JsonResponse:
@@ -200,7 +196,7 @@ class PaymeProvider(PaymentProvider):
         try:
             from_timestamp = int(params["from"])
             to_timestamp = int(params["to"])
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return self._error(request_id, -32602, "Invalid params")
         if from_timestamp > to_timestamp:
             return self._error(request_id, -32602, "Invalid params")

@@ -29,6 +29,13 @@ class ServiceCatalogListCreateView(CreateAPIView, ListAPIView):
     def get_queryset(self):
         return ServiceCatalogItem.objects.all()
 
+    def to_output(self, instance: ServiceCatalogItem) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        data = ServiceCatalogItemOutput.model_validate(instance).model_dump(mode="json")
+        data["translations"] = LocalizedContentService().extract_translations(instance, ["name", "description"])
+        return data
+
     def get(
         self, parsed_query: Query[CatalogFilterQuery]
     ) -> list[ServiceCatalogItemOutput] | Paginated[ServiceCatalogItemOutput]:
@@ -42,6 +49,9 @@ class ServiceCatalogListCreateView(CreateAPIView, ListAPIView):
 
             qs = qs.filter(
                 Q(name__icontains=parsed_query.search)
+                | Q(name_en__icontains=parsed_query.search)
+                | Q(name_uz__icontains=parsed_query.search)
+                | Q(name_ru__icontains=parsed_query.search)
                 | Q(partner_name__icontains=parsed_query.search)
                 | Q(description__icontains=parsed_query.search)
             )
@@ -52,8 +62,18 @@ class ServiceCatalogListCreateView(CreateAPIView, ListAPIView):
             return self.ok(build_paginated_response(items, parsed_query.page, parsed_query.per_page))
         return self.ok(items)
 
+    def perform_create(self, validated_data: dict):
+        from core.services.localization import LocalizedContentService
+
+        translations = validated_data.pop("translations", None)
+        item = super().perform_create(validated_data)
+        if translations:
+            LocalizedContentService().apply_translations(item, translations, ["name", "description"])
+            item.save()
+        return item
+
     @require_role(UserRole.MANAGEMENT)
-    def post(self, parsed_body: Body[ServiceCatalogItemCreateInput]) -> ServiceCatalogItemOutput:
+    def post(self, parsed_body: Body[dict]) -> dict:
         return super().post(parsed_body)
 
 
@@ -64,12 +84,23 @@ class ServiceCatalogDetailView(GenericController):
     def get_queryset(self):
         return ServiceCatalogItem.objects.all()
 
+    def to_output(self, instance: ServiceCatalogItem) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        data = ServiceCatalogItemOutput.model_validate(instance).model_dump(mode="json")
+        data["translations"] = LocalizedContentService().extract_translations(instance, ["name", "description"])
+        return data
+
     @require_role(UserRole.MANAGEMENT)
-    def patch(
-        self, parsed_path: Path[DetailPath], parsed_body: Body[ServiceCatalogItemUpdateInput]
-    ) -> ServiceCatalogItemOutput:
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[dict]) -> dict:
+        from core.services.localization import LocalizedContentService
+
         item = self.get_object(pk=parsed_path.pk)
-        for attr, value in parsed_body.model_dump(exclude_unset=True).items():
+        data = self._validate_body(ServiceCatalogItemUpdateInput, parsed_body, exclude_unset=True)
+        translations = data.pop("translations", None)
+        for attr, value in data.items():
             setattr(item, attr, value)
+        if translations:
+            LocalizedContentService().apply_translations(item, translations, ["name", "description"])
         item.save()
         return self.ok(self.to_output(item))

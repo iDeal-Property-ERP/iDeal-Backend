@@ -13,7 +13,8 @@ http:
     data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
       \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\": 1,\n\
       \  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"ask_price\"\
-      : 1,\n  \"ask_currency\": \"USD\",\n  \"accept_offer\": true\n}"
+      : 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\",\n  \"accept_offer\"\
+      : true\n}"
 settings:
   encodeUrl: true
   timeout: 0
@@ -65,6 +66,9 @@ docs: '# POST /api/v1/owner/onboarding/
   | `ask_currency` | no | no | default=''USD''; replace fixture values with domain-valid
   data before runtime execution. |
 
+  | `content_locale` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
   | `accept_offer` | yes | no | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
@@ -89,7 +93,8 @@ examples:
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
         \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
         \ 1,\n  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"\
-        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"accept_offer\": true\n}"
+        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\"\
+        ,\n  \"accept_offer\": true\n}"
   response:
     status: 201
     statusText: OK
@@ -113,7 +118,8 @@ examples:
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
         \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
         \ 1,\n  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"\
-        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"accept_offer\": true\n}"
+        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\"\
+        ,\n  \"accept_offer\": true\n}"
   response:
     status: 400
     statusText: Error
@@ -138,7 +144,8 @@ examples:
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
         \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
         \ 1,\n  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"\
-        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"accept_offer\": true\n}"
+        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\"\
+        ,\n  \"accept_offer\": true\n}"
   response:
     status: 401
     statusText: Error
@@ -163,7 +170,8 @@ examples:
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
         \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
         \ 1,\n  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"\
-        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"accept_offer\": true\n}"
+        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\"\
+        ,\n  \"accept_offer\": true\n}"
   response:
     status: 409
     statusText: Error

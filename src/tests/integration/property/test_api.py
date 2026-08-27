@@ -169,6 +169,28 @@ class TestPropertyUpdate:
         assert body["data"]["name"] == "New Name"
         assert body["data"]["status"] == "maintenance"
 
+    def test_partial_update_translations_partial_map(self, api_client, management, property_obj):
+        payload = json.dumps({
+            "name": "Updated English Name",
+            "translations": {
+                "uz": {"name": "O'zbekcha nom", "description": "O'zbekcha tavsif"},
+            },
+        })
+        response = api_client.patch(
+            f"/api/v1/properties/{property_obj.id}/",
+            payload,
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        property_obj.refresh_from_db()
+        assert property_obj.name == "Updated English Name"
+        assert property_obj.name_uz == "O'zbekcha nom"
+        assert property_obj.description_uz == "O'zbekcha tavsif"
+        assert body["data"]["translations"]["uz"]["name"] == "O'zbekcha nom"
+
     @pytest.mark.parametrize(("field", "value"), [("rooms", 0), ("rooms", -1), ("area_sqm", 0), ("area_sqm", -1)])
     def test_partial_update_rejects_non_positive_rooms_and_area(
         self, api_client, management, property_obj, field, value

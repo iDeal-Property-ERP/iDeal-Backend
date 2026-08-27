@@ -298,7 +298,9 @@ class BookingService:
             full_days = (anniversary_end - cursor).days + 1
             occupied_days = (period_end - cursor).days + 1
             amount = money(monthly_rent if period_end == anniversary_end else monthly_rent * occupied_days / full_days)
-            periods.append({"start_date": cursor.isoformat(), "end_date": period_end.isoformat(), "amount": str(amount)})
+            periods.append(
+                {"start_date": cursor.isoformat(), "end_date": period_end.isoformat(), "amount": str(amount)}
+            )
             cursor = period_end + timedelta(days=1)
         return periods
 
@@ -314,8 +316,10 @@ class BookingService:
         succeeded: bool,
         external_id: str | None = None,
     ) -> PaymentCheckout:
-        checkout = PaymentCheckout.objects.select_for_update().select_related("booking", "quote__listing__property").get(
-            pk=checkout_id
+        checkout = (
+            PaymentCheckout.objects.select_for_update()
+            .select_related("booking", "quote__listing__property")
+            .get(pk=checkout_id)
         )
         try:
             # The savepoint keeps a duplicate-event IntegrityError from
@@ -376,7 +380,9 @@ class BookingService:
                 type=NotificationType.GENERAL,
                 audience=NotificationAudience.ERP,
                 title=_("Paid booking requires reconciliation"),
-                body=_("Checkout %(checkout_id)s was paid after its date range became unavailable. Review and refund manually.")
+                body=_(
+                    "Checkout %(checkout_id)s was paid after its date range became unavailable. Review and refund manually."
+                )
                 % {"checkout_id": checkout.id},
                 related_object_type="payment_checkout",
                 related_object_id=checkout.id,
@@ -532,6 +538,7 @@ class BookingService:
                 break
             horizon = current.end_date
         return horizon
+
 
 def provider_timestamp(milliseconds: int) -> datetime:
     return datetime.combine(date.fromtimestamp(milliseconds / 1000), time.min, tzinfo=timezone.get_current_timezone())

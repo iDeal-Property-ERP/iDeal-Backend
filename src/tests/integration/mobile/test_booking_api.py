@@ -90,9 +90,7 @@ def test_mobile_quote_checkout_and_detail_contract(api_client):
 
     checkout_response = api_client.post(
         "/api/v1/mobile/bookings/checkouts/",
-        data=json.dumps(
-            {"quote_id": quote["id"], "provider": PaymentProvider.PAYME, "pay_full_stay": False}
-        ),
+        data=json.dumps({"quote_id": quote["id"], "provider": PaymentProvider.PAYME, "pay_full_stay": False}),
         content_type="application/json",
         HTTP_IDEMPOTENCY_KEY="mobile-booking-contract",
         **auth,

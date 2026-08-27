@@ -152,7 +152,12 @@ def allocate_paid_rent(payment) -> OwnerSettlement | None:
             )
             if not created:
                 expected = sum(
-                    (row.amount for row in coverage if row.owner_agreement_id == item.owner_agreement_id and row.start_date.replace(day=1) == period_start),
+                    (
+                        row.amount
+                        for row in coverage
+                        if row.owner_agreement_id == item.owner_agreement_id
+                        and row.start_date.replace(day=1) == period_start
+                    ),
                     Decimal("0"),
                 )
                 if allocation.amount != expected:

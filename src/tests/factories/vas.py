@@ -13,6 +13,13 @@ class ServiceCatalogItemFactory(factory.django.DjangoModelFactory):
 
     service_type = VASServiceType.CLEANING
     name = factory.Sequence(lambda n: f"Service {n}")
+    name_en = factory.LazyAttribute(lambda o: o.name)
+    name_uz = factory.LazyAttribute(lambda o: o.name)
+    name_ru = factory.LazyAttribute(lambda o: o.name)
+    description = factory.Faker("sentence")
+    description_en = factory.LazyAttribute(lambda o: o.description)
+    description_uz = factory.LazyAttribute(lambda o: o.description)
+    description_ru = factory.LazyAttribute(lambda o: o.description)
     partner_name = factory.Faker("company")
     base_price = 100.00
     currency = Currency.USD

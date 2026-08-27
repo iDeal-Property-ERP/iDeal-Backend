@@ -12,9 +12,13 @@ def update_agent_stats_on_deal(sender, instance, created, **kwargs):
     # cancelled deal never inflates performance and totals stay correct across
     # status transitions — not just a blind +1 on create.
     agent = instance.agent
-    stats = AgentDeal.objects.filter(agent=agent).exclude(status=AgentDealStatus.CANCELLED).aggregate(
-        deals=Count("id"),
-        revenue=Sum("commission_amount"),
+    stats = (
+        AgentDeal.objects.filter(agent=agent)
+        .exclude(status=AgentDealStatus.CANCELLED)
+        .aggregate(
+            deals=Count("id"),
+            revenue=Sum("commission_amount"),
+        )
     )
     agent.total_deals = stats["deals"] or 0
     agent.total_revenue = stats["revenue"] or 0

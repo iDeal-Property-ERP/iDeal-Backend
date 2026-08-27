@@ -33,13 +33,14 @@ class PushService:
         return preference.allows_category(category)
 
     def send_for_notification(self, notification) -> int:
-        return self.send_to_user(
-            recipient=notification.recipient,
-            category=notification.category,
-            message_factory=lambda _device: PushMessage(
+        def _build_push_message(_device):
+            loc = getattr(_device, "locale", "en") or "en"
+            title = getattr(notification, f"title_{loc}", None) or str(notification.title)
+            body_val = getattr(notification, f"body_{loc}", None) or notification.body
+            return PushMessage(
                 token=_device.token,
-                title=str(notification.title),
-                body="" if notification.body is None else str(notification.body),
+                title=title,
+                body="" if body_val is None else str(body_val),
                 data={
                     "notification_id": str(notification.id),
                     "type": str(notification.type),
@@ -52,7 +53,12 @@ class PushService:
                     else str(notification.related_object_id),
                     "deep_link": f"ideal://notifications/{notification.id}",
                 },
-            ),
+            )
+
+        return self.send_to_user(
+            recipient=notification.recipient,
+            category=notification.category,
+            message_factory=_build_push_message,
         )
 
     def send_to_user(

@@ -1,0 +1,121 @@
+info:
+  name: Get listing owner listings
+  type: http
+  seq: 2
+http:
+  method: GET
+  url: '{{base_url}}/api/v1/owner/listings/:pk/'
+  auth:
+    type: bearer
+    token: '{{access_token}}'
+  params:
+  - name: pk
+    value: '{{pk}}'
+    type: path
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs: '# GET /api/v1/owner/listings/<int:pk>/
+
+
+  Authentication: **bearer**.
+
+
+  ## Request field notes
+
+
+  | Field | Location | Required | Example | Notes |
+
+  |---|---|---:|---|---|
+
+  | `pk` | path | yes | `1` | non-nullable; fixture value; replace with a real ID
+  when running. |
+
+
+  ## Saved examples
+
+
+  Examples are static source-backed contract fixtures. Capture runtime responses with
+  the local environment when fixtures and providers are available.'
+examples:
+- name: success
+  request:
+    url: '{{base_url}}/api/v1/owner/listings/:pk/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    params: []
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": true,\n  \"message\": \"OK\",\n  \"data\": {}\n}"
+- name: validation error
+  request:
+    url: '{{base_url}}/api/v1/owner/listings/:pk/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    params: []
+  response:
+    status: 400
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"\
+        error\": {\n    \"field\": [\n      \"Invalid value.\"\n    ]\n  }\n}"
+- name: unauthorized
+  request:
+    url: '{{base_url}}/api/v1/owner/listings/:pk/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    params: []
+  response:
+    status: 401
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Authentication required\"\
+        ,\n  \"error\": \"unauthorized\"\n}"
+- name: not found
+  request:
+    url: '{{base_url}}/api/v1/owner/listings/:pk/'
+    method: GET
+    headers:
+    - name: accept
+      value: application/json
+    - name: authorization
+      value: Bearer {{access_token}}
+    params: []
+  response:
+    status: 404
+    statusText: Error
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"success\": false,\n  \"message\": \"Not found\",\n  \"error\"\
+        : \"not_found\"\n}"

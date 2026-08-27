@@ -125,8 +125,14 @@ class PropertySubmissionService:
 
         try:
             with transaction.atomic():
+                prop_name = data.get("name") or f"{data.get('rooms')}-room property in {district.name}"
+                prop_desc = data.get("description", "")
+                content_locale = data.get("content_locale") or "en"
                 prop = Property.objects.create(
-                    name=data.get("name") or f"{data.get('rooms')}-room property in {district.name}",
+                    name=prop_name,
+                    name_en=prop_name,
+                    name_uz=prop_name,
+                    name_ru=prop_name,
                     address=data.get("address") or district.name,
                     district=district,
                     property_type=data.get("property_type", PropertyType.APARTMENT),
@@ -138,7 +144,10 @@ class PropertySubmissionService:
                     owner=owner,
                     engagement_type=PropertyEngagementType.MANAGED,
                     status=PropertyStatus.VACANT,
-                    description=data.get("description", ""),
+                    description=prop_desc,
+                    description_en=prop_desc,
+                    description_uz=prop_desc,
+                    description_ru=prop_desc,
                     tariff=data.get("tariff", TariffChoices.STANDARD),
                     map_lat=data.get("map_lat"),
                     map_lon=data.get("map_lon"),
@@ -154,6 +163,12 @@ class PropertySubmissionService:
                     vacant_days=0,
                 )
 
+                if "translations" in data and isinstance(data["translations"], dict):
+                    from core.services.localization import LocalizedContentService
+
+                    LocalizedContentService().apply_translations(prop, data["translations"], ["name", "description"])
+                    prop.save()
+
                 amenity_slugs = data.get("amenities") or []
                 if amenity_slugs:
                     prop.amenities.set(Amenity.objects.filter(slug__in=amenity_slugs, is_active=True))
@@ -165,6 +180,9 @@ class PropertySubmissionService:
                         "status": ListingStatus.PUBLISHED,
                         "is_active": True,
                         "description": prop.description,
+                        "description_en": getattr(prop, "description_en", prop.description),
+                        "description_uz": getattr(prop, "description_uz", prop.description),
+                        "description_ru": getattr(prop, "description_ru", prop.description),
                         "monthly_price": prop.ask_price,
                         "listed_price": prop.ask_price,
                         "deposit_amount": prop.deposit_amount,
@@ -179,7 +197,7 @@ class PropertySubmissionService:
                     onboarding = OwnerOnboarding(owner=owner, property=prop)
                     active_offer = PublicOffer.get_active()
                     if active_offer:
-                        onboarding.accept_offer(active_offer)
+                        onboarding.accept_offer(active_offer, locale=content_locale)
                     onboarding.save()
 
                 if schedule_verification_at:
@@ -267,8 +285,13 @@ class PropertySubmissionService:
 
         try:
             with transaction.atomic():
+                prop_name = data.get("name") or f"{data.get('rooms')}-room property in {district.name}"
+                prop_desc = data.get("description", "")
                 prop = Property.objects.create(
-                    name=data.get("name") or f"{data.get('rooms')}-room property in {district.name}",
+                    name=prop_name,
+                    name_en=prop_name,
+                    name_uz=prop_name,
+                    name_ru=prop_name,
                     address=data.get("address") or district.name,
                     district=district,
                     property_type=data.get("property_type", PropertyType.APARTMENT),
@@ -280,7 +303,10 @@ class PropertySubmissionService:
                     owner=None,
                     engagement_type=PropertyEngagementType.ONE_OFF,
                     status=PropertyStatus.VACANT,
-                    description=data.get("description", ""),
+                    description=prop_desc,
+                    description_en=prop_desc,
+                    description_uz=prop_desc,
+                    description_ru=prop_desc,
                     tariff=data.get("tariff", TariffChoices.STANDARD),
                     map_lat=data.get("map_lat"),
                     map_lon=data.get("map_lon"),
@@ -291,6 +317,12 @@ class PropertySubmissionService:
                     vacant_since=timezone.now().date(),
                     vacant_days=0,
                 )
+
+                if "translations" in data and isinstance(data["translations"], dict):
+                    from core.services.localization import LocalizedContentService
+
+                    LocalizedContentService().apply_translations(prop, data["translations"], ["name", "description"])
+                    prop.save()
 
                 amenity_slugs = data.get("amenities") or []
                 if amenity_slugs:
@@ -316,6 +348,9 @@ class PropertySubmissionService:
                             "status": ListingStatus.PUBLISHED,
                             "is_active": True,
                             "description": prop.description,
+                            "description_en": getattr(prop, "description_en", prop.description),
+                            "description_uz": getattr(prop, "description_uz", prop.description),
+                            "description_ru": getattr(prop, "description_ru", prop.description),
                             "monthly_price": prop.ask_price,
                             "listed_price": prop.ask_price,
                             "deposit_amount": prop.deposit_amount,
@@ -398,13 +433,18 @@ class PropertySubmissionService:
             user.role = UserRole.OWNER
         user.save()
 
+        content_locale = data.get("content_locale") or "en"
         created_files_to_cleanup: list[PropertyPhoto] = []
 
         try:
             with transaction.atomic():
+                prop_name = (
+                    data.get("name")
+                    or f"{data.get('rooms')}-room {str(data.get('property_type')).replace('_', ' ').title()} in {district.name}"
+                )
+                prop_desc = data.get("description", "")
                 prop = Property.objects.create(
-                    name=data.get("name")
-                    or f"{data.get('rooms')}-room {str(data.get('property_type')).replace('_', ' ').title()} in {district.name}",
+                    name=prop_name,
                     address=data.get("address") or district.name,
                     district=district,
                     property_type=data.get("property_type", PropertyType.APARTMENT),
@@ -416,7 +456,7 @@ class PropertySubmissionService:
                     owner=user,
                     engagement_type=PropertyEngagementType.MANAGED,
                     status=PropertyStatus.PENDING_REVIEW,
-                    description=data.get("description", ""),
+                    description=prop_desc,
                     tariff=data.get("tariff", TariffChoices.STANDARD),
                     ask_price=monthly_price,
                     ask_currency=currency,
@@ -427,6 +467,9 @@ class PropertySubmissionService:
                     deposit_amount=deposit_amount,
                     deposit_currency=currency,
                 )
+                setattr(prop, f"name_{content_locale}", prop_name)
+                setattr(prop, f"description_{content_locale}", prop_desc)
+                prop.save(update_fields=[f"name_{content_locale}", f"description_{content_locale}"])
 
                 amenity_slugs = data.get("amenities") or []
                 if amenity_slugs:
@@ -436,7 +479,7 @@ class PropertySubmissionService:
                     property=prop,
                     status=ListingStatus.PENDING_REVIEW,
                     is_active=False,
-                    description=data.get("description", ""),
+                    description=prop_desc,
                     monthly_price=monthly_price,
                     listed_price=monthly_price,
                     deposit_amount=deposit_amount,
@@ -445,22 +488,26 @@ class PropertySubmissionService:
                     price_includes=data.get("price_includes", []),
                     submitted_at=timezone.now(),
                 )
+                setattr(listing, f"description_{content_locale}", prop_desc)
+                listing.save(update_fields=[f"description_{content_locale}"])
 
                 active_offer = PublicOffer.get_active()
                 onboarding = OwnerOnboarding(owner=user, property=prop)
                 if active_offer:
-                    onboarding.accept_offer(active_offer)
+                    onboarding.accept_offer(active_offer, locale=content_locale)
                 onboarding.save()
 
                 captions = data.get("captions") or []
                 for idx, file_obj in enumerate(files):
+                    cap = captions[idx] if idx < len(captions) and captions[idx] else ""
                     photo = PropertyPhoto(
                         property=prop,
                         image=file_obj,
-                        caption=captions[idx] if idx < len(captions) and captions[idx] else "",
+                        caption=cap,
                         is_primary=(idx == 0),
                         sort_order=idx,
                     )
+                    setattr(photo, f"caption_{content_locale}", cap)
                     photo.save()
                     created_files_to_cleanup.append(photo)
 

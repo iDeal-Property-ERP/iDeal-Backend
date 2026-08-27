@@ -11,10 +11,10 @@ from .contract import (
 from .finance import ExchangeRateFactory, PaymentFactory, PayoutScheduleFactory
 from .inventory import InventoryActFactory, InventoryActItemFactory, InventoryActPhotoFactory
 from .maintenance import ServiceRequestCommentFactory, ServiceRequestFactory, ServiceRequestPhotoFactory
-from .marketplace import BookingFactory, FavoriteListingFactory, ListingFactory, ViewingRequestFactory
+from .marketplace import BookingFactory, FaqItemFactory, FavoriteListingFactory, ListingFactory, ViewingRequestFactory
 from .mobile_config import MobileCriticalUpdateRangeFactory, MobileUpdatePolicyFactory
 from .notification import DeviceTokenFactory, NotificationFactory, NotificationPreferenceFactory
-from .property import DistrictFactory, PropertyFactory, PropertyPhotoFactory, VerificationVisitFactory
+from .property import AmenityFactory, DistrictFactory, PropertyFactory, PropertyPhotoFactory, VerificationVisitFactory
 from .vas import ServiceCatalogItemFactory, ServiceOrderFactory
 
 __all__ = [
@@ -25,6 +25,7 @@ __all__ = [
     "AgentProfileFactory",
     "AgentDealFactory",
     "DistrictFactory",
+    "AmenityFactory",
     "PropertyFactory",
     "PropertyPhotoFactory",
     "VerificationVisitFactory",
@@ -40,6 +41,7 @@ __all__ = [
     "ServiceRequestFactory",
     "ServiceRequestPhotoFactory",
     "ListingFactory",
+    "FaqItemFactory",
     "FavoriteListingFactory",
     "ViewingRequestFactory",
     "BookingFactory",

@@ -1,5 +1,5 @@
 import factory
-from property.models import District, Property, PropertyPhoto, VerificationVisit
+from property.models import Amenity, District, Property, PropertyPhoto, VerificationVisit
 
 from .account import OwnerFactory
 
@@ -9,7 +9,26 @@ class DistrictFactory(factory.django.DjangoModelFactory):
         model = District
 
     name = factory.Sequence(lambda n: f"District {n}")
+    name_en = factory.LazyAttribute(lambda o: o.name)
+    name_uz = factory.LazyAttribute(lambda o: o.name)
+    name_ru = factory.LazyAttribute(lambda o: o.name)
     city = "Toshkent"
+    city_en = factory.LazyAttribute(lambda o: o.city)
+    city_uz = factory.LazyAttribute(lambda o: o.city)
+    city_ru = factory.LazyAttribute(lambda o: o.city)
+
+
+class AmenityFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Amenity
+
+    name = factory.Sequence(lambda n: f"Amenity {n}")
+    name_en = factory.LazyAttribute(lambda o: o.name)
+    name_uz = factory.LazyAttribute(lambda o: o.name)
+    name_ru = factory.LazyAttribute(lambda o: o.name)
+    slug = factory.Sequence(lambda n: f"amenity-{n}")
+    icon = "wifi"
+    is_active = True
 
 
 class PropertyFactory(factory.django.DjangoModelFactory):
@@ -17,6 +36,13 @@ class PropertyFactory(factory.django.DjangoModelFactory):
         model = Property
 
     name = factory.Sequence(lambda n: f"Property {n}")
+    name_en = factory.LazyAttribute(lambda o: o.name)
+    name_uz = factory.LazyAttribute(lambda o: o.name)
+    name_ru = factory.LazyAttribute(lambda o: o.name)
+    description = "Test Property Description"
+    description_en = "Test Property Description"
+    description_uz = "Test Property Description"
+    description_ru = "Test Property Description"
     address = factory.Faker("street_address")
     district = factory.SubFactory(DistrictFactory)
     rooms = factory.Faker("random_int", min=1, max=5)

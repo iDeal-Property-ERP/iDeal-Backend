@@ -3,10 +3,14 @@ from decimal import Decimal
 from http import HTTPStatus
 from typing import Any
 
+from contract.models import PublicOffer
 from django.db import transaction
 from django.db.models import Case, Count, F, IntegerField, Max, Min, Q, Sum, Value, When
+from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from dmr import Body, Path, Query
+from marketplace.models import FaqItem
+from property.models import Amenity, District, Property
 from property.services.validation import validate_floor_bounds
 
 from api.v1.finance.schemas import SettlementOutput
@@ -24,8 +28,11 @@ from api.v1.management.schemas import (
     KpiVacant,
     MaintenanceRequestRow,
     ManagementAgreementOutput,
+    ManagementAmenityInput,
     ManagementBookingConvertInput,
     ManagementBookingOutput,
+    ManagementDistrictInput,
+    ManagementFaqInput,
     ManagementInquiryOutput,
     ManagementInquiryStatusInput,
     ManagementLeadOutput,
@@ -38,6 +45,7 @@ from api.v1.management.schemas import (
     ManagementPaymentOutput,
     ManagementPayoutOutput,
     ManagementPropertyOutput,
+    ManagementPublicOfferInput,
     ManagementServiceRequestOutput,
     ManagementUserCreateInput,
     ManagementUserOutput,
@@ -183,7 +191,7 @@ class DashboardView(ManagementView):
         from contract.models import Lease
         from finance.models import Payment, PayoutSchedule
         from maintenance.models import ServiceRequest
-        from property.models import District, OneOffDeal, Property
+        from property.models import District, OneOffDeal
 
         # Greeting / Date / Location
         greeting = f"Xush kelibsiz, {user.first_name} \U0001f44b"
@@ -251,7 +259,8 @@ class DashboardView(ManagementView):
 
         # ---- Occupancy ----
         props_by_status = {
-            entry["status"]: entry["count"] for entry in Property.objects.values("status").annotate(count=Count("id"))
+            entry["status"]: entry["count"]
+            for entry in Property.objects.order_by().values("status").annotate(count=Count("id"))
         }
         rented = props_by_status.get("rented", 0)
         vacant = props_by_status.get("vacant", 0)
@@ -460,7 +469,6 @@ class PnLSummaryView(ManagementView):
 
     def get(self) -> dict:
         from finance.utils import convert_amount
-        from property.models import Property
 
         today = date.today()
         params = self.request.GET
@@ -721,7 +729,6 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
     def get_queryset(self):
         from contract.models import Lease
         from django.db.models import Prefetch
-        from property.models import Property
 
         from core.constants import LeaseStatus
 
@@ -788,7 +795,7 @@ class OneOffDealListCreateView(ManagementView, ListAPIView):
         return super().get(parsed_query)
 
     def post(self, parsed_body: Body[OneOffDealCreateInput]) -> dict:
-        from property.models import OneOffDeal, Property
+        from property.models import OneOffDeal
 
         from core.constants import PropertyStatus
 
@@ -1032,7 +1039,6 @@ class ManagementPropertyMapView(ManagementView):
     def get(self) -> dict:
         from contract.models import Lease
         from django.db.models import Prefetch
-        from property.models import Property
 
         from core.constants import LeaseStatus
 
@@ -1107,7 +1113,6 @@ class ManagementPropertyImportView(ManagementView):
         import io
 
         from django.db import transaction
-        from property.models import Property
         from pydantic import ValidationError
 
         from api.v1.property.schemas import PropertyCreateInput
@@ -1151,8 +1156,11 @@ class ManagementPropertyImportView(ManagementView):
                 errors.append({"row": line_no, "message": messages})
                 continue
             try:
+                data = validated.model_dump()
+                data.pop("translations", None)
+                data.pop("content_locale", None)
                 with transaction.atomic():
-                    Property.objects.create(**validated.model_dump())
+                    Property.objects.create(**data)
             except Exception as err:  # noqa: BLE001 — per-row report, never a 500
                 errors.append({"row": line_no, "message": str(err)})
                 continue
@@ -1720,7 +1728,6 @@ class ManagementOnboardingDetailView(ManagementView, GenericController):
         )
 
     def get(self, parsed_path: Path[DetailPath]) -> dict:
-        from property.models import Property
 
         from core.constants import PropertyStatus
 
@@ -2212,7 +2219,6 @@ class ManagementVacancyView(ManagementView):
     """Vacancy-cost report: per-property revenue loss from vacant units."""
 
     def get(self) -> dict:
-        from property.models import Property
 
         from core.constants import PropertyStatus
 
@@ -2315,7 +2321,6 @@ class ManagementVASOrderListView(_VASOrderView, ListAPIView):
     def post(self, parsed_body: Body[ManagementServiceOrderCreateInput]) -> dict:
         """Management-initiated order; commission/cashback auto-compute in ServiceOrder.save()."""
         from account.models import User
-        from property.models import Property
         from vas.models import ServiceCatalogItem, ServiceOrder
 
         item = ServiceCatalogItem.objects.filter(pk=parsed_body.catalog_item_id, is_active=True).first()
@@ -2484,3 +2489,260 @@ class ManagementQueueCountsView(ManagementView):
                 "payouts": payouts_due,
             }
         )
+
+
+# =============================================================================
+# Localized Content Management Views
+# =============================================================================
+
+
+def _district_output(d: District) -> dict:
+    from core.services.localization import LocalizedContentService
+
+    return {
+        "id": d.id,
+        "name": str(d.name),
+        "city": str(d.city),
+        "translations": LocalizedContentService().extract_translations(d, ["name", "city"]),
+        "created_at": d.created_at.isoformat() if d.created_at else None,
+        "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+    }
+
+
+def _amenity_output(a: Amenity) -> dict:
+    from core.services.localization import LocalizedContentService
+
+    return {
+        "id": a.id,
+        "slug": a.slug,
+        "name": str(a.name),
+        "icon": a.icon,
+        "sort_order": a.sort_order,
+        "is_active": a.is_active,
+        "translations": LocalizedContentService().extract_translations(a, ["name"]),
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+        "updated_at": a.updated_at.isoformat() if a.updated_at else None,
+    }
+
+
+def _faq_output(f: FaqItem) -> dict:
+    from core.services.localization import LocalizedContentService
+
+    return {
+        "id": f.id,
+        "question": str(f.question),
+        "answer": str(f.answer),
+        "sort_order": f.sort_order,
+        "is_active": f.is_active,
+        "translations": LocalizedContentService().extract_translations(f, ["question", "answer"]),
+        "created_at": f.created_at.isoformat() if f.created_at else None,
+        "updated_at": f.updated_at.isoformat() if f.updated_at else None,
+    }
+
+
+def _public_offer_output(o: PublicOffer) -> dict:
+    from core.services.localization import LocalizedContentService
+
+    return {
+        "id": o.id,
+        "version": o.version,
+        "body": str(o.body),
+        "is_active": o.is_active,
+        "translations": LocalizedContentService().extract_translations(o, ["body"]),
+        "created_at": o.created_at.isoformat() if o.created_at else None,
+        "updated_at": o.updated_at.isoformat() if o.updated_at else None,
+    }
+
+
+class ManagementDistrictListView(ManagementView):
+    def get(self) -> dict:
+        districts = District.objects.filter(deleted_at__isnull=True).order_by("name")
+        return self.ok([_district_output(d) for d in districts])
+
+    def post(self, parsed_body: Body[ManagementDistrictInput]) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        trans = parsed_body.translations.model_dump()
+        en_data = trans.get("en", {})
+        d = District.objects.create(
+            name=en_data.get("name") or trans.get("uz", {}).get("name") or "New District",
+            city=en_data.get("city") or trans.get("uz", {}).get("city") or "Toshkent",
+        )
+        LocalizedContentService().apply_translations(d, trans, ["name", "city"])
+        d.save()
+        return self.ok(_district_output(d), status_code=HTTPStatus.CREATED)
+
+
+class ManagementDistrictDetailView(ManagementView):
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        d = get_object_or_404(District.objects.filter(deleted_at__isnull=True), pk=parsed_path.pk)
+        return self.ok(_district_output(d))
+
+    def put(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementDistrictInput]) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        d = get_object_or_404(District.objects.filter(deleted_at__isnull=True), pk=parsed_path.pk)
+        trans = parsed_body.translations.model_dump()
+        LocalizedContentService().apply_translations(d, trans, ["name", "city"])
+        d.save()
+        return self.ok(_district_output(d))
+
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementDistrictInput]) -> dict:
+        return self.put(parsed_path, parsed_body)
+
+    def delete(self, parsed_path: Path[DetailPath]) -> dict:
+        d = get_object_or_404(District.objects.filter(deleted_at__isnull=True), pk=parsed_path.pk)
+        d.delete()
+        return self.ok({"deleted": True})
+
+
+class ManagementAmenityListView(ManagementView):
+    def get(self) -> dict:
+        amenities = Amenity.objects.all().order_by("sort_order", "name")
+        return self.ok([_amenity_output(a) for a in amenities])
+
+    def post(self, parsed_body: Body[ManagementAmenityInput]) -> dict:
+        from django.utils.text import slugify
+
+        from core.services.localization import LocalizedContentService
+
+        trans = parsed_body.translations.model_dump()
+        en_name = trans.get("en", {}).get("name") or trans.get("uz", {}).get("name") or "amenity"
+        slug = parsed_body.slug or slugify(en_name)
+        a = Amenity.objects.create(
+            slug=slug,
+            name=en_name,
+            icon=parsed_body.icon,
+            sort_order=parsed_body.sort_order,
+            is_active=parsed_body.is_active,
+        )
+        LocalizedContentService().apply_translations(a, trans, ["name"])
+        a.save()
+        return self.ok(_amenity_output(a), status_code=HTTPStatus.CREATED)
+
+
+class ManagementAmenityDetailView(ManagementView):
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        a = get_object_or_404(Amenity, pk=parsed_path.pk)
+        return self.ok(_amenity_output(a))
+
+    def put(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementAmenityInput]) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        a = get_object_or_404(Amenity, pk=parsed_path.pk)
+        if parsed_body.slug:
+            a.slug = parsed_body.slug
+        a.icon = parsed_body.icon
+        a.sort_order = parsed_body.sort_order
+        a.is_active = parsed_body.is_active
+        trans = parsed_body.translations.model_dump()
+        LocalizedContentService().apply_translations(a, trans, ["name"])
+        a.save()
+        return self.ok(_amenity_output(a))
+
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementAmenityInput]) -> dict:
+        return self.put(parsed_path, parsed_body)
+
+    def delete(self, parsed_path: Path[DetailPath]) -> dict:
+        a = get_object_or_404(Amenity, pk=parsed_path.pk)
+        a.delete()
+        return self.ok({"deleted": True})
+
+
+class ManagementFaqListView(ManagementView):
+    def get(self) -> dict:
+        faqs = FaqItem.objects.all().order_by("sort_order", "id")
+        return self.ok([_faq_output(f) for f in faqs])
+
+    def post(self, parsed_body: Body[ManagementFaqInput]) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        trans = parsed_body.translations.model_dump()
+        en_data = trans.get("en", {})
+        f = FaqItem.objects.create(
+            question=en_data.get("question") or "Question",
+            answer=en_data.get("answer") or "Answer",
+            sort_order=parsed_body.sort_order,
+            is_active=parsed_body.is_active,
+        )
+        LocalizedContentService().apply_translations(f, trans, ["question", "answer"])
+        f.save()
+        return self.ok(_faq_output(f), status_code=HTTPStatus.CREATED)
+
+
+class ManagementFaqDetailView(ManagementView):
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        f = get_object_or_404(FaqItem, pk=parsed_path.pk)
+        return self.ok(_faq_output(f))
+
+    def put(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementFaqInput]) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        f = get_object_or_404(FaqItem, pk=parsed_path.pk)
+        f.sort_order = parsed_body.sort_order
+        f.is_active = parsed_body.is_active
+        trans = parsed_body.translations.model_dump()
+        LocalizedContentService().apply_translations(f, trans, ["question", "answer"])
+        f.save()
+        return self.ok(_faq_output(f))
+
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementFaqInput]) -> dict:
+        return self.put(parsed_path, parsed_body)
+
+    def delete(self, parsed_path: Path[DetailPath]) -> dict:
+        f = get_object_or_404(FaqItem, pk=parsed_path.pk)
+        f.delete()
+        return self.ok({"deleted": True})
+
+
+class ManagementPublicOfferListView(ManagementView):
+    def get(self) -> dict:
+        offers = PublicOffer.objects.filter(deleted_at__isnull=True).order_by("-created_at")
+        return self.ok([_public_offer_output(o) for o in offers])
+
+    def post(self, parsed_body: Body[ManagementPublicOfferInput]) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        trans = parsed_body.translations.model_dump()
+        en_body = trans.get("en", {}).get("body") or "Terms"
+        o = PublicOffer.objects.create(
+            version=parsed_body.version,
+            body=en_body,
+            is_active=parsed_body.is_active,
+        )
+        LocalizedContentService().apply_translations(o, trans, ["body"])
+        o.save()
+        return self.ok(_public_offer_output(o), status_code=HTTPStatus.CREATED)
+
+
+class ManagementPublicOfferDetailView(ManagementView):
+    def get(self, parsed_path: Path[DetailPath]) -> dict:
+        o = get_object_or_404(PublicOffer.objects.filter(deleted_at__isnull=True), pk=parsed_path.pk)
+        return self.ok(_public_offer_output(o))
+
+    def put(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementPublicOfferInput]) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        o = get_object_or_404(PublicOffer.objects.filter(deleted_at__isnull=True), pk=parsed_path.pk)
+        o.version = parsed_body.version
+        o.is_active = parsed_body.is_active
+        trans = parsed_body.translations.model_dump()
+        LocalizedContentService().apply_translations(o, trans, ["body"])
+        o.save()
+        return self.ok(_public_offer_output(o))
+
+    def patch(self, parsed_path: Path[DetailPath], parsed_body: Body[ManagementPublicOfferInput]) -> dict:
+        return self.put(parsed_path, parsed_body)
+
+    def delete(self, parsed_path: Path[DetailPath]) -> dict:
+        o = get_object_or_404(PublicOffer.objects.filter(deleted_at__isnull=True), pk=parsed_path.pk)
+        o.delete()
+        return self.ok({"deleted": True})
+
+
+class ManagementLocalizationStatusView(ManagementView):
+    def get(self) -> dict:
+        from core.services.localization import LocalizedContentService
+
+        status = LocalizedContentService().get_localization_status()
+        return self.ok(status)

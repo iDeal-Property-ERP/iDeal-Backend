@@ -26,14 +26,13 @@ class Command(BaseCommand):
 
         districts_created = 0
         for data in districts:
-            _, created = District.objects.get_or_create(
-                name=data["name"],
-                defaults={"city": data["city"]}
-            )
+            _, created = District.objects.get_or_create(name=data["name"], defaults={"city": data["city"]})
             if created:
                 districts_created += 1
 
-        self.stdout.write(self.style.SUCCESS(f"Successfully bootstrapped {districts_created} new districts (Total: {len(districts)})"))
+        self.stdout.write(
+            self.style.SUCCESS(f"Successfully bootstrapped {districts_created} new districts (Total: {len(districts)})")
+        )
 
         # Add amenities (matching lucide icons commonly used)
         amenities = [
@@ -57,12 +56,11 @@ class Command(BaseCommand):
         for data in amenities:
             defaults = data.copy()
             defaults.pop("slug")
-            _, created = Amenity.objects.get_or_create(
-                slug=data["slug"],
-                defaults=defaults
-            )
+            _, created = Amenity.objects.get_or_create(slug=data["slug"], defaults=defaults)
             if created:
                 amenities_created += 1
 
-        self.stdout.write(self.style.SUCCESS(f"Successfully bootstrapped {amenities_created} new amenities (Total: {len(amenities)})"))
+        self.stdout.write(
+            self.style.SUCCESS(f"Successfully bootstrapped {amenities_created} new amenities (Total: {len(amenities)})")
+        )
         self.stdout.write(self.style.SUCCESS("Bootstrap completed!"))

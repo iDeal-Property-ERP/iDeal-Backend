@@ -8,6 +8,17 @@ import pydantic
 from core.constants import VASServiceType
 
 
+class VASTranslationItem(pydantic.BaseModel):
+    name: str | None = None
+    description: str | None = None
+
+
+class VASTranslationMap(pydantic.BaseModel):
+    en: VASTranslationItem | None = None
+    uz: VASTranslationItem | None = None
+    ru: VASTranslationItem | None = None
+
+
 class ServiceCatalogItemOutput(pydantic.BaseModel):
     id: int
     service_type: str
@@ -19,6 +30,7 @@ class ServiceCatalogItemOutput(pydantic.BaseModel):
     commission_rate: Decimal
     cashback_rate: Decimal
     is_active: bool
+    translations: VASTranslationMap | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -35,6 +47,7 @@ class ServiceCatalogItemCreateInput(pydantic.BaseModel):
     commission_rate: Decimal = Decimal("0.00")
     cashback_rate: Decimal = Decimal("0.00")
     is_active: bool = True
+    translations: VASTranslationMap | None = None
 
 
 class ServiceCatalogItemUpdateInput(pydantic.BaseModel):
@@ -47,6 +60,7 @@ class ServiceCatalogItemUpdateInput(pydantic.BaseModel):
     commission_rate: Decimal | None = None
     cashback_rate: Decimal | None = None
     is_active: bool | None = None
+    translations: VASTranslationMap | None = None
 
 
 class ServiceOrderOutput(pydantic.BaseModel):
