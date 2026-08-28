@@ -1,4 +1,5 @@
 import math
+from datetime import date
 from typing import Any, Literal
 
 import pydantic
@@ -13,6 +14,14 @@ def _safe_float(value: Any, default: float | None = None) -> float | None:
         return float(value)
     except TypeError, ValueError:
         return default
+
+
+def _validate_availability(query) -> None:
+    """Require ``start_date`` and ``end_date`` together and a coherent range."""
+    if bool(query.start_date) != bool(query.end_date):
+        raise ValueError("start_date and end_date must be provided together.")
+    if query.start_date and query.end_date and query.end_date < query.start_date:
+        raise ValueError("end_date cannot be before start_date.")
 
 
 def parse_bbox(value: str) -> tuple[float, float, float, float]:
@@ -44,6 +53,9 @@ class MobileHomeFeedQuery(APIModel):
     per_page: int = pydantic.Field(default=20, ge=1, le=100)
     q: str | None = None
     district_id: int | None = pydantic.Field(default=None, ge=1)
+    start_date: date | None = None
+    end_date: date | None = None
+    flexibility_days: int | None = pydantic.Field(default=None, ge=0)
     price_min: float | None = pydantic.Field(default=None, ge=0)
     price_max: float | None = pydantic.Field(default=None, ge=0)
     rooms_min: int | None = pydantic.Field(default=None, ge=0)
@@ -60,6 +72,7 @@ class MobileHomeFeedQuery(APIModel):
             raise ValueError("price_min cannot exceed price_max")
         if self.rooms_min is not None and self.rooms_max is not None and self.rooms_min > self.rooms_max:
             raise ValueError("rooms_min cannot exceed rooms_max")
+        _validate_availability(self)
         return self
 
 
@@ -68,6 +81,9 @@ class MobileHomeMapQuery(APIModel):
     favorites_only: bool = False
     q: str | None = None
     district_id: int | None = pydantic.Field(default=None, ge=1)
+    start_date: date | None = None
+    end_date: date | None = None
+    flexibility_days: int | None = pydantic.Field(default=None, ge=0)
     property_type: Literal["apartment", "house", "studio", "room"] | None = None
     price_min: float | None = pydantic.Field(default=None, ge=0)
     price_max: float | None = pydantic.Field(default=None, ge=0)
@@ -89,6 +105,7 @@ class MobileHomeMapQuery(APIModel):
             raise ValueError("price_min cannot exceed price_max")
         if self.rooms_min is not None and self.rooms_max is not None and self.rooms_min > self.rooms_max:
             raise ValueError("rooms_min cannot exceed rooms_max")
+        _validate_availability(self)
         return self
 
 

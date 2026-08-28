@@ -493,3 +493,54 @@ class TestMobileFavoriteToggle:
         assert response.status_code == 200
         assert FavoriteListing.objects.filter(user=tenant, listing=listing).count() == 0
         assert FavoriteListing.objects.filter(user=other_tenant, listing=listing).count() == 1
+
+
+class TestMobileFavoritesAvailability:
+    def test_favorites_honor_availability_window(self, api_client):
+        from datetime import date
+
+        from core.constants import LeaseStatus, OwnerAgreementStatus
+
+        from tests.factories import LeaseFactory
+
+        tenant = TenantFactory()
+        today = date.today()
+        start = today + timedelta(days=10)
+        end = today + timedelta(days=20)
+
+        available_prop = PropertyFactory(status=PropertyStatus.RENTED)
+        available = ListingFactory(property=available_prop, status=ListingStatus.PUBLISHED)
+        OwnerAgreementFactory(
+            property=available_prop,
+            status=OwnerAgreementStatus.ACTIVE,
+            start_date=start + timedelta(days=3),
+            end_date=end - timedelta(days=3),
+        )
+        FavoriteListingFactory(user=tenant, listing=available)
+
+        blocked_prop = PropertyFactory(status=PropertyStatus.RENTED)
+        blocked = ListingFactory(property=blocked_prop, status=ListingStatus.PUBLISHED)
+        oa = OwnerAgreementFactory(
+            property=blocked_prop,
+            status=OwnerAgreementStatus.ACTIVE,
+            start_date=today,
+            end_date=today + timedelta(days=30),
+        )
+        LeaseFactory(
+            property=blocked_prop,
+            owner_agreement=oa,
+            status=LeaseStatus.ACTIVE,
+            start_date=today,
+            end_date=today + timedelta(days=15),
+        )
+        FavoriteListingFactory(user=tenant, listing=blocked)
+
+        response = api_client.get(
+            FAVORITES_URL,
+            {"start_date": start.isoformat(), "end_date": end.isoformat()},
+            **_make_jwt(tenant),
+        )
+        assert response.status_code == 200
+        ids = {item["id"] for item in response.json()["data"]["page"]["object_list"]}
+        assert available.id in ids
+        assert blocked.id not in ids

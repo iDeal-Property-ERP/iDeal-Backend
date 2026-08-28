@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from urllib.parse import urlparse
 
 import pytest
@@ -12,7 +12,9 @@ from property.models import Amenity, Property, PropertyPhoto
 
 from core.constants import (
     FurnishingType,
+    LeaseStatus,
     ListingStatus,
+    OwnerAgreementStatus,
     PropertyEngagementType,
     PropertyStatus,
     PropertyType,
@@ -20,6 +22,7 @@ from core.constants import (
 )
 from tests.factories import (
     DistrictFactory,
+    LeaseFactory,
     ListingFactory,
     OwnerAgreementFactory,
     PropertyFactory,
@@ -1180,3 +1183,126 @@ class TestMobileHomeRecommendedListings:
         assert RecentSearchActivity.global_objects.filter(user=user).count() == 0
         assert ListingViewActivity.objects.filter(user=user).count() == 0
         assert ListingViewActivity.global_objects.filter(user=user).count() == 0
+
+
+class TestMobileHomeAvailabilityFilters:
+    """Mobile feed, map, and inherited favorites honor the availability window."""
+
+    def _available_listing(self, *, today, start, end, with_coordinates: bool = False):
+        prop = PropertyFactory(status=PropertyStatus.RENTED)
+        listing = ListingFactory(property=prop, status=ListingStatus.PUBLISHED)
+        OwnerAgreementFactory(
+            property=prop,
+            status=OwnerAgreementStatus.ACTIVE,
+            start_date=start + timedelta(days=3),
+            end_date=end - timedelta(days=3),
+        )
+        if with_coordinates:
+            prop.map_lat = 41.31
+            prop.map_lon = 69.28
+            prop.save(update_fields=["map_lat", "map_lon"])
+        return listing
+
+    def _blocked_listing(self, *, today, start, end):
+        prop = PropertyFactory(status=PropertyStatus.RENTED)
+        listing = ListingFactory(property=prop, status=ListingStatus.PUBLISHED)
+        oa = OwnerAgreementFactory(
+            property=prop,
+            status=OwnerAgreementStatus.ACTIVE,
+            start_date=today,
+            end_date=today + timedelta(days=30),
+        )
+        LeaseFactory(
+            property=prop,
+            owner_agreement=oa,
+            status=LeaseStatus.ACTIVE,
+            start_date=today,
+            end_date=today + timedelta(days=15),
+        )
+        return listing
+
+    def test_feed_filters_by_availability(self, api_client):
+        today = date.today()
+        start = today + timedelta(days=10)
+        end = today + timedelta(days=20)
+
+        available = self._available_listing(today=today, start=start, end=end)
+        blocked = self._blocked_listing(today=today, start=start, end=end)
+
+        response = api_client.get(LISTINGS_URL, {"start_date": start.isoformat(), "end_date": end.isoformat()})
+        assert response.status_code == 200
+        ids = {item["id"] for item in _items(response.json())}
+        assert available.id in ids
+        assert blocked.id not in ids
+
+    def test_feed_map_availability_parity(self, api_client):
+        today = date.today()
+        start = today + timedelta(days=10)
+        end = today + timedelta(days=20)
+
+        available = self._available_listing(today=today, start=start, end=end, with_coordinates=True)
+        blocked = self._blocked_listing(today=today, start=start, end=end)
+        Property.objects.filter(pk=blocked.property_id).update(map_lat=41.32, map_lon=69.29)
+
+        query = {"start_date": start.isoformat(), "end_date": end.isoformat()}
+        feed_response = api_client.get(LISTINGS_URL, query)
+        map_response = api_client.get(MAP_URL, {"bbox": "69,41,70,42", **query})
+
+        assert feed_response.status_code == 200
+        assert map_response.status_code == 200
+        feed_ids = {item["id"] for item in _items(feed_response.json())}
+        map_ids = {item["id"] for item in map_response.json()["data"]["items"]}
+        assert available.id in feed_ids
+        assert available.id in map_ids
+        assert blocked.id not in feed_ids
+        assert blocked.id not in map_ids
+        assert feed_ids == map_ids
+
+    def test_flexibility_narrows_available_window(self, api_client):
+        today = date.today()
+        start = today + timedelta(days=10)
+        end = today + timedelta(days=20)
+        # Owner agreement covers only the strict core window (no flexibility slack).
+        prop = PropertyFactory(status=PropertyStatus.RENTED)
+        listing = ListingFactory(property=prop, status=ListingStatus.PUBLISHED)
+        OwnerAgreementFactory(
+            property=prop,
+            status=OwnerAgreementStatus.ACTIVE,
+            start_date=start,
+            end_date=end,
+        )
+
+        strict = api_client.get(LISTINGS_URL, {"start_date": start.isoformat(), "end_date": end.isoformat()})
+        flexible = api_client.get(
+            LISTINGS_URL,
+            {"start_date": start.isoformat(), "end_date": end.isoformat(), "flexibility_days": 0},
+        )
+        assert strict.status_code == 200
+        assert flexible.status_code == 200
+        assert listing.id in {item["id"] for item in _items(strict.json())}
+        assert listing.id in {item["id"] for item in _items(flexible.json())}
+
+    def test_missing_one_date_is_rejected(self, api_client):
+        today = date.today()
+        response = api_client.get(LISTINGS_URL, {"start_date": today.isoformat()})
+        assert response.status_code == 400
+
+    def test_reversed_dates_are_rejected(self, api_client):
+        today = date.today()
+        response = api_client.get(
+            LISTINGS_URL,
+            {"start_date": (today + timedelta(days=5)).isoformat(), "end_date": today.isoformat()},
+        )
+        assert response.status_code == 400
+
+    def test_negative_flexibility_is_rejected(self, api_client):
+        today = date.today()
+        response = api_client.get(
+            LISTINGS_URL,
+            {
+                "start_date": today.isoformat(),
+                "end_date": (today + timedelta(days=1)).isoformat(),
+                "flexibility_days": -1,
+            },
+        )
+        assert response.status_code == 400
