@@ -20,6 +20,15 @@ http:
   - name: district_id
     value: '1'
     type: query
+  - name: start_date
+    value: '2026-01-01T00:00:00Z'
+    type: query
+  - name: end_date
+    value: '2026-01-01T00:00:00Z'
+    type: query
+  - name: flexibility_days
+    value: '1'
+    type: query
   - name: price_min
     value: '1'
     type: query
@@ -77,6 +86,15 @@ docs: '# GET /api/v1/mobile/home/listings/
   | `district_id` | query | no | `fixture-value` | non-nullable; fixture value; replace
   with a real ID when running. |
 
+  | `start_date` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `end_date` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `flexibility_days` | query | no | `fixture-value` | non-nullable; fixture value;
+  replace with a real ID when running. |
+
   | `price_min` | query | no | `fixture-value` | non-nullable; fixture value; replace
   with a real ID when running. |
 
@@ -129,6 +147,15 @@ examples:
       value: '1'
       type: query
     - name: district_id
+      value: '1'
+      type: query
+    - name: start_date
+      value: '1'
+      type: query
+    - name: end_date
+      value: '1'
+      type: query
+    - name: flexibility_days
       value: '1'
       type: query
     - name: price_min
@@ -185,6 +212,15 @@ examples:
       value: '1'
       type: query
     - name: district_id
+      value: '1'
+      type: query
+    - name: start_date
+      value: '1'
+      type: query
+    - name: end_date
+      value: '1'
+      type: query
+    - name: flexibility_days
       value: '1'
       type: query
     - name: price_min

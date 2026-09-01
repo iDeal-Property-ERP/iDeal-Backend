@@ -4,13 +4,19 @@ from typing import Literal
 
 import pydantic
 from django.utils.translation import gettext_lazy as _
-from property.services.validation import validate_floor_bounds
+from property.services.validation import validate_and_normalize_landmark, validate_floor_bounds
 from pydantic import field_validator
 
 
 class PropertyTranslationItem(pydantic.BaseModel):
     name: str | None = None
     description: str | None = None
+    landmark: str | None = None
+
+    @field_validator("landmark")
+    @classmethod
+    def normalize_landmark(cls, v: str | None) -> str | None:
+        return validate_and_normalize_landmark(v)
 
 
 class PropertyTranslationMap(pydantic.BaseModel):
@@ -87,6 +93,7 @@ class PropertyOutput(pydantic.BaseModel):
     id: int
     name: str
     address: str
+    landmark: str | None = None
     # Nullable so DRAFT properties (saved partially) serialize cleanly.
     district: DistrictOutput | None
     rooms: int | None
@@ -127,6 +134,7 @@ class PropertyOutput(pydantic.BaseModel):
 class PropertyCreateInput(pydantic.BaseModel):
     name: str
     address: str
+    landmark: str | None = None
     district_id: int
     rooms: int = pydantic.Field(gt=0)
     area_sqm: int = pydantic.Field(gt=0)
@@ -154,6 +162,11 @@ class PropertyCreateInput(pydantic.BaseModel):
         validate_floor_bounds(self.floor, self.total_floors)
         return self
 
+    @field_validator("landmark")
+    @classmethod
+    def normalize_landmark(cls, v: str | None) -> str | None:
+        return validate_and_normalize_landmark(v)
+
     @field_validator("district_id")
     @classmethod
     def check_district_exists(cls, v: int) -> int:
@@ -178,6 +191,7 @@ class PropertyCreateInput(pydantic.BaseModel):
 class PropertyUpdateInput(pydantic.BaseModel):
     name: str | None = None
     address: str | None = None
+    landmark: str | None = None
     district_id: int | None = None
     rooms: int | None = pydantic.Field(default=None, gt=0)
     area_sqm: int | None = pydantic.Field(default=None, gt=0)
@@ -204,6 +218,11 @@ class PropertyUpdateInput(pydantic.BaseModel):
     def validate_floor_bounds(self):
         validate_floor_bounds(self.floor, self.total_floors)
         return self
+
+    @field_validator("landmark")
+    @classmethod
+    def normalize_landmark(cls, v: str | None) -> str | None:
+        return validate_and_normalize_landmark(v)
 
     @field_validator("district_id")
     @classmethod
@@ -243,6 +262,7 @@ class PropertySubmissionInput(pydantic.BaseModel):
     engagement_type: str = "managed"  # 'managed' or 'one_off'
     name: str | None = None
     address: str | None = None
+    landmark: str | None = None
     district_id: int
     property_type: str = "apartment"
     rooms: int = pydantic.Field(gt=0)
@@ -271,6 +291,11 @@ class PropertySubmissionInput(pydantic.BaseModel):
     translations: PropertyTranslationMap | None = None
     schedule_verification_at: str | None = None
     brokerage: OneOffDealInput | None = None
+
+    @field_validator("landmark")
+    @classmethod
+    def normalize_landmark(cls, v: str | None) -> str | None:
+        return validate_and_normalize_landmark(v)
 
     @pydantic.model_validator(mode="after")
     def validate_bounds(self):

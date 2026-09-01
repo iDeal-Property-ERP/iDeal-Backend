@@ -14,11 +14,11 @@ http:
       type: text
       value: '{"contact": {"first_name": "fixture-value", "last_name": "fixture-value",
         "email": "fixture@example.com", "phone": "+998901234567"}, "property_type":
-        "apartment", "engagement_type": "managed", "name": "fixture-value", "district_id":
-        1, "rooms": 1, "area_sqm": 1, "floor": 0, "total_floors": 1, "furnishing":
-        "unfurnished", "description": "fixture-value", "amenities": ["fixture-value"],
-        "monthly_price": 1, "deposit_amount": 1, "currency": "USD", "minimum_stay":
-        6, "price_includes": ["utilities"]}'
+        "apartment", "engagement_type": "managed", "name": "fixture-value", "landmark":
+        "fixture-value", "district_id": 1, "rooms": 1, "area_sqm": 1, "floor": 0,
+        "total_floors": 1, "furnishing": "unfurnished", "description": "fixture-value",
+        "amenities": ["fixture-value"], "monthly_price": 1, "deposit_amount": 1, "currency":
+        "USD", "minimum_stay": 6, "price_includes": ["utilities"]}'
     - name: images[]
       type: file
       path: '{{sample_image}}'
@@ -66,6 +66,9 @@ docs: '# POST /api/v1/marketplace/listings/submit/
 
   | `name` | yes | no | fixture value; replace fixture values with domain-valid data
   before runtime execution. |
+
+  | `landmark` | no | yes | default=None; replace fixture values with domain-valid
+  data before runtime execution. |
 
   | `district_id` | yes | no | fixture value; replace fixture values with domain-valid
   data before runtime execution. |

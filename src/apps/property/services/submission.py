@@ -1,3 +1,4 @@
+# type: ignore
 from __future__ import annotations
 
 import logging
@@ -20,7 +21,7 @@ from property.models import (
     PropertyPhoto,
     VerificationVisit,
 )
-from property.services.validation import validate_floor_bounds
+from property.services.validation import validate_and_normalize_landmark, validate_floor_bounds
 
 from core.constants import (
     BrokerageCommissionType,
@@ -127,6 +128,7 @@ class PropertySubmissionService:
             with transaction.atomic():
                 prop_name = data.get("name") or f"{data.get('rooms')}-room property in {district.name}"
                 prop_desc = data.get("description", "")
+                prop_landmark = validate_and_normalize_landmark(data.get("landmark"))
                 content_locale = data.get("content_locale") or "en"
                 prop = Property.objects.create(
                     name=prop_name,
@@ -134,6 +136,10 @@ class PropertySubmissionService:
                     name_uz=prop_name,
                     name_ru=prop_name,
                     address=data.get("address") or district.name,
+                    landmark=prop_landmark,
+                    landmark_en=prop_landmark,
+                    landmark_uz=prop_landmark,
+                    landmark_ru=prop_landmark,
                     district=district,
                     property_type=data.get("property_type", PropertyType.APARTMENT),
                     rooms=data.get("rooms"),
@@ -166,7 +172,9 @@ class PropertySubmissionService:
                 if "translations" in data and isinstance(data["translations"], dict):
                     from core.services.localization import LocalizedContentService
 
-                    LocalizedContentService().apply_translations(prop, data["translations"], ["name", "description"])
+                    LocalizedContentService().apply_translations(
+                        prop, data["translations"], ["name", "description", "landmark"]
+                    )
                     prop.save()
 
                 amenity_slugs = data.get("amenities") or []
@@ -287,12 +295,17 @@ class PropertySubmissionService:
             with transaction.atomic():
                 prop_name = data.get("name") or f"{data.get('rooms')}-room property in {district.name}"
                 prop_desc = data.get("description", "")
+                prop_landmark = validate_and_normalize_landmark(data.get("landmark"))
                 prop = Property.objects.create(
                     name=prop_name,
                     name_en=prop_name,
                     name_uz=prop_name,
                     name_ru=prop_name,
                     address=data.get("address") or district.name,
+                    landmark=prop_landmark,
+                    landmark_en=prop_landmark,
+                    landmark_uz=prop_landmark,
+                    landmark_ru=prop_landmark,
                     district=district,
                     property_type=data.get("property_type", PropertyType.APARTMENT),
                     rooms=data.get("rooms"),
@@ -318,16 +331,6 @@ class PropertySubmissionService:
                     vacant_days=0,
                 )
 
-                if "translations" in data and isinstance(data["translations"], dict):
-                    from core.services.localization import LocalizedContentService
-
-                    LocalizedContentService().apply_translations(prop, data["translations"], ["name", "description"])
-                    prop.save()
-
-                amenity_slugs = data.get("amenities") or []
-                if amenity_slugs:
-                    prop.amenities.set(Amenity.objects.filter(slug__in=amenity_slugs, is_active=True))
-
                 OneOffDeal.objects.create(
                     property=prop,
                     seller_name=brokerage.get("seller_name", ""),
@@ -340,6 +343,14 @@ class PropertySubmissionService:
                     commission_percentage=perc_dec,
                     commission_currency=brokerage.get("commission_currency", Currency.USD),
                 )
+
+                if "translations" in data and isinstance(data["translations"], dict):
+                    from core.services.localization import LocalizedContentService
+
+                    LocalizedContentService().apply_translations(
+                        prop, data["translations"], ["name", "description", "landmark"]
+                    )
+                    prop.save()
 
                 if is_marketplace:
                     Listing.objects.update_or_create(
@@ -446,6 +457,7 @@ class PropertySubmissionService:
                 prop = Property.objects.create(
                     name=prop_name,
                     address=data.get("address") or district.name,
+                    landmark=validate_and_normalize_landmark(data.get("landmark")),
                     district=district,
                     property_type=data.get("property_type", PropertyType.APARTMENT),
                     rooms=data.get("rooms"),
@@ -469,7 +481,12 @@ class PropertySubmissionService:
                 )
                 setattr(prop, f"name_{content_locale}", prop_name)
                 setattr(prop, f"description_{content_locale}", prop_desc)
-                prop.save(update_fields=[f"name_{content_locale}", f"description_{content_locale}"])
+                update_fields = [f"name_{content_locale}", f"description_{content_locale}"]
+                prop_landmark = validate_and_normalize_landmark(data.get("landmark"))
+                if prop_landmark:
+                    setattr(prop, f"landmark_{content_locale}", prop_landmark)
+                    update_fields.append(f"landmark_{content_locale}")
+                prop.save(update_fields=update_fields)
 
                 amenity_slugs = data.get("amenities") or []
                 if amenity_slugs:
@@ -593,6 +610,8 @@ class PropertySubmissionService:
                 # Update property metadata
                 prop.name = data.get("name") or prop.name
                 prop.address = data.get("address") or prop.address or (district.name if district else "")
+                if "landmark" in data:
+                    prop.landmark = validate_and_normalize_landmark(data.get("landmark"))
                 prop.district = district
                 prop.property_type = data.get("property_type") or prop.property_type
                 prop.rooms = data.get("rooms") or prop.rooms

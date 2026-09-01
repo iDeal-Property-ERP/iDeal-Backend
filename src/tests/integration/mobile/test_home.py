@@ -1,3 +1,4 @@
+# type: ignore
 from datetime import date, datetime, timedelta
 from urllib.parse import urlparse
 
@@ -40,7 +41,7 @@ RECOMMENDED_URL = "/api/v1/mobile/home/listings/recommended/"
 
 
 def _make_jwt(user, **overrides):
-    from datetime import UTC, datetime, timedelta
+    from datetime import UTC, timedelta
 
     import jwt
 
@@ -178,7 +179,7 @@ class TestMobileHomeListings:
         assert card["is_favorite"] is False
 
     def test_expired_optional_auth_keeps_is_favorite_false(self, api_client, tenant):
-        from datetime import UTC, datetime, timedelta
+        from datetime import UTC, timedelta
 
         from tests.factories import FavoriteListingFactory
 
@@ -732,6 +733,7 @@ class TestMobileHomeListingDetail:
             "title",
             "district",
             "address",
+            "landmark",
             "property_type",
             "rooms",
             "area_sqm",
@@ -759,6 +761,7 @@ class TestMobileHomeListingDetail:
             "contact_phone",
             "booking",
         }
+        assert data["landmark"] is None
         assert data["price"] == 850.0
         assert isinstance(data["price"], float)
         assert isinstance(data["score"], float)

@@ -15,14 +15,15 @@ http:
   body:
     type: json
     data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-      \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\": 1,\n\
-      \  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-      ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-      : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n  \"\
-      ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-      : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-      : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-      : 1,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
+      \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+      \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"owner_id\"\
+      : 1,\n  \"status\": \"fixture-value\",\n  \"score\": 1,\n  \"map_lat\": 1,\n\
+      \  \"map_lon\": 1,\n  \"description\": \"fixture-value\",\n  \"tariff\": \"\
+      standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
+      : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
+      : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\":\
+      \ \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
+      : {}\n}"
 settings:
   encodeUrl: true
   timeout: 0
@@ -53,6 +54,9 @@ docs: '# PATCH /api/v1/properties/<int:pk>/one-off/
   before runtime execution. |
 
   | `address` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `landmark` | no | yes | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
   | `district_id` | no | yes | fixture value; replace fixture values with domain-valid
@@ -141,14 +145,15 @@ examples:
     body:
       type: json
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
+        \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+        \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"owner_id\"\
+        : 1,\n  \"status\": \"fixture-value\",\n  \"score\": 1,\n  \"map_lat\": 1,\n\
+        \  \"map_lon\": 1,\n  \"description\": \"fixture-value\",\n  \"tariff\": \"\
+        standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
+        : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
+        : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
+        : {}\n}"
   response:
     status: 200
     statusText: OK
@@ -171,14 +176,15 @@ examples:
     body:
       type: json
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
+        \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+        \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"owner_id\"\
+        : 1,\n  \"status\": \"fixture-value\",\n  \"score\": 1,\n  \"map_lat\": 1,\n\
+        \  \"map_lon\": 1,\n  \"description\": \"fixture-value\",\n  \"tariff\": \"\
+        standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
+        : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
+        : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
+        : {}\n}"
   response:
     status: 400
     statusText: Error
@@ -202,14 +208,15 @@ examples:
     body:
       type: json
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
+        \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+        \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"owner_id\"\
+        : 1,\n  \"status\": \"fixture-value\",\n  \"score\": 1,\n  \"map_lat\": 1,\n\
+        \  \"map_lon\": 1,\n  \"description\": \"fixture-value\",\n  \"tariff\": \"\
+        standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
+        : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
+        : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
+        : {}\n}"
   response:
     status: 401
     statusText: Error
@@ -233,14 +240,15 @@ examples:
     body:
       type: json
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
+        \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+        \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"owner_id\"\
+        : 1,\n  \"status\": \"fixture-value\",\n  \"score\": 1,\n  \"map_lat\": 1,\n\
+        \  \"map_lon\": 1,\n  \"description\": \"fixture-value\",\n  \"tariff\": \"\
+        standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
+        : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
+        : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
+        : {}\n}"
   response:
     status: 404
     statusText: Error
@@ -264,14 +272,15 @@ examples:
     body:
       type: json
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"owner_id\": 1,\n  \"status\": \"fixture-value\"\
-        ,\n  \"score\": 1,\n  \"map_lat\": 1,\n  \"map_lon\": 1,\n  \"description\"\
-        : \"fixture-value\",\n  \"tariff\": \"standard\",\n  \"ask_price\": 1,\n \
-        \ \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\": 1,\n  \"owner_guaranteed_currency\"\
-        : \"fixture-value\",\n  \"tenant_charge_price\": 1,\n  \"tenant_charge_currency\"\
-        : \"fixture-value\",\n  \"vacant_since\": \"2026-01-01\",\n  \"vacant_days\"\
-        : 1,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
+        \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+        \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"owner_id\"\
+        : 1,\n  \"status\": \"fixture-value\",\n  \"score\": 1,\n  \"map_lat\": 1,\n\
+        \  \"map_lon\": 1,\n  \"description\": \"fixture-value\",\n  \"tariff\": \"\
+        standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
+        : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
+        : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
+        : {}\n}"
   response:
     status: 409
     statusText: Error

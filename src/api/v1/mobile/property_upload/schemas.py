@@ -2,7 +2,8 @@ from decimal import Decimal
 from typing import Literal
 
 import pydantic
-from property.services.validation import validate_floor_bounds
+from property.services.validation import validate_and_normalize_landmark, validate_floor_bounds
+from pydantic import field_validator
 
 
 class ChoiceItem(pydantic.BaseModel):
@@ -58,6 +59,7 @@ class MobilePropertyUploadInput(pydantic.BaseModel):
     name: str | None = None
     property_type: str
     district_id: int
+    landmark: str | None = None
     rooms: int = pydantic.Field(ge=1)
     floor: int = pydantic.Field(ge=0)
     total_floors: int | None = pydantic.Field(default=None, ge=0)
@@ -73,6 +75,11 @@ class MobilePropertyUploadInput(pydantic.BaseModel):
     content_locale: Literal["en", "uz", "ru"] | None = None
     accept_offer: bool
     contact: MobilePropertyContactInput | None = None
+
+    @field_validator("landmark")
+    @classmethod
+    def normalize_landmark(cls, v: str | None) -> str | None:
+        return validate_and_normalize_landmark(v)
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):

@@ -5,13 +5,15 @@ from decimal import Decimal
 from typing import Literal
 
 import pydantic
-from property.services.validation import validate_floor_bounds
+from property.services.validation import validate_and_normalize_landmark, validate_floor_bounds
+from pydantic import field_validator
 
 
 class OwnerPropertyOutput(pydantic.BaseModel):
     id: int
     name: str
     address: str
+    landmark: str | None = None
     rooms: int
     area_sqm: int
     floor: int
@@ -72,6 +74,7 @@ class PublicOfferOutput(pydantic.BaseModel):
 class OwnerOnboardingCreateInput(pydantic.BaseModel):
     name: str
     address: str
+    landmark: str | None = None
     district_id: int
     rooms: int = pydantic.Field(gt=0)
     area_sqm: int = pydantic.Field(gt=0)
@@ -82,6 +85,11 @@ class OwnerOnboardingCreateInput(pydantic.BaseModel):
     ask_currency: str = "USD"
     content_locale: Literal["en", "uz", "ru"] | None = None
     accept_offer: Literal[True]
+
+    @field_validator("landmark")
+    @classmethod
+    def normalize_landmark(cls, v: str | None) -> str | None:
+        return validate_and_normalize_landmark(v)
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):
@@ -100,6 +108,7 @@ class OwnerListingSubmitPayload(pydantic.BaseModel):
     property_type: str = "apartment"
     name: str | None = None
     address: str | None = None
+    landmark: str | None = None
     district_id: int
     rooms: int = pydantic.Field(gt=0)
     area_sqm: int = pydantic.Field(gt=0)
@@ -118,6 +127,11 @@ class OwnerListingSubmitPayload(pydantic.BaseModel):
     content_locale: Literal["en", "uz", "ru"] | None = None
     contact: OwnerContactInput | None = None
     accept_offer: Literal[True]
+
+    @field_validator("landmark")
+    @classmethod
+    def normalize_landmark(cls, v: str | None) -> str | None:
+        return validate_and_normalize_landmark(v)
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):

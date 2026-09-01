@@ -170,12 +170,14 @@ class TestPropertyUpdate:
         assert body["data"]["status"] == "maintenance"
 
     def test_partial_update_translations_partial_map(self, api_client, management, property_obj):
-        payload = json.dumps({
-            "name": "Updated English Name",
-            "translations": {
-                "uz": {"name": "O'zbekcha nom", "description": "O'zbekcha tavsif"},
-            },
-        })
+        payload = json.dumps(
+            {
+                "name": "Updated English Name",
+                "translations": {
+                    "uz": {"name": "O'zbekcha nom", "description": "O'zbekcha tavsif"},
+                },
+            }
+        )
         response = api_client.patch(
             f"/api/v1/properties/{property_obj.id}/",
             payload,

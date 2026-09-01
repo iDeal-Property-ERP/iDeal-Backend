@@ -14,7 +14,7 @@ class AmenityTranslationOptions(TranslationOptions):
 
 @register(Property)
 class PropertyTranslationOptions(TranslationOptions):
-    fields = ("name", "description")
+    fields = ("name", "description", "landmark")
 
 
 @register(PropertyPhoto)

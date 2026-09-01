@@ -226,6 +226,7 @@ class MobileListingDetail(APIModel):
     title: str
     district: str | None
     address: str
+    landmark: str | None = None
     property_type: str
     rooms: int | None
     area_sqm: int | None
@@ -274,6 +275,7 @@ class MobileListingDetail(APIModel):
             title=prop.name,
             district=prop.district.name if prop.district else None,
             address=prop.address,
+            landmark=prop.landmark,
             property_type=prop.property_type,
             rooms=prop.rooms,
             area_sqm=prop.area_sqm,

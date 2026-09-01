@@ -4,7 +4,8 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pydantic
-from property.services.validation import validate_floor_bounds
+from property.services.validation import validate_and_normalize_landmark, validate_floor_bounds
+from pydantic import field_validator
 
 
 class AmenityBrief(pydantic.BaseModel):
@@ -19,6 +20,7 @@ class PropertyBrief(pydantic.BaseModel):
     id: int
     name: str
     address: str
+    landmark: str | None = None
     district_id: int
     district_name: str | None = None
     property_type: str
@@ -155,6 +157,7 @@ class PublicListingSubmitInput(pydantic.BaseModel):
     property_type: str
     engagement_type: str = "managed"
     name: str
+    landmark: str | None = None
     district_id: int
     rooms: int = pydantic.Field(ge=1)
     area_sqm: int = pydantic.Field(ge=0)
@@ -170,6 +173,11 @@ class PublicListingSubmitInput(pydantic.BaseModel):
     currency: str = "USD"
     minimum_stay: int = pydantic.Field(default=6, ge=0)
     price_includes: list[str] = pydantic.Field(default_factory=list)
+
+    @field_validator("landmark")
+    @classmethod
+    def normalize_landmark(cls, v: str | None) -> str | None:
+        return validate_and_normalize_landmark(v)
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):

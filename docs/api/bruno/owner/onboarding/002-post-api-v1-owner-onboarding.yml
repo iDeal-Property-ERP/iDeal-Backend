@@ -11,10 +11,10 @@ http:
   body:
     type: json
     data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-      \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\": 1,\n\
-      \  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"ask_price\"\
-      : 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\",\n  \"accept_offer\"\
-      : true\n}"
+      \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+      \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"description\"\
+      : \"fixture-value\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"\
+      content_locale\": \"en\",\n  \"accept_offer\": true\n}"
 settings:
   encodeUrl: true
   timeout: 0
@@ -40,6 +40,9 @@ docs: '# POST /api/v1/owner/onboarding/
   before runtime execution. |
 
   | `address` | yes | no | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
+  | `landmark` | no | yes | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
   | `district_id` | yes | no | fixture value; replace fixture values with domain-valid
@@ -91,10 +94,10 @@ examples:
     body:
       type: json
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"\
-        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\"\
-        ,\n  \"accept_offer\": true\n}"
+        \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+        \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"description\"\
+        : \"fixture-value\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n\
+        \  \"content_locale\": \"en\",\n  \"accept_offer\": true\n}"
   response:
     status: 201
     statusText: OK
@@ -116,10 +119,10 @@ examples:
     body:
       type: json
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"\
-        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\"\
-        ,\n  \"accept_offer\": true\n}"
+        \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+        \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"description\"\
+        : \"fixture-value\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n\
+        \  \"content_locale\": \"en\",\n  \"accept_offer\": true\n}"
   response:
     status: 400
     statusText: Error
@@ -142,10 +145,10 @@ examples:
     body:
       type: json
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"\
-        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\"\
-        ,\n  \"accept_offer\": true\n}"
+        \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+        \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"description\"\
+        : \"fixture-value\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n\
+        \  \"content_locale\": \"en\",\n  \"accept_offer\": true\n}"
   response:
     status: 401
     statusText: Error
@@ -168,10 +171,10 @@ examples:
     body:
       type: json
       data: "{\n  \"name\": \"fixture-value\",\n  \"address\": \"fixture-value\",\n\
-        \  \"district_id\": 1,\n  \"rooms\": 1,\n  \"area_sqm\": 1,\n  \"floor\":\
-        \ 1,\n  \"total_floors\": 1,\n  \"description\": \"fixture-value\",\n  \"\
-        ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"content_locale\": \"en\"\
-        ,\n  \"accept_offer\": true\n}"
+        \  \"landmark\": \"fixture-value\",\n  \"district_id\": 1,\n  \"rooms\": 1,\n\
+        \  \"area_sqm\": 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"description\"\
+        : \"fixture-value\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n\
+        \  \"content_locale\": \"en\",\n  \"accept_offer\": true\n}"
   response:
     status: 409
     statusText: Error

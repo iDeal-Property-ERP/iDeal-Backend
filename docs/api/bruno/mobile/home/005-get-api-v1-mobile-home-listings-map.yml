@@ -20,6 +20,15 @@ http:
   - name: district_id
     value: '1'
     type: query
+  - name: start_date
+    value: '2026-01-01T00:00:00Z'
+    type: query
+  - name: end_date
+    value: '2026-01-01T00:00:00Z'
+    type: query
+  - name: flexibility_days
+    value: '1'
+    type: query
   - name: property_type
     value: apartment
     type: query
@@ -74,6 +83,15 @@ docs: '# GET /api/v1/mobile/home/listings/map/
   | `district_id` | query | no | `fixture-value` | non-nullable; fixture value; replace
   with a real ID when running. |
 
+  | `start_date` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `end_date` | query | no | `fixture-value` | non-nullable; fixture value; replace
+  with a real ID when running. |
+
+  | `flexibility_days` | query | no | `fixture-value` | non-nullable; fixture value;
+  replace with a real ID when running. |
+
   | `property_type` | query | no | `fixture-value` | non-nullable; fixture value;
   replace with a real ID when running. |
 
@@ -123,6 +141,15 @@ examples:
       value: '1'
       type: query
     - name: district_id
+      value: '1'
+      type: query
+    - name: start_date
+      value: '1'
+      type: query
+    - name: end_date
+      value: '1'
+      type: query
+    - name: flexibility_days
       value: '1'
       type: query
     - name: property_type
@@ -176,6 +203,15 @@ examples:
       value: '1'
       type: query
     - name: district_id
+      value: '1'
+      type: query
+    - name: start_date
+      value: '1'
+      type: query
+    - name: end_date
+      value: '1'
+      type: query
+    - name: flexibility_days
       value: '1'
       type: query
     - name: property_type

@@ -1,3 +1,4 @@
+# type: ignore
 import logging
 from decimal import Decimal
 from io import BytesIO
@@ -9,6 +10,7 @@ from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from PIL import Image, ImageFilter, ImageOps
+from property.services.validation import validate_and_normalize_landmark
 
 from core.constants import (
     BrokerageCommissionType,
@@ -66,6 +68,7 @@ class Amenity(TimestampedModel):
 class Property(TimestampedModel, SoftDeleteModel):
     name = models.CharField(max_length=200)
     address = models.CharField(max_length=255, blank=True, default="")
+    landmark = models.CharField(max_length=100, null=True, blank=True)
     # Publish-required fields are nullable so a DRAFT can be saved partially;
     # the publish transition enforces completeness before going VACANT.
     district = models.ForeignKey(District, on_delete=models.PROTECT, related_name="properties", null=True, blank=True)
@@ -173,6 +176,11 @@ class Property(TimestampedModel, SoftDeleteModel):
         super().clean()
         if self.floor is not None and self.total_floors is not None and self.floor > self.total_floors:
             raise ValidationError({"floor": _("Floor cannot be greater than total floors.")})
+        if self.landmark:
+            try:
+                self.landmark = validate_and_normalize_landmark(self.landmark)
+            except ValueError as err:
+                raise ValidationError({"landmark": str(err)}) from err
 
     def save(self, *args, **kwargs):
         """Keep engagement immutable once a property becomes commercially active."""

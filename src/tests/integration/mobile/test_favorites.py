@@ -500,7 +500,6 @@ class TestMobileFavoritesAvailability:
         from datetime import date
 
         from core.constants import LeaseStatus, OwnerAgreementStatus
-
         from tests.factories import LeaseFactory
 
         tenant = TenantFactory()

@@ -45,6 +45,7 @@ class ManagementPropertyOutput(pydantic.BaseModel):
     id: int
     name: str
     address: str
+    landmark: str | None = None
     # Nullable: draft properties (Phase 7) are saved partially, so these
     # publish-required fields may be absent until the draft is published.
     district_id: int | None
@@ -122,6 +123,7 @@ class ManagementPropertyOutput(pydantic.BaseModel):
             "id": v.id,
             "name": v.name,
             "address": v.address,
+            "landmark": getattr(v, "landmark", None),
             "district_id": v.district_id,
             "district_name": v.district.name if v.district else None,
             "rooms": v.rooms,
