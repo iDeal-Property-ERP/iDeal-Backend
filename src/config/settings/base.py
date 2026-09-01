@@ -16,7 +16,9 @@ if not DEBUG and _secret_key == "django-insecure-change-me-in-production":
     raise RuntimeError("SECRET_KEY must be set to a secure value in production (DEBUG=False)")
 SECRET_KEY = _secret_key
 _allowed_hosts_raw = str(config("ALLOWED_HOSTS", default="localhost,127.0.0.1"))
-ALLOWED_HOSTS = [h for h in _allowed_hosts_raw.split(",") if h]
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(",") if h.strip()]
+_csrf_trusted_raw = str(config("CSRF_TRUSTED_ORIGINS", default=""))
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_trusted_raw.split(",") if o.strip()]
 DATABASE_URL = f"postgres://{config('POSTGRES_USER')}:{config('POSTGRES_PASSWORD')}@{config('POSTGRES_HOST')}/{config('POSTGRES_DB')}"
 
 MODELTRANSLATION_APPS = [
