@@ -37,6 +37,7 @@ from core.constants import (
     TariffChoices,
     UserRole,
 )
+from core.utils.html_sanitizer import sanitize_description_html
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +128,7 @@ class PropertySubmissionService:
         try:
             with transaction.atomic():
                 prop_name = data.get("name") or f"{data.get('rooms')}-room property in {district.name}"
-                prop_desc = data.get("description", "")
+                prop_desc = sanitize_description_html(data.get("description"))
                 prop_landmark = validate_and_normalize_landmark(data.get("landmark"))
                 content_locale = data.get("content_locale") or "en"
                 contact_phone = data.get("contact_phone") or getattr(user, "phone", None) or None
@@ -297,7 +298,7 @@ class PropertySubmissionService:
         try:
             with transaction.atomic():
                 prop_name = data.get("name") or f"{data.get('rooms')}-room property in {district.name}"
-                prop_desc = data.get("description", "")
+                prop_desc = sanitize_description_html(data.get("description"))
                 prop_landmark = validate_and_normalize_landmark(data.get("landmark"))
                 contact_phone = data.get("contact_phone") or getattr(user, "phone", None) or None
                 prop = Property.objects.create(
@@ -459,7 +460,7 @@ class PropertySubmissionService:
                     data.get("name")
                     or f"{data.get('rooms')}-room {str(data.get('property_type')).replace('_', ' ').title()} in {district.name}"
                 )
-                prop_desc = data.get("description", "")
+                prop_desc = sanitize_description_html(data.get("description"))
                 prop = Property.objects.create(
                     name=prop_name,
                     address=data.get("address") or district.name,
@@ -625,7 +626,8 @@ class PropertySubmissionService:
                 prop.floor = floor
                 prop.total_floors = total_floors
                 prop.furnishing = data.get("furnishing") or prop.furnishing
-                prop.description = data.get("description") or prop.description
+                if "description" in data:
+                    prop.description = sanitize_description_html(data.get("description"))
                 prop.tariff = data.get("tariff") or prop.tariff
                 prop.ask_price = monthly_price
                 prop.ask_currency = currency

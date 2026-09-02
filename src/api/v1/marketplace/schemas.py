@@ -7,6 +7,8 @@ import pydantic
 from property.services.validation import validate_and_normalize_landmark, validate_floor_bounds
 from pydantic import field_validator
 
+from core.utils.html_sanitizer import sanitize_description_html
+
 
 class AmenityBrief(pydantic.BaseModel):
     slug: str
@@ -173,6 +175,11 @@ class PublicListingSubmitInput(pydantic.BaseModel):
     currency: str = "USD"
     minimum_stay: int = pydantic.Field(default=6, ge=0)
     price_includes: list[str] = pydantic.Field(default_factory=list)
+
+    @field_validator("description")
+    @classmethod
+    def sanitize_description(cls, v: str | None) -> str | None:
+        return sanitize_description_html(v)
 
     @field_validator("landmark")
     @classmethod

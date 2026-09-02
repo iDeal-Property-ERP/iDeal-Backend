@@ -216,8 +216,32 @@ class TestPropertyUpdate:
         property_obj.refresh_from_db()
         assert property_obj.name == "Updated English Name"
         assert property_obj.name_uz == "O'zbekcha nom"
-        assert property_obj.description_uz == "O'zbekcha tavsif"
+        assert property_obj.description_uz == "<p>O'zbekcha tavsif</p>"
         assert body["data"]["translations"]["uz"]["name"] == "O'zbekcha nom"
+
+    def test_partial_update_rich_html_description(self, api_client, management, property_obj):
+        payload = json.dumps(
+            {
+                "description": "<h3>Modern Apartment</h3><p>Includes <strong>renovated</strong> interior.</p>",
+                "translations": {
+                    "ru": {
+                        "description": "<script>alert('xss')</script><p style='color:red;'>Квартира с <em>ремонтом</em></p>"
+                    }
+                },
+            }
+        )
+        response = api_client.patch(
+            f"/api/v1/properties/{property_obj.id}/",
+            payload,
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 200
+        property_obj.refresh_from_db()
+        assert (
+            property_obj.description == "<h3>Modern Apartment</h3><p>Includes <strong>renovated</strong> interior.</p>"
+        )
+        assert property_obj.description_ru == "<p>Квартира с <em>ремонтом</em></p>"
 
     @pytest.mark.parametrize(("field", "value"), [("rooms", 0), ("rooms", -1), ("area_sqm", 0), ("area_sqm", -1)])
     def test_partial_update_rejects_non_positive_rooms_and_area(

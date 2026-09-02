@@ -7,11 +7,18 @@ from django.utils.translation import gettext_lazy as _
 from property.services.validation import validate_and_normalize_landmark, validate_floor_bounds
 from pydantic import field_validator
 
+from core.utils.html_sanitizer import sanitize_description_html
+
 
 class PropertyTranslationItem(pydantic.BaseModel):
     name: str | None = None
     description: str | None = None
     landmark: str | None = None
+
+    @field_validator("description")
+    @classmethod
+    def sanitize_description(cls, v: str | None) -> str | None:
+        return sanitize_description_html(v)
 
     @field_validator("landmark")
     @classmethod
@@ -161,6 +168,11 @@ class PropertyCreateInput(pydantic.BaseModel):
     contact_phone: str | None = None
     translations: PropertyTranslationMap | None = None
 
+    @field_validator("description")
+    @classmethod
+    def sanitize_description(cls, v: str | None) -> str | None:
+        return sanitize_description_html(v)
+
     @field_validator("contact_phone")
     @classmethod
     def normalize_contact_phone(cls, v: str | None) -> str | None:
@@ -227,6 +239,11 @@ class PropertyUpdateInput(pydantic.BaseModel):
     vacant_days: int | None = pydantic.Field(default=None, ge=0)
     contact_phone: str | None = None
     translations: PropertyTranslationMap | None = None
+
+    @field_validator("description")
+    @classmethod
+    def sanitize_description(cls, v: str | None) -> str | None:
+        return sanitize_description_html(v)
 
     @field_validator("contact_phone")
     @classmethod
@@ -315,6 +332,11 @@ class PropertySubmissionInput(pydantic.BaseModel):
     schedule_verification_at: str | None = None
     contact_phone: str | None = None
     brokerage: OneOffDealInput | None = None
+
+    @field_validator("description")
+    @classmethod
+    def sanitize_description(cls, v: str | None) -> str | None:
+        return sanitize_description_html(v)
 
     @field_validator("contact_phone")
     @classmethod

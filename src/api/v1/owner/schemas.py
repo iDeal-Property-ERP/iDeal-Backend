@@ -8,6 +8,8 @@ import pydantic
 from property.services.validation import validate_and_normalize_landmark, validate_floor_bounds
 from pydantic import field_validator
 
+from core.utils.html_sanitizer import sanitize_description_html
+
 
 class OwnerPropertyOutput(pydantic.BaseModel):
     id: int
@@ -86,6 +88,11 @@ class OwnerOnboardingCreateInput(pydantic.BaseModel):
     content_locale: Literal["en", "uz", "ru"] | None = None
     accept_offer: Literal[True]
 
+    @field_validator("description")
+    @classmethod
+    def sanitize_description(cls, v: str | None) -> str | None:
+        return sanitize_description_html(v)
+
     @field_validator("landmark")
     @classmethod
     def normalize_landmark(cls, v: str | None) -> str | None:
@@ -127,6 +134,11 @@ class OwnerListingSubmitPayload(pydantic.BaseModel):
     content_locale: Literal["en", "uz", "ru"] | None = None
     contact: OwnerContactInput | None = None
     accept_offer: Literal[True]
+
+    @field_validator("description")
+    @classmethod
+    def sanitize_description(cls, v: str | None) -> str | None:
+        return sanitize_description_html(v)
 
     @field_validator("landmark")
     @classmethod

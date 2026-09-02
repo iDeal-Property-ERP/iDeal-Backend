@@ -7,6 +7,8 @@ from typing import Any
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from core.utils.html_sanitizer import sanitize_description_html
+
 SUPPORTED_LOCALES = ("en", "uz", "ru")
 DEFAULT_LOCALE = "en"
 
@@ -32,6 +34,8 @@ class LocalizedContentService:
             for field in fields:
                 if field in locale_data:
                     val = locale_data[field]
+                    if field == "description" and isinstance(val, str | type(None)):
+                        val = sanitize_description_html(val)
                     field_name = f"{field}_{locale}"
                     if hasattr(instance, field_name):
                         setattr(instance, field_name, val)
@@ -139,7 +143,7 @@ class LocalizedContentService:
     def sync_property_listing_translations(
         self,
         property_instance: Any,
-        listing_instance: Any | None = None,
+        listing_instance: Any = None,
     ) -> None:
         """Explicitly copy property description translation columns to listing."""
         if listing_instance is None:
@@ -147,6 +151,9 @@ class LocalizedContentService:
                 listing_instance = property_instance.listing
             except Exception:
                 return
+
+        if listing_instance is None:
+            return
 
         update_fields = []
         for locale in self.locales:

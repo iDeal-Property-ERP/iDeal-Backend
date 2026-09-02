@@ -5,6 +5,8 @@ import pydantic
 from property.services.validation import validate_and_normalize_landmark, validate_floor_bounds
 from pydantic import field_validator
 
+from core.utils.html_sanitizer import sanitize_description_html
+
 
 class ChoiceItem(pydantic.BaseModel):
     value: str
@@ -75,6 +77,11 @@ class MobilePropertyUploadInput(pydantic.BaseModel):
     content_locale: Literal["en", "uz", "ru"] | None = None
     accept_offer: bool
     contact: MobilePropertyContactInput | None = None
+
+    @field_validator("description")
+    @classmethod
+    def sanitize_description(cls, v: str | None) -> str | None:
+        return sanitize_description_html(v)
 
     @field_validator("landmark")
     @classmethod
