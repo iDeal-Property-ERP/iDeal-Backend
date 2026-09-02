@@ -95,5 +95,35 @@ dbml-sql:
     uv run python .agents/skills/ideal-dbml/scripts/dbml_tool.py export-sql
 
 dbml-html:
-    uv run python .agents/skills/ideal-dbml/scripts/dbml_tool.py build-html
+    uv run python .agents/skills/ideal-dbml/scripts/build_web_docs.py
+
+# Bruno API documentation
+bruno-inventory:
+    uv run python .agents/skills/ideal-bruno/scripts/bruno_tool.py inventory
+
+bruno-generate:
+    uv run python .agents/skills/ideal-bruno/scripts/bruno_tool.py generate
+
+bruno-validate:
+    uv run python .agents/skills/ideal-bruno/scripts/bruno_tool.py validate
+
+bruno-html:
+    uv run python .agents/skills/ideal-bruno/scripts/build_web_docs.py
+
+# Architecture documentation
+arch-html:
+    uv run python .agents/skills/ideal-arch/scripts/build_web_docs.py
+
+# Unified documentation build & validation
+docs-build:
+    uv run python .agents/skills/ideal-dbml/scripts/build_web_docs.py
+    uv run python .agents/skills/ideal-bruno/scripts/build_web_docs.py
+    uv run python .agents/skills/ideal-arch/scripts/build_web_docs.py
+    @echo "All documentation portals successfully compiled into docs/."
+
+docs-validate:
+    uv run python .agents/skills/ideal-dbml/scripts/dbml_tool.py validate
+    uv run python .agents/skills/ideal-bruno/scripts/bruno_tool.py validate
+    @echo "All documentation sources validated successfully."
+
 

@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>iDeal Technical Documentation Hub</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+            rel="stylesheet"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css"
+        />
+        <style>
+            :root {
+                --bg-body: #0a0d14;
+                --bg-card: #121826;
+                --bg-card-hover: #1a2236;
+                --border-color: #232c42;
+                --border-color-light: #2e3b58;
+                --text-main: #f1f5f9;
+                --text-muted: #94a3b8;
+                --text-dim: #64748b;
+                --primary: #3b82f6;
+                --primary-light: #60a5fa;
+                --primary-bg: rgba(59, 130, 246, 0.12);
+                --accent: #10b981;
+                --accent-bg: rgba(16, 185, 129, 0.12);
+                --warning: #f59e0b;
+                --warning-bg: rgba(245, 158, 11, 0.12);
+                --purple: #8b5cf6;
+                --purple-bg: rgba(139, 92, 246, 0.12);
+                --font-sans:
+                    "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont,
+                    sans-serif;
+                --font-mono: "JetBrains Mono", monospace;
+            }
+
+            [data-theme="light"] {
+                --bg-body: #f8fafc;
+                --bg-card: #ffffff;
+                --bg-card-hover: #f1f5f9;
+                --border-color: #e2e8f0;
+                --border-color-light: #cbd5e1;
+                --text-main: #0f172a;
+                --text-muted: #475569;
+                --text-dim: #94a3b8;
+                --primary: #2563eb;
+                --primary-light: #3b82f6;
+                --primary-bg: rgba(37, 99, 235, 0.08);
+                --accent: #059669;
+                --accent-bg: rgba(5, 150, 105, 0.08);
+                --warning: #d97706;
+                --warning-bg: rgba(217, 119, 6, 0.08);
+                --purple: #7c3aed;
+                --purple-bg: rgba(124, 58, 237, 0.08);
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                font-family: var(--font-sans);
+                background: var(--bg-body);
+                color: var(--text-main);
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                line-height: 1.6;
+            }
+
+            .header {
+                border-bottom: 1px solid var(--border-color);
+                padding: 18px 36px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: rgba(10, 13, 20, 0.8);
+                backdrop-filter: blur(12px);
+                position: sticky;
+                top: 0;
+                z-index: 50;
+            }
+
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 1.3rem;
+                font-weight: 800;
+                color: var(--text-main);
+                text-decoration: none;
+                letter-spacing: -0.02em;
+            }
+
+            .brand-badge {
+                font-size: 0.75rem;
+                font-weight: 700;
+                padding: 2px 8px;
+                border-radius: 6px;
+                background: var(--primary-bg);
+                color: var(--primary-light);
+                border: 1px solid rgba(59, 130, 246, 0.3);
+                text-transform: uppercase;
+            }
+
+            .theme-btn {
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                color: var(--text-muted);
+                width: 38px;
+                height: 38px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .theme-btn:hover {
+                color: var(--text-main);
+                border-color: var(--primary);
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 60px 24px 80px;
+                flex: 1;
+            }
+
+            .hero {
+                text-align: center;
+                margin-bottom: 56px;
+            }
+
+            .hero h1 {
+                font-size: 3rem;
+                font-weight: 800;
+                letter-spacing: -0.03em;
+                margin-bottom: 16px;
+                background: linear-gradient(
+                    135deg,
+                    var(--text-main) 30%,
+                    var(--primary-light) 100%
+                );
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+
+            .hero p {
+                font-size: 1.2rem;
+                color: var(--text-muted);
+                max-width: 720px;
+                margin: 0 auto 24px;
+            }
+
+            .tech-chips {
+                display: flex;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-top: 16px;
+            }
+
+            .chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-size: 0.8rem;
+                font-weight: 600;
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                color: var(--text-muted);
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+                gap: 24px;
+                margin-bottom: 56px;
+            }
+
+            .portal-card {
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                border-radius: 16px;
+                padding: 32px 28px;
+                text-decoration: none;
+                color: inherit;
+                display: flex;
+                flex-direction: column;
+                transition: all 0.25s ease;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .portal-card::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: transparent;
+                transition: background 0.25s ease;
+            }
+
+            .portal-card.card-db::before {
+                background: var(--accent);
+            }
+            .portal-card.card-api::before {
+                background: var(--primary);
+            }
+            .portal-card.card-arch::before {
+                background: var(--purple);
+            }
+
+            .portal-card:hover {
+                transform: translateY(-4px);
+                border-color: var(--border-color-light);
+                background: var(--bg-card-hover);
+                box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+            }
+
+            .card-icon-wrap {
+                width: 54px;
+                height: 54px;
+                border-radius: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.6rem;
+                margin-bottom: 20px;
+            }
+
+            .card-db .card-icon-wrap {
+                background: var(--accent-bg);
+                color: var(--accent);
+            }
+            .card-api .card-icon-wrap {
+                background: var(--primary-bg);
+                color: var(--primary);
+            }
+            .card-arch .card-icon-wrap {
+                background: var(--purple-bg);
+                color: var(--purple);
+            }
+
+            .card-title {
+                font-size: 1.4rem;
+                font-weight: 700;
+                margin-bottom: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .card-desc {
+                color: var(--text-muted);
+                font-size: 0.95rem;
+                margin-bottom: 24px;
+                flex: 1;
+            }
+
+            .card-features {
+                list-style: none;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                border-top: 1px solid var(--border-color);
+                padding-top: 16px;
+                margin-bottom: 20px;
+            }
+
+            .card-features li {
+                font-size: 0.85rem;
+                color: var(--text-dim);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .card-features li i {
+                color: var(--primary-light);
+                font-size: 1rem;
+            }
+
+            .card-footer {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                font-size: 0.88rem;
+                font-weight: 600;
+                color: var(--primary-light);
+            }
+
+            .stats-banner {
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                border-radius: 16px;
+                padding: 28px 36px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 24px;
+                text-align: center;
+            }
+
+            .stat-item h4 {
+                font-size: 2rem;
+                font-weight: 800;
+                color: var(--text-main);
+                margin-bottom: 4px;
+                font-family: var(--font-mono);
+            }
+
+            .stat-item p {
+                font-size: 0.85rem;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                font-weight: 600;
+            }
+
+            .footer {
+                border-top: 1px solid var(--border-color);
+                padding: 24px;
+                text-align: center;
+                color: var(--text-dim);
+                font-size: 0.85rem;
+            }
+        </style>
+    </head>
+    <body>
+        <header class="header">
+            <a href="/" class="brand">
+                <span>🏢 iDeal</span>
+                <span class="brand-badge">Official Docs</span>
+            </a>
+            <button
+                class="theme-btn"
+                onclick="toggleTheme()"
+                title="Toggle Theme"
+            >
+                <i class="ri-moon-line" id="theme-icon"></i>
+            </button>
+        </header>
+
+        <div class="container">
+            <div class="hero">
+                <h1>iDeal Engineering Documentation</h1>
+                <p>
+                    Complete technical specifications, interactive database
+                    schema models, REST API documentation, and distributed
+                    system architecture.
+                </p>
+                <div class="tech-chips">
+                    <span class="chip"
+                        ><i class="ri-code-line"></i> Django 5.2</span
+                    >
+                    <span class="chip"
+                        ><i class="ri-database-2-line"></i> PostgreSQL 16</span
+                    >
+                    <span class="chip"
+                        ><i class="ri-flashlight-line"></i> Redis 7</span
+                    >
+                    <span class="chip"
+                        ><i class="ri-layout-masonry-line"></i> Next.js
+                        (Web)</span
+                    >
+                    <span class="chip"
+                        ><i class="ri-smartphone-line"></i> Flutter
+                        (Mobile)</span
+                    >
+                    <span class="chip"
+                        ><i class="ri-server-line"></i> Uvicorn ASGI</span
+                    >
+                    <span class="chip"
+                        ><i class="ri-shield-keyhole-line"></i> JWT HS256</span
+                    >
+                </div>
+            </div>
+
+            <div class="grid">
+                <!-- DB Docs -->
+                <a href="/db/" class="portal-card card-db">
+                    <div class="card-icon-wrap">
+                        <i class="ri-database-2-line"></i>
+                    </div>
+                    <div class="card-title">
+                        <span>Database Schema & ER</span>
+                        <i class="ri-arrow-right-up-line"></i>
+                    </div>
+                    <p class="card-desc">
+                        Interactive entity relationship diagram, 12 modular app
+                        domain models, column-level constraints, choices enums,
+                        and PostgreSQL DDL export.
+                    </p>
+                    <ul class="card-features">
+                        <li>
+                            <i class="ri-check-line"></i> Visual canvas with
+                            auto-layout & search
+                        </li>
+                        <li>
+                            <i class="ri-check-line"></i> 12 Domains
+                            (Properties, Contracts, Finance, Chat...)
+                        </li>
+                        <li>
+                            <i class="ri-check-line"></i> Direct PostgreSQL DDL
+                            & DBML export
+                        </li>
+                    </ul>
+                    <div class="card-footer">
+                        <span>Open DBML Viewer</span>
+                        <i class="ri-arrow-right-line"></i>
+                    </div>
+                </a>
+
+                <!-- API Docs -->
+                <a href="/api/" class="portal-card card-api">
+                    <div class="card-icon-wrap">
+                        <i class="ri-code-s-slash-line"></i>
+                    </div>
+                    <div class="card-title">
+                        <span>REST API Specification</span>
+                        <i class="ri-arrow-right-up-line"></i>
+                    </div>
+                    <p class="card-desc">
+                        Comprehensive Bruno collection and OpenAPI endpoint
+                        documentation covering all client, management, and
+                        payment webhooks.
+                    </p>
+                    <ul class="card-features">
+                        <li>
+                            <i class="ri-check-line"></i> 100+ Endpoints with
+                            Request/Response schemas
+                        </li>
+                        <li>
+                            <i class="ri-check-line"></i> Local / Dev / Prod
+                            environment configs
+                        </li>
+                        <li>
+                            <i class="ri-check-line"></i> JWT Bearer
+                            authentication workflows
+                        </li>
+                    </ul>
+                    <div class="card-footer">
+                        <span>Open API Portal</span>
+                        <i class="ri-arrow-right-line"></i>
+                    </div>
+                </a>
+
+                <!-- Architecture Docs -->
+                <a href="/arch/" class="portal-card card-arch">
+                    <div class="card-icon-wrap">
+                        <i class="ri-building-4-line"></i>
+                    </div>
+                    <div class="card-title">
+                        <span>System Architecture</span>
+                        <i class="ri-arrow-right-up-line"></i>
+                    </div>
+                    <p class="card-desc">
+                        High-level system topology, C4 container diagrams,
+                        WebSocket realtime event streams, background cron
+                        clusters, and security policies.
+                    </p>
+                    <ul class="card-features">
+                        <li>
+                            <i class="ri-check-line"></i> C4 container &
+                            component diagrams
+                        </li>
+                        <li>
+                            <i class="ri-check-line"></i> Django-Q2 background
+                            job schedules
+                        </li>
+                        <li>
+                            <i class="ri-check-line"></i> Realtime WebSocket
+                            event stream protocol
+                        </li>
+                    </ul>
+                    <div class="card-footer">
+                        <span>Open Architecture Viewer</span>
+                        <i class="ri-arrow-right-line"></i>
+                    </div>
+                </a>
+            </div>
+
+            <div class="stats-banner">
+                <div class="stat-item">
+                    <h4>12</h4>
+                    <p>Domain Modules</p>
+                </div>
+                <div class="stat-item">
+                    <h4>100+</h4>
+                    <p>REST Endpoints</p>
+                </div>
+                <div class="stat-item">
+                    <h4>3</h4>
+                    <p>Client Surfaces</p>
+                </div>
+                <div class="stat-item">
+                    <h4>100%</h4>
+                    <p>Automated Pipeline</p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            &copy; 2026 iDeal Platform. All technical specifications and system
+            documentation are proprietary.
+        </footer>
+
+        <script>
+            function toggleTheme() {
+                const current =
+                    document.documentElement.getAttribute("data-theme");
+                const next = current === "dark" ? "light" : "dark";
+                document.documentElement.setAttribute("data-theme", next);
+                localStorage.setItem("ideal-theme", next);
+                document.getElementById("theme-icon").className =
+                    next === "dark" ? "ri-moon-line" : "ri-sun-line";
+            }
+
+            const savedTheme = localStorage.getItem("ideal-theme");
+            if (savedTheme) {
+                document.documentElement.setAttribute("data-theme", savedTheme);
+                document.getElementById("theme-icon").className =
+                    savedTheme === "dark" ? "ri-moon-line" : "ri-sun-line";
+            }
+        </script>
+    </body>
+</html>

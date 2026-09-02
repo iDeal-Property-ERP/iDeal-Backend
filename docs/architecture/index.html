@@ -1,0 +1,3766 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iDeal System Architecture & Technical Specifications</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+    <style>
+        :root {{
+            --bg-body: #0a0d14;
+            --bg-sidebar: #0f1420;
+            --bg-card: #141a29;
+            --bg-card-hover: #1b2337;
+            --border-color: #232c42;
+            --border-color-light: #2e3b58;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --primary: #3b82f6;
+            --primary-light: #60a5fa;
+            --primary-bg: rgba(59, 130, 246, 0.12);
+            --accent: #10b981;
+            --accent-bg: rgba(16, 185, 129, 0.12);
+            --warning: #f59e0b;
+            --warning-bg: rgba(245, 158, 11, 0.12);
+            --danger: #ef4444;
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --header-h: 64px;
+            --sidebar-w: 300px;
+        }}
+
+        [data-theme="light"] {{
+            --bg-body: #f8fafc;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f1f5f9;
+            --border-color: #e2e8f0;
+            --border-color-light: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --text-dim: #94a3b8;
+            --primary: #2563eb;
+            --primary-light: #3b82f6;
+            --primary-bg: rgba(37, 99, 235, 0.08);
+            --accent: #059669;
+            --accent-bg: rgba(5, 150, 105, 0.08);
+            --warning: #d97706;
+            --warning-bg: rgba(217, 119, 6, 0.08);
+        }}
+
+        * {{
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }}
+
+        body {{
+            font-family: var(--font-sans);
+            background: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            font-size: 15px;
+            display: flex;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }}
+
+        /* Header */
+        .top-header {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-h);
+            background: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 100;
+        }}
+
+        .brand-logo {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--text-main);
+            font-weight: 800;
+            font-size: 1.25rem;
+            letter-spacing: -0.02em;
+        }}
+
+        .brand-badge {{
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: var(--primary-bg);
+            color: var(--primary-light);
+            padding: 2px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            text-transform: uppercase;
+        }}
+
+        .header-links {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }}
+
+        .nav-pill {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }}
+
+        .nav-pill:hover {{
+            background: var(--bg-card);
+            color: var(--text-main);
+            border-color: var(--border-color);
+        }}
+
+        .nav-pill.active {{
+            background: var(--primary-bg);
+            color: var(--primary-light);
+            border-color: rgba(59, 130, 246, 0.4);
+        }}
+
+        .theme-toggle {{
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+
+        .theme-toggle:hover {{
+            color: var(--text-main);
+            border-color: var(--primary);
+        }}
+
+        /* Sidebar */
+        .sidebar {{
+            position: fixed;
+            top: var(--header-h);
+            left: 0;
+            bottom: 0;
+            width: var(--sidebar-w);
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 90;
+        }}
+
+        .search-box {{
+            position: relative;
+            margin-bottom: 12px;
+        }}
+
+        .search-box input {{
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px 8px 36px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }}
+
+        .search-box input:focus {{
+            border-color: var(--primary);
+        }}
+
+        .search-box i {{
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            font-size: 1rem;
+        }}
+
+        .sidebar-nav {{
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }}
+
+        .nav-item {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: all 0.15s;
+        }}
+
+        .nav-item:hover {{
+            background: var(--bg-card-hover);
+            color: var(--text-main);
+        }}
+
+        .nav-item.active {{
+            background: var(--primary-bg);
+            color: var(--primary-light);
+            font-weight: 600;
+        }}
+
+        .nav-item i {{
+            font-size: 1.1rem;
+        }}
+
+        /* Main Content */
+        .main-content {{
+            margin-left: var(--sidebar-w);
+            margin-top: var(--header-h);
+            padding: 40px 48px 100px;
+            max-width: 1100px;
+            width: calc(100% - var(--sidebar-w));
+        }}
+
+        .section-block {{
+            margin-bottom: 60px;
+            scroll-margin-top: calc(var(--header-h) + 20px);
+        }}
+
+        h1, h2, h3, h4, h5, h6 {{
+            color: var(--text-main);
+            font-weight: 700;
+            line-height: 1.3;
+            margin: 28px 0 16px;
+            position: relative;
+        }}
+
+        h1 {{
+            font-size: 2.2rem;
+            letter-spacing: -0.03em;
+            margin-top: 0;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        h2 {{
+            font-size: 1.5rem;
+            letter-spacing: -0.02em;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        h3 {{
+            font-size: 1.2rem;
+        }}
+
+        p {{
+            margin-bottom: 16px;
+            color: var(--text-main);
+        }}
+
+        .heading-anchor {{
+            color: var(--text-dim);
+            text-decoration: none;
+            opacity: 0;
+            margin-left: 6px;
+            font-size: 0.9em;
+            transition: opacity 0.2s;
+        }}
+
+        h1:hover .heading-anchor,
+        h2:hover .heading-anchor,
+        h3:hover .heading-anchor {{
+            opacity: 1;
+        }}
+
+        /* Code & Tables */
+        code {{
+            font-family: var(--font-mono);
+            font-size: 0.88em;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--primary-light);
+        }}
+
+        .code-block {{
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin: 16px 0;
+            overflow: hidden;
+        }}
+
+        .code-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            font-family: var(--font-mono);
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        .copy-btn {{
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+
+        .copy-btn:hover {{
+            background: var(--bg-card-hover);
+            color: var(--text-main);
+        }}
+
+        pre {{
+            padding: 16px;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }}
+
+        pre code {{
+            background: transparent;
+            border: none;
+            padding: 0;
+            color: var(--text-main);
+        }}
+
+        .table-container {{
+            overflow-x: auto;
+            margin: 20px 0;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: var(--bg-sidebar);
+        }}
+
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            text-align: left;
+        }}
+
+        th {{
+            background: var(--bg-card);
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }}
+
+        td {{
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+        }}
+
+        tr:last-child td {{
+            border-bottom: none;
+        }}
+
+        ul, ol {{
+            margin: 12px 0 20px 24px;
+        }}
+
+        li {{
+            margin-bottom: 6px;
+        }}
+
+        hr {{
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 32px 0;
+        }}
+
+        /* Hero / C4 Card */
+        .c4-hero-card {{
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 24px 0 32px;
+        }}
+
+        .c4-hero-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }}
+
+        .badge {{
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }}
+
+        .badge-primary {{
+            background: var(--primary-bg);
+            color: var(--primary-light);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }}
+
+        .btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-main);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+
+        .btn:hover {{
+            background: var(--bg-card-hover);
+            border-color: var(--primary);
+        }}
+
+        .mermaid-wrap {{
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            display: flex;
+            justify-content: center;
+        }}
+
+        .mermaid {{
+            text-align: center;
+        }}
+
+        .callout {{
+            border-left: 4px solid var(--primary);
+            background: var(--primary-bg);
+            padding: 14px 18px;
+            border-radius: 0 8px 8px 0;
+            margin: 16px 0;
+            font-size: 0.95rem;
+        }}
+
+        .callout-warning {{
+            border-left-color: var(--warning);
+            background: var(--warning-bg);
+        }}
+
+        .callout-note {{
+            border-left-color: var(--accent);
+            background: var(--accent-bg);
+        }}
+
+        @media (max-width: 900px) {{
+            .sidebar {{
+                display: none;
+            }}
+            .main-content {{
+                margin-left: 0;
+                width: 100%;
+                padding: 24px;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <header class="top-header">
+        <a href="/" class="brand-logo">
+            <span>🏢 iDeal</span>
+            <span class="brand-badge">Docs Hub</span>
+        </a>
+        <div class="header-links">
+            <a href="/db/" class="nav-pill">
+                <i class="ri-database-2-line"></i> DB Schema & ER
+            </a>
+            <a href="/api/" class="nav-pill">
+                <i class="ri-code-s-slash-line"></i> Bruno API
+            </a>
+            <a href="/arch/" class="nav-pill active">
+                <i class="ri-building-4-line"></i> Architecture
+            </a>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Theme">
+                <i class="ri-moon-line" id="theme-icon"></i>
+            </button>
+        </div>
+    </header>
+
+    <aside class="sidebar">
+        <div class="search-box">
+            <i class="ri-search-line"></i>
+            <input type="text" id="searchInput" placeholder="Search architecture docs..." onkeyup="filterDocs()">
+        </div>
+        <nav class="sidebar-nav">
+
+            <a href="#overview" class="nav-item" onclick="setActiveNav(this)">
+                <i class="ri-apps-line"></i>
+                <span>Product Identity & Overview</span>
+            </a>
+
+            <a href="#architecture" class="nav-item" onclick="setActiveNav(this)">
+                <i class="ri-building-4-line"></i>
+                <span>System Architecture & Stack</span>
+            </a>
+
+            <a href="#data-models" class="nav-item" onclick="setActiveNav(this)">
+                <i class="ri-database-2-line"></i>
+                <span>Data Models & Storage</span>
+            </a>
+
+            <a href="#api-design" class="nav-item" onclick="setActiveNav(this)">
+                <i class="ri-code-s-slash-line"></i>
+                <span>API Strategy & Contracts</span>
+            </a>
+
+            <a href="#realtime-chat" class="nav-item" onclick="setActiveNav(this)">
+                <i class="ri-chat-voice-line"></i>
+                <span>WebSocket Realtime Protocol</span>
+            </a>
+
+            <a href="#django-q2" class="nav-item" onclick="setActiveNav(this)">
+                <i class="ri-timer-flash-line"></i>
+                <span>Background Tasks & Cron Jobs</span>
+            </a>
+
+            <a href="#mobile-booking" class="nav-item" onclick="setActiveNav(this)">
+                <i class="ri-smartphone-line"></i>
+                <span>Mobile & Marketplace Flow</span>
+            </a>
+
+            <a href="#refactor-audit" class="nav-item" onclick="setActiveNav(this)">
+                <i class="ri-shield-check-line"></i>
+                <span>Codebase Audit & Standards</span>
+            </a>
+
+        </nav>
+    </aside>
+
+    <main class="main-content" id="mainContent">
+        <div class="section-block" id="overview-hero">
+            <h1>iDeal Architecture & Technical Documentation</h1>
+            <p style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 24px;">
+                Comprehensive system architecture, C4 container topologies, relational database domain models, REST API specifications, and operational execution standards.
+            </p>
+            
+<div class="c4-hero-card">
+    <div class="c4-hero-header">
+        <div>
+            <span class="badge badge-primary">C4 Level 2</span>
+            <h3 style="margin: 6px 0 0 0; font-size: 1.25rem;">iDeal High-Level System Container Diagram</h3>
+        </div>
+        <button class="btn btn-sm" onclick="toggleMermaidZoom(this)">Expand Diagram</button>
+    </div>
+    <div class="mermaid-wrap">
+        <pre class="mermaid">
+graph TB
+    subgraph ClientTier ["Client Tier (Web & Mobile)"]
+        WebSPA["Next.js App Router (SPA)<br/>(Web Application)"]
+        MobileApp["Flutter Mobile App<br/>(iOS & Android)"]
+    end
+
+    subgraph EdgeTier ["Edge & Reverse Proxy"]
+        Nginx["Nginx Edge Proxy<br/>(SSL / HTTP/2 / Static Cache / Rate Limiting)"]
+    end
+
+    subgraph AppTier ["Application Tier (Dockerized Django 5.2)"]
+        ASGI["ASGI Server (Uvicorn / Django Channels)"]
+        RESTAPI["DMR REST API Layer<br/>(JWT Auth, Pydantic, OpenAPI)"]
+        WSHub["WebSocket Event Hub<br/>(Realtime Chat & Alerts)"]
+        Q2Worker["Django-Q2 Worker Cluster<br/>(Async Cron & Background Tasks)"]
+    end
+
+    subgraph DataTier ["Data & Cache Storage Tier"]
+        Postgres[("PostgreSQL 16 Database<br/>(Relational Stores, ACID, SoftDeletes)")]
+        RedisDB[("Redis 7 In-Memory<br/>(Cache, Channel Layers, Task Broker)")]
+        S3Storage[("S3 / CDN Media Storage<br/>(Photos, Acts, Documents)")]
+    end
+
+    subgraph ExternalServices ["External Integrations"]
+        Eskiz["Eskiz SMS Gateway<br/>(OTP Verification)"]
+        Payments["Click / Payme / Stripe<br/>(Payment Webhooks & Gateways)"]
+        FCM["Firebase Cloud Messaging<br/>(Push Notifications)"]
+    end
+
+    WebSPA -->|HTTPS / REST API| Nginx
+    MobileApp -->|HTTPS / REST API| Nginx
+    WebSPA -.->|WSS / WebSocket| Nginx
+    MobileApp -.->|WSS / WebSocket| Nginx
+
+    Nginx -->|Proxy Pass| ASGI
+    ASGI --> RESTAPI
+    ASGI --> WSHub
+
+    RESTAPI --> Postgres
+    RESTAPI --> RedisDB
+    RESTAPI --> S3Storage
+
+    WSHub <--> RedisDB
+    Q2Worker <--> RedisDB
+    Q2Worker --> Postgres
+
+    RESTAPI --> Eskiz
+    RESTAPI --> FCM
+    Payments -->|Webhooks| Nginx
+        </pre>
+    </div>
+</div>
+
+        </div>
+
+        <section class="section-block doc-section" id="overview">
+            <div class="section-header">
+                <h2><i class="ri-apps-line" style="margin-right: 8px; color: var(--primary);"></i> Product Identity & Overview</h2>
+            </div>
+            <h1 id="ideal-backend-project-overview">iDeal Backend — Project Overview <a class="heading-anchor" href="#ideal-backend-project-overview">#</a></h1>
+<h2 id="product-identity">Product Identity <a class="heading-anchor" href="#product-identity">#</a></h2>
+<ul>
+<li><strong>Name:</strong> iDeal (previously referenced as Makon in early prototypes)</li>
+<li><strong>Domain:</strong> Property management platform for rental properties in Uzbekistan</li>
+<li><strong>Primary Market:</strong> Tashkent (Toshkent) and surrounding districts</li>
+<li><strong>Business Model:</strong> Trust management (Mulkni Ishonchli Boshqarish) — the platform guarantees a fixed monthly income to property owners while managing tenants, maintenance, and compliance.</li>
+</ul>
+<hr/>
+<h2 id="what-problem-it-solves">What Problem It Solves <a class="heading-anchor" href="#what-problem-it-solves">#</a></h2>
+<h3 id="for-property-owners">For Property Owners <a class="heading-anchor" href="#for-property-owners">#</a></h3>
+<ul>
+<li><strong>Problem:</strong> Finding reliable tenants, dealing with vacancies, handling repairs, chasing rent payments, and navigating informal/unregistered rental arrangements.</li>
+<li><strong>Solution:</strong> iDeal signs a formal trust-management contract with the owner, pays them a <strong>guaranteed monthly rate</strong> regardless of whether the unit is occupied, and handles all tenant-facing operations.</li>
+</ul>
+<h3 id="for-tenants">For Tenants <a class="heading-anchor" href="#for-tenants">#</a></h3>
+<ul>
+<li><strong>Problem:</strong> Finding verified, clean, legally documented apartments with responsive maintenance and modern payment options.</li>
+<li><strong>Solution:</strong> iDeal offers vetted listings with official contracts, 24/7 maintenance support, and transparent pricing.</li>
+</ul>
+<h3 id="for-the-platform-management">For the Platform (Management) <a class="heading-anchor" href="#for-the-platform-management">#</a></h3>
+<ul>
+<li><strong>Revenue Model:</strong> The spread between the <strong>tenant's monthly rent</strong> and the <strong>owner's guaranteed payout</strong>.</li>
+<li><strong>Example:</strong> Owner market rate = $500. Platform guarantees owner $380. Platform charges tenant $500. Monthly margin = $120.</li>
+<li><strong>Additional Revenue:</strong> Agent commissions on new lease deals.</li>
+</ul>
+<hr/>
+<h2 id="user-roles-responsibilities">User Roles & Responsibilities <a class="heading-anchor" href="#user-roles-responsibilities">#</a></h2>
+<h3 id="1-management-platform-admin">1. Management (Platform Admin) <a class="heading-anchor" href="#1-management-platform-admin">#</a></h3>
+<ul>
+<li>Full access to the entire portfolio</li>
+<li>Add properties, manage owner contracts, manage tenant leases</li>
+<li>View P&L (Profit & Loss), occupancy, vacancy cost</li>
+<li>Process payments manually (mark tenant payments as received, schedule owner payouts)</li>
+<li>Manage maintenance requests and assign technicians</li>
+<li>Manage agent roster and commission tracking</li>
+<li>View lease expiry calendars and trigger renewals</li>
+<li>Publish listings to the marketplace</li>
+</ul>
+<h3 id="2-owner-property-owner">2. Owner (Property Owner) <a class="heading-anchor" href="#2-owner-property-owner">#</a></h3>
+<ul>
+<li>Views their own properties and their guaranteed monthly income</li>
+<li>Views payment history (guaranteed payouts)</li>
+<li>Understands why their guaranteed rate is lower than market rate (vacancy risk coverage, maintenance, international tenants, legal protection)</li>
+<li>Cannot modify properties or see other owners' data</li>
+</ul>
+<h3 id="3-tenant-renter">3. Tenant (Renter) <a class="heading-anchor" href="#3-tenant-renter">#</a></h3>
+<ul>
+<li>Views their current apartment details, lease end date, and rent amount</li>
+<li>Pays rent (initially: manually recorded by admin; future: integrated payment gateways)</li>
+<li>Submits maintenance requests with priority levels</li>
+<li>Browses other available listings in the marketplace</li>
+</ul>
+<h3 id="4-marketplace-public-unauthenticated">4. Marketplace (Public / Unauthenticated) <a class="heading-anchor" href="#4-marketplace-public-unauthenticated">#</a></h3>
+<ul>
+<li>Browse available (vacant) listings</li>
+<li>Filter by district, price, rooms, area</li>
+<li>View listings on a map</li>
+<li>Book a viewing appointment</li>
+<li>No authentication required for browsing</li>
+</ul>
+<hr/>
+<h2 id="core-business-process-flow">Core Business Process Flow <a class="heading-anchor" href="#core-business-process-flow">#</a></h2>
+<h3 id="step-1-property-onboarding">Step 1: Property Onboarding <a class="heading-anchor" href="#step-1-property-onboarding">#</a></h3>
+<ol>
+<li><strong>Management</strong> identifies a property or an owner approaches iDeal.</li>
+<li><strong>Property</strong> is added to the system with location details (district, address, floor, rooms, area).</li>
+<li><strong>Pricing</strong> is negotiated:</li>
+</ol>
+<ul>
+<li>Owner's asking price (market rate on OLX, etc.) = <code>ask_price</code></li>
+<li>iDeal's offer to owner (guaranteed, typically ~24% below ask) = <code>owner_guaranteed_price</code></li>
+<li>iDeal's charge to tenant (market rate) = <code>tenant_charge_price</code></li>
+</ul>
+<ol>
+<li><strong>Owner Agreement</strong> is created (12/24/36 months, notarized contract).</li>
+<li><strong>Listing</strong> is automatically published to the marketplace (OLX, Joymee, Bir-Bir — via future integrations or manual posting).</li>
+</ol>
+<h3 id="step-2-tenant-acquisition">Step 2: Tenant Acquisition <a class="heading-anchor" href="#step-2-tenant-acquisition">#</a></h3>
+<ol>
+<li>Tenant finds listing via marketplace or agent.</li>
+<li><strong>Lease</strong> is signed (start date, end date, monthly rent = <code>tenant_charge_price</code>).</li>
+<li>Property status changes to <code>rented</code>.</li>
+<li>Tenant moves in; property score may be updated based on condition.</li>
+</ol>
+<h3 id="step-3-monthly-operations">Step 3: Monthly Operations <a class="heading-anchor" href="#step-3-monthly-operations">#</a></h3>
+<ol>
+<li><strong>Tenant pays rent</strong> (manually recorded by admin for now; later via Click/Payme/Uzcard).</li>
+<li><strong>Payment record</strong> is created: <code>PaymentType.TENANT_RENT</code>, status <code>paid</code>.</li>
+<li>On the <strong>25th of each month</strong>, admin schedules or records <strong>owner payout</strong>:</li>
+</ol>
+<ul>
+<li><code>PaymentType.OWNER_PAYOUT</code>, status <code>paid</code> or <code>pending</code>.</li>
+</ul>
+<ol>
+<li><strong>Maintenance requests</strong> may be submitted by tenant → assigned to technician → resolved.</li>
+</ol>
+<h3 id="step-4-lease-renewal-or-vacancy">Step 4: Lease Renewal or Vacancy <a class="heading-anchor" href="#step-4-lease-renewal-or-vacancy">#</a></h3>
+<ol>
+<li>As lease end date approaches (e.g., < 60 days), system alerts management.</li>
+<li>Management contacts tenant for renewal.</li>
+<li>If renewed: new lease record is created; old lease is archived.</li>
+<li>If not renewed: property status changes to <code>vacant</code>; listing is republished.</li>
+<li><strong>Vacancy cost</strong> is tracked: <code>vacant_days * daily_rent</code> = lost revenue.</li>
+</ol>
+<h3 id="step-5-financial-reporting">Step 5: Financial Reporting <a class="heading-anchor" href="#step-5-financial-reporting">#</a></h3>
+<ol>
+<li><strong>P&L Dashboard</strong> shows monthly gross revenue, owner payouts, net margin, and tax liability.</li>
+<li><strong>Tax declarations</strong> are generated from payment records (4% turnover tax on gross rental income).</li>
+<li>All transactions are bank-transfer-based for traceability.</li>
+</ol>
+<hr/>
+<h2 id="key-metrics-tracked">Key Metrics Tracked <a class="heading-anchor" href="#key-metrics-tracked">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Metric</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td>Occupancy Rate</td>
+<td>Rented properties / Total properties</td>
+</tr>
+<tr>
+<td>Monthly Gross Revenue</td>
+<td>Sum of all tenant rents collected</td>
+</tr>
+<tr>
+<td>Monthly Net Margin</td>
+<td>Gross revenue − Owner payouts</td>
+</tr>
+<tr>
+<td>Vacancy Cost</td>
+<td>Days vacant × daily rent for each vacant property</td>
+</tr>
+<tr>
+<td>Owner Guaranteed Yield</td>
+<td>Guaranteed payout / Market asking price</td>
+</tr>
+<tr>
+<td>Tenant Satisfaction Score</td>
+<td>Property-level rating (1–10)</td>
+</tr>
+<tr>
+<td>Agent Performance</td>
+<td>Deals closed, total revenue generated</td>
+</tr>
+<tr>
+<td>Maintenance Resolution Time</td>
+<td>Average time from open to resolved</td>
+</tr>
+<tr>
+<td>Payment On-Time Rate</td>
+<td>Percentage of tenant payments received on or before due date</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="currency-strategy">Currency Strategy <a class="heading-anchor" href="#currency-strategy">#</a></h2>
+<ul>
+<li>Each property/deal stores its <strong>preferred currency</strong> (<code>USD</code> or <code>UZS</code>) and the <strong>amount</strong> in that currency.</li>
+<li>The system supports <strong>dynamic conversion</strong> between USD and UZS using an exchange rate service or stored daily rate.</li>
+<li>Tax reporting and local compliance are calculated in UZS after conversion.</li>
+<li>Financial dashboards may display both currencies where relevant.</li>
+</ul>
+<hr/>
+<h2 id="out-of-scope-initial-phase">Out of Scope (Initial Phase) <a class="heading-anchor" href="#out-of-scope-initial-phase">#</a></h2>
+<p>The following are <strong>not part of the initial backend design</strong> and will be deferred to future iterations:</p>
+<ul>
+<li><strong>Tax Inspector role / dashboard:</strong> Deferred. Compliance data is still generated internally, but no dedicated inspector UI or API.</li>
+<li><strong>Automated payment gateways:</strong> Tenant payments are manually recorded by admin. Click, Payme, Uzcard/Humo integrations are planned for v2.</li>
+<li><strong>OLX/Joymee/Bir-Bir auto-publishing:</strong> Manual listing for now; API integrations for auto-posting are future work.</li>
+<li><strong>Telegram bot notifications:</strong> Noted as a useful feature for the UZ market but deferred.</li>
+<li><strong>AI/agent recommendations:</strong> Not in scope.</li>
+</ul>
+        </section>
+
+        <section class="section-block doc-section" id="architecture">
+            <div class="section-header">
+                <h2><i class="ri-building-4-line" style="margin-right: 8px; color: var(--primary);"></i> System Architecture & Stack</h2>
+            </div>
+            <h1 id="ideal-backend-system-architecture">iDeal Backend — System Architecture <a class="heading-anchor" href="#ideal-backend-system-architecture">#</a></h1>
+<h2 id="overview">Overview <a class="heading-anchor" href="#overview">#</a></h2>
+<p>iDeal is a <strong>Django REST API</strong> backend serving a <strong>React + TypeScript SPA</strong> frontend. The architecture is modular, containerized, and designed for future scalability.</p>
+<hr/>
+<h2 id="tech-stack">Tech Stack <a class="heading-anchor" href="#tech-stack">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Layer</th>
+<th>Technology</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Backend Framework</strong></td>
+<td>Django 5.2 + Python 3.14</td>
+<td>Core web framework</td>
+</tr>
+<tr>
+<td><strong>API Layer</strong></td>
+<td>django-modern-rest (DMR)</td>
+<td>REST API, JWT auth, OpenAPI docs, Pydantic validation</td>
+</tr>
+<tr>
+<td><strong>Database</strong></td>
+<td>PostgreSQL</td>
+<td>Primary data store</td>
+</tr>
+<tr>
+<td><strong>Task Queue</strong></td>
+<td>Django-Q2 + Redis</td>
+<td>Background jobs: lease expiry alerts, monthly payouts, tax reports</td>
+</tr>
+<tr>
+<td><strong>Cache</strong></td>
+<td>Redis</td>
+<td>Session cache, dashboard stats, rate limiting</td>
+</tr>
+<tr>
+<td><strong>Frontend</strong></td>
+<td>React + TypeScript (separate SPA)</td>
+<td>All user-facing UI</td>
+</tr>
+<tr>
+<td><strong>Static/Media</strong></td>
+<td>WhiteNoise + CDN</td>
+<td>Static assets and uploaded media</td>
+</tr>
+<tr>
+<td><strong>Auth</strong></td>
+<td>JWT (HS256)</td>
+<td>Stateless authentication via access/refresh tokens</td>
+</tr>
+<tr>
+<td><strong>Admin</strong></td>
+<td>Django Unfold</td>
+<td>Enhanced admin dashboard for management</td>
+</tr>
+<tr>
+<td><strong>DevOps</strong></td>
+<td>Docker + Docker Compose</td>
+<td>Local and production deployment</td>
+</tr>
+<tr>
+<td><strong>Process Manager</strong></td>
+<td><code>just</code> (Justfile)</td>
+<td>Common commands: install, migrate, test, run</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="high-level-system-diagram">High-Level System Diagram <a class="heading-anchor" href="#high-level-system-diagram">#</a></h2>
+<div class="code-block"><div class="code-header"><span>text</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-">┌─────────────────────────────────────────────┐
+│          React + TypeScript SPA             │
+│         (Hosted separately / Vercel)        │
+│         ──────── API calls ────────►        │
+└─────────────────────────────────────────────┘
+                      │
+                      │ HTTPS / CORS
+                      ▼
+┌─────────────────────────────────────────────┐
+│         Nginx (reverse proxy)               │
+│         ──────── static/media ────────►     │
+└─────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────┐
+│         Django Application (ASGI/Uvicorn)    │
+│         ──────── DMR REST API ────────►     │
+│                                              │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
+│  │ account │ │ property│ │ contract│       │
+│  │  (user) │ │ (units) │ │ (leases)│       │
+│  └─────────┘ └─────────┘ └─────────┘       │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
+│  │ finance │ │mainten. │ │  agent  │       │
+│  │(payments)│ │(requests)│ │(brokers)│      │
+│  └─────────┘ └─────────┘ └─────────┘       │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
+│  │  core   │ │marketpl.│ │  tax   │       │
+│  │(base)   │ │(public) │ │(deferred)│       │
+│  └─────────┘ └─────────┘ └─────────┘       │
+│                                              │
+└─────────────────────────────────────────────┘
+                      │
+                      │
+        ┌─────────────┼─────────────┐
+        ▼             ▼             ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│  PostgreSQL │ │    Redis    │ │  (Future)   │
+│  (main DB)  │ │ (cache+Q2)  │ │  S3/MinIO   │
+│             │ │             │ │  (media)     │
+└─────────────┘ └─────────────┘ └─────────────┘</code></pre></div>
+<hr/>
+<h2 id="backend-module-structure-django-apps">Backend Module Structure (Django Apps) <a class="heading-anchor" href="#backend-module-structure-django-apps">#</a></h2>
+<p>All apps live under <code>src/apps/</code>.</p>
+<h3 id="account-existing"><code>account</code> (Existing) <a class="heading-anchor" href="#account-existing">#</a></h3>
+<ul>
+<li><strong>Responsibility:</strong> User authentication, registration, roles, profiles.</li>
+<li><strong>Key Models:</strong> <code>User</code> (custom, extended from AbstractBaseUser)</li>
+<li><strong>Extensions Needed:</strong> <code>role</code>, <code>is_verified</code>, <code>phone</code>, <code>telegram_id</code>, <code>nationality</code></li>
+</ul>
+<h3 id="core-existing"><code>core</code> (Existing) <a class="heading-anchor" href="#core-existing">#</a></h3>
+<ul>
+<li><strong>Responsibility:</strong> Base abstractions, utilities, middleware, shared helpers.</li>
+<li><strong>Key Models:</strong> <code>TimestampedModel</code>, <code>SoftDeleteModel</code>, <code>BaseManager</code></li>
+<li><strong>Key Utilities:</strong> Pagination, logging (Telegram error alerts), request context filter</li>
+</ul>
+<h3 id="property-new"><code>property</code> (New) <a class="heading-anchor" href="#property-new">#</a></h3>
+<ul>
+<li><strong>Responsibility:</strong> Physical properties, districts, photos, amenities, status tracking.</li>
+<li><strong>Key Models:</strong> <code>Property</code>, <code>District</code>, <code>PropertyPhoto</code>, <code>PropertyAmenity</code></li>
+</ul>
+<h3 id="contract-new"><code>contract</code> (New) <a class="heading-anchor" href="#contract-new">#</a></h3>
+<ul>
+<li><strong>Responsibility:</strong> Legal agreements between owner and platform, and between platform and tenant.</li>
+<li><strong>Key Models:</strong> <code>OwnerAgreement</code>, <code>Lease</code>, <code>LeaseRenewal</code></li>
+</ul>
+<h3 id="finance-new"><code>finance</code> (New) <a class="heading-anchor" href="#finance-new">#</a></h3>
+<ul>
+<li><strong>Responsibility:</strong> All monetary transactions: tenant rent collection, owner payouts, agent commissions.</li>
+<li><strong>Key Models:</strong> <code>Payment</code>, <code>ExchangeRate</code>, <code>PayoutSchedule</code></li>
+<li><strong>Note:</strong> Payments are manually entered by admin in v1. No automated payment gateways yet.</li>
+</ul>
+<h3 id="maintenance-new"><code>maintenance</code> (New) <a class="heading-anchor" href="#maintenance-new">#</a></h3>
+<ul>
+<li><strong>Responsibility:</strong> Service requests from tenants, technician assignments, resolution tracking.</li>
+<li><strong>Key Models:</strong> <code>ServiceRequest</code>, <code>ServiceRequestAssignment</code>, <code>MaintenanceLog</code></li>
+</ul>
+<h3 id="marketplace-new"><code>marketplace</code> (New) <a class="heading-anchor" href="#marketplace-new">#</a></h3>
+<ul>
+<li><strong>Responsibility:</strong> Public-facing listing data, search/filter APIs, booking/viewing requests.</li>
+<li><strong>Key Models:</strong> <code>Listing</code>, <code>ViewingRequest</code></li>
+<li><strong>Note:</strong> This is a read-heavy module; may benefit from caching and denormalized listing views.</li>
+</ul>
+<h3 id="agent-new"><code>agent</code> (New) <a class="heading-anchor" href="#agent-new">#</a></h3>
+<ul>
+<li><strong>Responsibility:</strong> Commission-based broker/agent management, deal tracking.</li>
+<li><strong>Key Models:</strong> <code>Agent</code>, <code>AgentDeal</code>, <code>CommissionRule</code></li>
+</ul>
+<h3 id="tax-new-deferred"><code>tax</code> (New — Deferred) <a class="heading-anchor" href="#tax-new-deferred">#</a></h3>
+<ul>
+<li><strong>Responsibility:</strong> Internal tax declaration generation, compliance reports.</li>
+<li><strong>Key Models:</strong> <code>Declaration</code> (generated monthly from finance data)</li>
+<li><strong>Note:</strong> No dedicated Tax Inspector API or UI in v1. Data is generated for internal/management use.</li>
+</ul>
+<hr/>
+<h2 id="api-communication-contract">API Communication Contract <a class="heading-anchor" href="#api-communication-contract">#</a></h2>
+<h3 id="frontend-backend">Frontend ↔ Backend <a class="heading-anchor" href="#frontend-backend">#</a></h3>
+<ul>
+<li><strong>Protocol:</strong> HTTPS only</li>
+<li><strong>Format:</strong> JSON (via DMR's JsonParser/JsonRenderer)</li>
+<li><strong>Authentication:</strong> JWT Bearer token in <code>Authorization</code> header</li>
+<li><strong>CORS:</strong> Enabled for <code>/api/*</code> endpoints only</li>
+<li><strong>Base URL:</strong> <code>/api/v1/</code></li>
+</ul>
+<h3 id="jwt-token-strategy">JWT Token Strategy <a class="heading-anchor" href="#jwt-token-strategy">#</a></h3>
+<ul>
+<li><strong>Access Token:</strong> 1 hour lifetime (HS256)</li>
+<li><strong>Refresh Token:</strong> 30 days lifetime</li>
+<li><strong>Issuer:</strong> <code>iDeal</code></li>
+<li><strong>Endpoints:</strong></li>
+<li><code>POST /api/v1/token/</code> — Obtain access + refresh</li>
+<li><code>POST /api/v1/token/refresh/</code> — Refresh access token</li>
+</ul>
+<h3 id="api-design-principles">API Design Principles <a class="heading-anchor" href="#api-design-principles">#</a></h3>
+<ul>
+<li><strong>Role-based access control (RBAC):</strong> Every endpoint checks the user's role before proceeding.</li>
+<li><strong>Soft deletes:</strong> All business entities use soft-delete (via <code>django-soft-delete</code>) for audit trails.</li>
+<li><strong>Timestamped:</strong> Every entity tracks <code>created_at</code> and <code>updated_at</code>.</li>
+<li><strong>Pagination:</strong> List endpoints use standardized pagination (cursor or offset-based).</li>
+<li><strong>OpenAPI:</strong> Auto-generated schema via DMR's <code>OpenAPIConfig</code> for frontend type generation.</li>
+</ul>
+<hr/>
+<h2 id="background-jobs-django-q2">Background Jobs (Django-Q2) <a class="heading-anchor" href="#background-jobs-django-q2">#</a></h2>
+<p>Scheduled and async tasks running via Redis-backed Django-Q2 cluster:</p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Task</th>
+<th>Frequency</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>lease_expiry_alert</code></td>
+<td>Daily</td>
+<td>Find leases expiring in ≤60 days; notify management</td>
+</tr>
+<tr>
+<td><code>owner_payout_schedule</code></td>
+<td>Monthly (25th)</td>
+<td>Generate pending <code>OWNER_PAYOUT</code> payment records</td>
+</tr>
+<tr>
+<td><code>vacancy_cost_update</code></td>
+<td>Daily</td>
+<td>Recalculate <code>vacant_days</code> and <code>lost_revenue</code> for vacant properties</td>
+</tr>
+<tr>
+<td><code>tax_declaration_generate</code></td>
+<td>Monthly (1st)</td>
+<td>Generate <code>tax.Declaration</code> from prior month's gross revenue</td>
+</tr>
+<tr>
+<td><code>listing_sync</code></td>
+<td>Daily</td>
+<td>Refresh marketplace listing availability status</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="deployment-environment">Deployment & Environment <a class="heading-anchor" href="#deployment-environment">#</a></h2>
+<h3 id="development">Development <a class="heading-anchor" href="#development">#</a></h3>
+<ul>
+<li><code>uv sync</code> → <code>python manage.py migrate</code> → <code>python manage.py runserver</code></li>
+<li>Docker Compose: <code>docker-compose up --build</code></li>
+</ul>
+<h3 id="production">Production <a class="heading-anchor" href="#production">#</a></h3>
+<ul>
+<li><code>docker-compose -f docker-compose.prod.yml up --build</code></li>
+<li>WhiteNoise for static files</li>
+<li>PostgreSQL with connection pooling (<code>conn_max_age=600</code>)</li>
+<li>Redis for cache and Q2 queue</li>
+<li>Sentry SDK for error tracking</li>
+</ul>
+<hr/>
+<h2 id="security-considerations">Security Considerations <a class="heading-anchor" href="#security-considerations">#</a></h2>
+<ul>
+<li><strong>Password hashing:</strong> PBKDF2 SHA256 (Django default)</li>
+<li><strong>CSRF:</strong> Disabled for API endpoints; JWT handles stateless auth</li>
+<li><strong>SQL Injection:</strong> Protected by Django ORM</li>
+<li><strong>XSS:</strong> Protected by DMR's JSON renderer (no HTML rendering)</li>
+<li><strong>Audit:</strong> Soft deletes + timestamped models preserve history</li>
+<li><strong>Logging:</strong> All 500 errors are logged to console + Telegram (if configured)</li>
+<li><strong>Media uploads:</strong> Restricted file types and sizes; stored outside web root</li>
+</ul>
+<hr/>
+<h2 id="scalability-notes">Scalability Notes <a class="heading-anchor" href="#scalability-notes">#</a></h2>
+<ul>
+<li>The modular app structure allows each domain to be split into a separate service later if needed.</li>
+<li><code>marketplace</code> is the most read-heavy module; it can be denormalized or cached aggressively.</li>
+<li><code>finance</code> is write-heavy and audit-sensitive; it should remain in the primary database with strong indexing.</li>
+<li>Redis is already provisioned for caching and task queues; can be expanded for rate limiting and session storage.</li>
+</ul>
+        </section>
+
+        <section class="section-block doc-section" id="data-models">
+            <div class="section-header">
+                <h2><i class="ri-database-2-line" style="margin-right: 8px; color: var(--primary);"></i> Data Models & Storage</h2>
+            </div>
+            <h1 id="ideal-backend-data-models-database-design">iDeal Backend — Data Models & Database Design <a class="heading-anchor" href="#ideal-backend-data-models-database-design">#</a></h1>
+<h2 id="conventions">Conventions <a class="heading-anchor" href="#conventions">#</a></h2>
+<ul>
+<li><strong>Primary Key:</strong> All tables use <code>BigAutoField</code> (Django default).</li>
+<li><strong>Soft Deletes:</strong> All business entities inherit from <code>SoftDeleteModel</code> (via <code>django-soft-delete</code>).</li>
+<li><strong>Timestamps:</strong> All entities inherit from <code>TimestampedModel</code> (<code>created_at</code>, <code>updated_at</code>).</li>
+<li><strong>Currency:</strong> Amounts stored as <code>DecimalField(max_digits=12, decimal_places=2)</code> with an associated <code>currency</code> field (<code>USD</code> or <code>UZS</code>).</li>
+<li><strong>Exchange Rates:</strong> A separate <code>ExchangeRate</code> table stores daily rates for dynamic conversion.</li>
+</ul>
+<hr/>
+<h2 id="core-abstractions">Core Abstractions <a class="heading-anchor" href="#core-abstractions">#</a></h2>
+<h3 id="core-timestampedmodel-abstract"><code>core.TimestampedModel</code> (Abstract) <a class="heading-anchor" href="#core-timestampedmodel-abstract">#</a></h3>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td><code>created_at</code></td>
+<td><code>DateTimeField</code></td>
+<td><code>auto_now_add=True</code></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td><code>DateTimeField</code></td>
+<td><code>auto_now=True</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="core-softdeletemodel-abstract"><code>core.SoftDeleteModel</code> (Abstract) <a class="heading-anchor" href="#core-softdeletemodel-abstract">#</a></h3>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td><code>deleted_at</code></td>
+<td><code>DateTimeField</code></td>
+<td><code>null=True, blank=True</code></td>
+</tr>
+<tr>
+<td><code>restored_at</code></td>
+<td><code>DateTimeField</code></td>
+<td><code>null=True, blank=True</code></td>
+</tr>
+<tr>
+<td><code>transaction_id</code></td>
+<td><code>UUIDField</code></td>
+<td>For audit tracking</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-user-account-app">Entity: User (<code>account</code> app) <a class="heading-anchor" href="#entity-user-account-app">#</a></h2>
+<p><strong>Extends:</strong> <code>AbstractBaseUser</code>, <code>TimestampedModel</code>, <code>SoftDeleteModel</code></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td>System identifier</td>
+</tr>
+<tr>
+<td><code>first_name</code></td>
+<td><code>CharField(30)</code></td>
+<td>Required</td>
+<td>Legal first name</td>
+</tr>
+<tr>
+<td><code>last_name</code></td>
+<td><code>CharField(30)</code></td>
+<td>Optional</td>
+<td>Legal last name</td>
+</tr>
+<tr>
+<td><code>patronymic</code></td>
+<td><code>CharField(100)</code></td>
+<td>Optional</td>
+<td>Middle name (CIS naming)</td>
+</tr>
+<tr>
+<td><code>username</code></td>
+<td><code>CharField(150)</code></td>
+<td>Unique</td>
+<td>Login identifier</td>
+</tr>
+<tr>
+<td><code>phone</code></td>
+<td><code>CharField(15)</code></td>
+<td>Unique, nullable</td>
+<td>Mobile number (UZ format)</td>
+</tr>
+<tr>
+<td><code>email</code></td>
+<td><code>EmailField</code></td>
+<td>Unique</td>
+<td>Primary contact email</td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>mgmt</code>, <code>owner</code>, <code>tenant</code>, <code>agent</code></td>
+</tr>
+<tr>
+<td><code>is_staff</code></td>
+<td><code>BooleanField</code></td>
+<td>Default <code>False</code></td>
+<td>Django admin access</td>
+</tr>
+<tr>
+<td><code>is_superuser</code></td>
+<td><code>BooleanField</code></td>
+<td>Default <code>False</code></td>
+<td>Full system access</td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td><code>BooleanField</code></td>
+<td>Default <code>True</code></td>
+<td>Account status</td>
+</tr>
+<tr>
+<td><code>is_verified</code></td>
+<td><code>BooleanField</code></td>
+<td>Default <code>False</code></td>
+<td>Identity verification (KYC)</td>
+</tr>
+<tr>
+<td><code>nationality</code></td>
+<td><code>CharField(50)</code></td>
+<td>Optional</td>
+<td>e.g., "UK", "China", "Germany"</td>
+</tr>
+<tr>
+<td><code>telegram_id</code></td>
+<td><code>CharField</code></td>
+<td>Optional</td>
+<td>For future Telegram bot integration</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Indexes:</strong> <code>username</code>, <code>phone</code>, <code>email</code>, <code>role</code></p>
+<hr/>
+<h2 id="entity-district-property-app">Entity: District (<code>property</code> app) <a class="heading-anchor" href="#entity-district-property-app">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>CharField(100)</code></td>
+<td>Unique</td>
+<td>e.g., "Yunusobod", "Chilonzor"</td>
+</tr>
+<tr>
+<td><code>city</code></td>
+<td><code>CharField(100)</code></td>
+<td>Default "Toshkent"</td>
+<td>City name</td>
+</tr>
+<tr>
+<td><code>region</code></td>
+<td><code>CharField(100)</code></td>
+<td>Optional</td>
+<td>Region/state</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-property-property-app">Entity: Property (<code>property</code> app) <a class="heading-anchor" href="#entity-property-property-app">#</a></h2>
+<p><strong>Extends:</strong> <code>TimestampedModel</code>, <code>SoftDeleteModel</code></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>CharField(200)</code></td>
+<td>Required</td>
+<td>e.g., "Yunusobod 12-kvartal"</td>
+</tr>
+<tr>
+<td><code>address</code></td>
+<td><code>CharField(255)</code></td>
+<td>Required</td>
+<td>Street address</td>
+</tr>
+<tr>
+<td><code>district</code></td>
+<td><code>FK → District</code></td>
+<td><code>PROTECT</code></td>
+<td>Location district</td>
+</tr>
+<tr>
+<td><code>rooms</code></td>
+<td><code>PositiveSmallIntegerField</code></td>
+<td>Required</td>
+<td>Number of rooms</td>
+</tr>
+<tr>
+<td><code>area_sqm</code></td>
+<td><code>PositiveSmallIntegerField</code></td>
+<td>Required</td>
+<td>Area in square meters</td>
+</tr>
+<tr>
+<td><code>floor</code></td>
+<td><code>PositiveSmallIntegerField</code></td>
+<td>Required</td>
+<td>Floor number</td>
+</tr>
+<tr>
+<td><code>total_floors</code></td>
+<td><code>PositiveSmallIntegerField</code></td>
+<td>Optional</td>
+<td>Total building floors</td>
+</tr>
+<tr>
+<td><code>owner</code></td>
+<td><code>FK → User</code></td>
+<td><code>PROTECT</code></td>
+<td>The property owner</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>rented</code>, <code>vacant</code>, <code>maintenance</code></td>
+</tr>
+<tr>
+<td><code>score</code></td>
+<td><code>DecimalField(3,1)</code></td>
+<td>Default 0.0</td>
+<td>Quality rating (1–10)</td>
+</tr>
+<tr>
+<td><code>map_lat</code></td>
+<td><code>DecimalField(10,7)</code></td>
+<td>Optional</td>
+<td>Latitude</td>
+</tr>
+<tr>
+<td><code>map_lon</code></td>
+<td><code>DecimalField(10,7)</code></td>
+<td>Optional</td>
+<td>Longitude</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>TextField</code></td>
+<td>Optional</td>
+<td>Public description</td>
+</tr>
+<tr>
+<td><code>tariff</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>standard</code>, <code>comfort</code>, <code>premium</code></td>
+</tr>
+<tr>
+<td><code>vacant_since</code></td>
+<td><code>DateField</code></td>
+<td>Optional</td>
+<td>Date when property became vacant</td>
+</tr>
+<tr>
+<td><code>vacant_days</code></td>
+<td><code>PositiveSmallIntegerField</code></td>
+<td>Default 0</td>
+<td>Cached count of vacant days</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="property-pricing-stored-per-property">Property Pricing (stored per property) <a class="heading-anchor" href="#property-pricing-stored-per-property">#</a></h3>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>ask_price</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Owner's market asking price</td>
+</tr>
+<tr>
+<td><code>ask_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td>Currency of ask_price</td>
+</tr>
+<tr>
+<td><code>owner_guaranteed_price</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Guaranteed monthly payout to owner</td>
+</tr>
+<tr>
+<td><code>owner_guaranteed_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td>Currency of guaranteed price</td>
+</tr>
+<tr>
+<td><code>tenant_charge_price</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Monthly rent charged to tenant</td>
+</tr>
+<tr>
+<td><code>tenant_charge_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td>Currency of tenant charge</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Indexes:</strong> <code>district</code>, <code>owner</code>, <code>status</code>, <code>map_lat</code> + <code>map_lon</code> (composite)</p>
+<hr/>
+<h2 id="entity-propertyphoto-property-app">Entity: PropertyPhoto (<code>property</code> app) <a class="heading-anchor" href="#entity-propertyphoto-property-app">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td><code>FK → Property</code></td>
+<td><code>CASCADE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>image</code></td>
+<td><code>ImageField</code></td>
+<td>Required</td>
+<td>Uploaded photo</td>
+</tr>
+<tr>
+<td><code>is_primary</code></td>
+<td><code>BooleanField</code></td>
+<td>Default <code>False</code></td>
+<td>Cover image</td>
+</tr>
+<tr>
+<td><code>sort_order</code></td>
+<td><code>PositiveSmallIntegerField</code></td>
+<td>Default 0</td>
+<td>Gallery order</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-owneragreement-contract-app">Entity: OwnerAgreement (<code>contract</code> app) <a class="heading-anchor" href="#entity-owneragreement-contract-app">#</a></h2>
+<p><strong>Extends:</strong> <code>TimestampedModel</code>, <code>SoftDeleteModel</code></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td><code>OneToOne → Property</code></td>
+<td><code>CASCADE</code></td>
+<td>The managed property</td>
+</tr>
+<tr>
+<td><code>owner</code></td>
+<td><code>FK → User</code></td>
+<td><code>PROTECT</code></td>
+<td>The property owner</td>
+</tr>
+<tr>
+<td><code>term_months</code></td>
+<td><code>PositiveSmallIntegerField</code></td>
+<td>Required</td>
+<td>12, 24, or 36</td>
+</tr>
+<tr>
+<td><code>start_date</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>Agreement start</td>
+</tr>
+<tr>
+<td><code>end_date</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>Agreement end</td>
+</tr>
+<tr>
+<td><code>guaranteed_monthly</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Monthly guaranteed amount</td>
+</tr>
+<tr>
+<td><code>guaranteed_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>notarized</code></td>
+<td><code>BooleanField</code></td>
+<td>Default <code>False</code></td>
+<td>Notarial confirmation</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>draft</code>, <code>active</code>, <code>expired</code>, <code>terminated</code></td>
+</tr>
+<tr>
+<td><code>contract_file</code></td>
+<td><code>FileField</code></td>
+<td>Optional</td>
+<td>Signed PDF</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-lease-contract-app">Entity: Lease (<code>contract</code> app) <a class="heading-anchor" href="#entity-lease-contract-app">#</a></h2>
+<p><strong>Extends:</strong> <code>TimestampedModel</code>, <code>SoftDeleteModel</code></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td><code>FK → Property</code></td>
+<td><code>PROTECT</code></td>
+<td>The rented property</td>
+</tr>
+<tr>
+<td><code>tenant</code></td>
+<td><code>FK → User</code></td>
+<td><code>PROTECT</code></td>
+<td>The tenant</td>
+</tr>
+<tr>
+<td><code>start_date</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>Lease start</td>
+</tr>
+<tr>
+<td><code>end_date</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>Lease end</td>
+</tr>
+<tr>
+<td><code>monthly_rent</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Rent amount</td>
+</tr>
+<tr>
+<td><code>rent_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>active</code>, <code>expiring</code>, <code>expired</code>, <code>renewed</code></td>
+</tr>
+<tr>
+<td><code>nationality</code></td>
+<td><code>CharField(50)</code></td>
+<td>Optional</td>
+<td>Tenant nationality (e.g., "UK")</td>
+</tr>
+<tr>
+<td><code>deposit_amount</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Optional</td>
+<td>Security deposit</td>
+</tr>
+<tr>
+<td><code>deposit_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>contract_file</code></td>
+<td><code>FileField</code></td>
+<td>Optional</td>
+<td>Signed lease PDF</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-leaserenewal-contract-app">Entity: LeaseRenewal (<code>contract</code> app) <a class="heading-anchor" href="#entity-leaserenewal-contract-app">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>original_lease</code></td>
+<td><code>FK → Lease</code></td>
+<td><code>CASCADE</code></td>
+<td>The lease being renewed</td>
+</tr>
+<tr>
+<td><code>new_lease</code></td>
+<td><code>FK → Lease</code></td>
+<td><code>CASCADE</code></td>
+<td>The new lease record</td>
+</tr>
+<tr>
+<td><code>renewed_at</code></td>
+<td><code>DateTimeField</code></td>
+<td><code>auto_now_add</code></td>
+<td>When renewal was processed</td>
+</tr>
+<tr>
+<td><code>renewed_by</code></td>
+<td><code>FK → User</code></td>
+<td><code>PROTECT</code></td>
+<td>Management user who processed it</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-payment-finance-app">Entity: Payment (<code>finance</code> app) <a class="heading-anchor" href="#entity-payment-finance-app">#</a></h2>
+<p><strong>Extends:</strong> <code>TimestampedModel</code>, <code>SoftDeleteModel</code></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td><code>FK → Property</code></td>
+<td><code>PROTECT</code></td>
+<td>Related property</td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td><code>FK → User</code></td>
+<td><code>PROTECT</code></td>
+<td>Payer or receiver</td>
+</tr>
+<tr>
+<td><code>payment_type</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>tenant_rent</code>, <code>owner_payout</code>, <code>agent_commission</code></td>
+</tr>
+<tr>
+<td><code>amount</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Transaction amount</td>
+</tr>
+<tr>
+<td><code>currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>pending</code>, <code>paid</code>, <code>failed</code>, <code>cancelled</code></td>
+</tr>
+<tr>
+<td><code>period_month</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>The month this payment covers (e.g., 2025-06-01)</td>
+</tr>
+<tr>
+<td><code>payment_method</code></td>
+<td><code>CharField(50)</code></td>
+<td>Optional</td>
+<td><code>cash</code>, <code>bank_transfer</code>, <code>uzcard</code>, <code>humo</code>, <code>click</code>, <code>payme</code></td>
+</tr>
+<tr>
+<td><code>reference_number</code></td>
+<td><code>CharField(100)</code></td>
+<td>Optional</td>
+<td>Bank receipt / transfer ID</td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td><code>TextField</code></td>
+<td>Optional</td>
+<td>Admin notes</td>
+</tr>
+<tr>
+<td><code>recorded_by</code></td>
+<td><code>FK → User</code></td>
+<td><code>PROTECT</code></td>
+<td>Admin who manually entered this</td>
+</tr>
+<tr>
+<td><code>paid_at</code></td>
+<td><code>DateTimeField</code></td>
+<td>Optional</td>
+<td>When payment was actually received/sent</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Indexes:</strong> <code>property</code>, <code>user</code>, <code>payment_type</code>, <code>status</code>, <code>period_month</code> (composite with <code>property</code>)</p>
+<hr/>
+<h2 id="entity-exchangerate-finance-app">Entity: ExchangeRate (<code>finance</code> app) <a class="heading-anchor" href="#entity-exchangerate-finance-app">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>from_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Required</td>
+<td>e.g., <code>USD</code></td>
+</tr>
+<tr>
+<td><code>to_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Required</td>
+<td>e.g., <code>UZS</code></td>
+</tr>
+<tr>
+<td><code>rate</code></td>
+<td><code>DecimalField(15,6)</code></td>
+<td>Required</td>
+<td>Conversion rate</td>
+</tr>
+<tr>
+<td><code>date</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>Rate effective date</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Unique Constraint:</strong> <code>from_currency</code>, <code>to_currency</code>, <code>date</code></p>
+<hr/>
+<h2 id="entity-payoutschedule-finance-app">Entity: PayoutSchedule (<code>finance</code> app) <a class="heading-anchor" href="#entity-payoutschedule-finance-app">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td><code>FK → Property</code></td>
+<td><code>PROTECT</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>owner</code></td>
+<td><code>FK → User</code></td>
+<td><code>PROTECT</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>scheduled_date</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>e.g., 25th of each month</td>
+</tr>
+<tr>
+<td><code>period_month</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>The month being paid for</td>
+</tr>
+<tr>
+<td><code>amount</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Scheduled amount</td>
+</tr>
+<tr>
+<td><code>currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>scheduled</code>, <code>processed</code>, <code>skipped</code></td>
+</tr>
+<tr>
+<td><code>payment</code></td>
+<td><code>FK → Payment</code></td>
+<td>Optional, nullable</td>
+<td>Link to actual payment record once created</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-servicerequest-maintenance-app">Entity: ServiceRequest (<code>maintenance</code> app) <a class="heading-anchor" href="#entity-servicerequest-maintenance-app">#</a></h2>
+<p><strong>Extends:</strong> <code>TimestampedModel</code>, <code>SoftDeleteModel</code></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td><code>FK → Property</code></td>
+<td><code>PROTECT</code></td>
+<td>The affected property</td>
+</tr>
+<tr>
+<td><code>tenant</code></td>
+<td><code>FK → User</code></td>
+<td><code>PROTECT</code></td>
+<td>The tenant who reported it</td>
+</tr>
+<tr>
+<td><code>request_type</code></td>
+<td><code>CharField(50)</code></td>
+<td>Required</td>
+<td><code>plumbing</code>, <code>electric</code>, <code>ac</code>, <code>heating</code>, <code>door_lock</code>, <code>other</code></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>TextField</code></td>
+<td>Required</td>
+<td>Tenant's description</td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>low</code>, <code>medium</code>, <code>high</code></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>open</code>, <code>in_progress</code>, <code>resolved</code>, <code>escalated</code></td>
+</tr>
+<tr>
+<td><code>assigned_to</code></td>
+<td><code>FK → User</code></td>
+<td>Optional, nullable</td>
+<td>Technician / agent assigned</td>
+</tr>
+<tr>
+<td><code>resolved_at</code></td>
+<td><code>DateTimeField</code></td>
+<td>Optional</td>
+<td>Resolution timestamp</td>
+</tr>
+<tr>
+<td><code>resolution_notes</code></td>
+<td><code>TextField</code></td>
+<td>Optional</td>
+<td>Technician notes</td>
+</tr>
+<tr>
+<td><code>cost</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Optional</td>
+<td>Repair cost</td>
+</tr>
+<tr>
+<td><code>cost_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Indexes:</strong> <code>property</code>, <code>tenant</code>, <code>status</code>, <code>priority</code>, <code>assigned_to</code></p>
+<hr/>
+<h2 id="entity-servicerequestphoto-maintenance-app">Entity: ServiceRequestPhoto (<code>maintenance</code> app) <a class="heading-anchor" href="#entity-servicerequestphoto-maintenance-app">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>request</code></td>
+<td><code>FK → ServiceRequest</code></td>
+<td><code>CASCADE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>image</code></td>
+<td><code>ImageField</code></td>
+<td>Required</td>
+<td>Uploaded photo</td>
+</tr>
+<tr>
+<td><code>uploaded_by</code></td>
+<td><code>FK → User</code></td>
+<td><code>PROTECT</code></td>
+<td>Who uploaded it</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-listing-marketplace-app">Entity: Listing (<code>marketplace</code> app) <a class="heading-anchor" href="#entity-listing-marketplace-app">#</a></h2>
+<p><strong>Extends:</strong> <code>TimestampedModel</code></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td><code>OneToOne → Property</code></td>
+<td><code>CASCADE</code></td>
+<td>The property being listed</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td><code>CharField(200)</code></td>
+<td>Required</td>
+<td>Marketplace title</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>TextField</code></td>
+<td>Optional</td>
+<td>Public description</td>
+</tr>
+<tr>
+<td><code>price</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Listed price (typically = <code>tenant_charge_price</code>)</td>
+</tr>
+<tr>
+<td><code>currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td><code>BooleanField</code></td>
+<td>Default <code>True</code></td>
+<td>Visibility flag</td>
+</tr>
+<tr>
+<td><code>is_featured</code></td>
+<td><code>BooleanField</code></td>
+<td>Default <code>False</code></td>
+<td>Highlighted listing</td>
+</tr>
+<tr>
+<td><code>published_at</code></td>
+<td><code>DateTimeField</code></td>
+<td>Optional</td>
+<td>When it went live</td>
+</tr>
+<tr>
+<td><code>unpublished_at</code></td>
+<td><code>DateTimeField</code></td>
+<td>Optional</td>
+<td>When it was taken down</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-viewingrequest-marketplace-app">Entity: ViewingRequest (<code>marketplace</code> app) <a class="heading-anchor" href="#entity-viewingrequest-marketplace-app">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>listing</code></td>
+<td><code>FK → Listing</code></td>
+<td><code>CASCADE</code></td>
+<td>The listing of interest</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>CharField(100)</code></td>
+<td>Required</td>
+<td>Prospect's name</td>
+</tr>
+<tr>
+<td><code>phone</code></td>
+<td><code>CharField(20)</code></td>
+<td>Required</td>
+<td>Prospect's phone</td>
+</tr>
+<tr>
+<td><code>email</code></td>
+<td><code>EmailField</code></td>
+<td>Optional</td>
+<td>Prospect's email</td>
+</tr>
+<tr>
+<td><code>preferred_date</code></td>
+<td><code>DateField</code></td>
+<td>Optional</td>
+<td>When they want to view</td>
+</tr>
+<tr>
+<td><code>preferred_time</code></td>
+<td><code>TimeField</code></td>
+<td>Optional</td>
+<td>Time of day</td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td><code>TextField</code></td>
+<td>Optional</td>
+<td>Additional notes</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>new</code>, <code>contacted</code>, <code>scheduled</code>, <code>completed</code>, <code>cancelled</code></td>
+</tr>
+<tr>
+<td><code>assigned_agent</code></td>
+<td><code>FK → User</code></td>
+<td>Optional</td>
+<td>Agent who will handle the viewing</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-agent-agent-app">Entity: Agent (<code>agent</code> app) <a class="heading-anchor" href="#entity-agent-agent-app">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td><code>OneToOne → User</code></td>
+<td><code>CASCADE</code></td>
+<td>The agent's user account</td>
+</tr>
+<tr>
+<td><code>commission_rate</code></td>
+<td><code>DecimalField(4,2)</code></td>
+<td>Default 0.10</td>
+<td>Percentage (e.g., 0.10 = 10%)</td>
+</tr>
+<tr>
+<td><code>total_deals</code></td>
+<td><code>PositiveIntegerField</code></td>
+<td>Default 0</td>
+<td>Lifetime deals closed</td>
+</tr>
+<tr>
+<td><code>total_revenue</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Default 0</td>
+<td>Lifetime commission revenue</td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td><code>BooleanField</code></td>
+<td>Default <code>True</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>bio</code></td>
+<td><code>TextField</code></td>
+<td>Optional</td>
+<td>Short bio</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-agentdeal-agent-app">Entity: AgentDeal (<code>agent</code> app) <a class="heading-anchor" href="#entity-agentdeal-agent-app">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>agent</code></td>
+<td><code>FK → Agent</code></td>
+<td><code>CASCADE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td><code>FK → Property</code></td>
+<td><code>PROTECT</code></td>
+<td>The property involved</td>
+</tr>
+<tr>
+<td><code>lease</code></td>
+<td><code>FK → Lease</code></td>
+<td>Optional</td>
+<td>The resulting lease</td>
+</tr>
+<tr>
+<td><code>deal_date</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>When deal was closed</td>
+</tr>
+<tr>
+<td><code>commission_amount</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Calculated commission</td>
+</tr>
+<tr>
+<td><code>commission_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>pending</code>, <code>paid</code>, <code>cancelled</code></td>
+</tr>
+<tr>
+<td><code>payment</code></td>
+<td><code>FK → Payment</code></td>
+<td>Optional</td>
+<td>Link to commission payment record</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="entity-declaration-tax-app-deferred">Entity: Declaration (<code>tax</code> app — Deferred) <a class="heading-anchor" href="#entity-declaration-tax-app-deferred">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>BigAutoField</code></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>period_month</code></td>
+<td><code>DateField</code></td>
+<td>Required</td>
+<td>e.g., 2025-06-01</td>
+</tr>
+<tr>
+<td><code>gross_revenue</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Sum of tenant rents</td>
+</tr>
+<tr>
+<td><code>revenue_currency</code></td>
+<td><code>CharField(3)</code></td>
+<td>Default <code>USD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>tax_rate</code></td>
+<td><code>DecimalField(4,2)</code></td>
+<td>Default 0.04</td>
+<td>4% turnover tax</td>
+</tr>
+<tr>
+<td><code>tax_amount</code></td>
+<td><code>DecimalField(12,2)</code></td>
+<td>Required</td>
+<td>Tax in original currency</td>
+</tr>
+<tr>
+<td><code>tax_amount_uzs</code></td>
+<td><code>DecimalField(15,2)</code></td>
+<td>Required</td>
+<td>Converted to UZS</td>
+</tr>
+<tr>
+<td><code>exchange_rate</code></td>
+<td><code>DecimalField(15,6)</code></td>
+<td>Required</td>
+<td>Rate used for conversion</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>CharField(20)</code></td>
+<td>Choices</td>
+<td><code>draft</code>, <code>filed</code>, <code>paid</code></td>
+</tr>
+<tr>
+<td><code>generated_at</code></td>
+<td><code>DateTimeField</code></td>
+<td><code>auto_now_add</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="relationship-diagram-summary">Relationship Diagram (Summary) <a class="heading-anchor" href="#relationship-diagram-summary">#</a></h2>
+<div class="code-block"><div class="code-header"><span>text</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-">User (1) ────────┬──────► Property (N)           [as owner]
+                 │
+                 ├──────► Lease (N)               [as tenant]
+                 │
+                 ├──────► ServiceRequest (N)       [as tenant]
+                 │
+                 ├──────► ServiceRequest (N)       [as assigned technician]
+                 │
+                 ├──────► Payment (N)              [as payer/receiver]
+                 │
+                 └──────► Agent (1)                [as agent profile]
+
+Property (1) ───► OwnerAgreement (1)              [one active agreement]
+Property (1) ───► Lease (N)                        [history of leases]
+Property (1) ───► PropertyPhoto (N)
+Property (1) ───► Payment (N)
+Property (1) ───► ServiceRequest (N)
+Property (1) ───► Listing (1)                     [one active listing]
+Property (1) ───► PayoutSchedule (N)
+
+District (1) ───► Property (N)
+
+Listing (1) ───► ViewingRequest (N)
+
+Lease (1) ───► LeaseRenewal (1) ───► Lease (1)     [old → new]
+
+Agent (1) ───► AgentDeal (N)</code></pre></div>
+<hr/>
+<h2 id="currency-conversion-rules">Currency & Conversion Rules <a class="heading-anchor" href="#currency-conversion-rules">#</a></h2>
+<ol>
+<li><strong>Storage:</strong> Every monetary field is stored with its original currency (<code>USD</code> or <code>UZS</code>).</li>
+<li><strong>Preferred Currency:</strong> The <code>Property</code> table defines the preferred currency for that property's pricing fields (<code>ask_price</code>, <code>owner_guaranteed_price</code>, <code>tenant_charge_price</code>).</li>
+<li><strong>Conversion:</strong> When a dashboard or report needs a unified currency, the system:</li>
+</ol>
+<ul>
+<li>Looks up the latest <code>ExchangeRate</code> for the date in question.</li>
+<li>Converts on-the-fly using <code>Decimal</code> arithmetic for precision.</li>
+<li>Never mutates the stored original amount.</li>
+</ul>
+<ol>
+<li><strong>Tax:</strong> <code>Declaration</code> stores both the original currency tax and the UZS equivalent for local compliance.</li>
+</ol>
+        </section>
+
+        <section class="section-block doc-section" id="api-design">
+            <div class="section-header">
+                <h2><i class="ri-code-s-slash-line" style="margin-right: 8px; color: var(--primary);"></i> API Strategy & Contracts</h2>
+            </div>
+            <h1 id="ideal-backend-api-design">iDeal Backend — API Design <a class="heading-anchor" href="#ideal-backend-api-design">#</a></h1>
+<h2 id="base-configuration">Base Configuration <a class="heading-anchor" href="#base-configuration">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Base URL</strong></td>
+<td><code>/api/v1/</code></td>
+</tr>
+<tr>
+<td><strong>Format</strong></td>
+<td>JSON (via DMR)</td>
+</tr>
+<tr>
+<td><strong>Authentication</strong></td>
+<td>JWT Bearer Token (<code>Authorization: Bearer <access_token></code>)</td>
+</tr>
+<tr>
+<td><strong>CORS</strong></td>
+<td>Enabled for all origins on <code>/api/*</code> (configurable via env)</td>
+</tr>
+<tr>
+<td><strong>OpenAPI</strong></td>
+<td>Auto-generated at <code>/api/v1/docs/</code> (DMR OpenAPIConfig)</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="authentication-endpoints">Authentication Endpoints <a class="heading-anchor" href="#authentication-endpoints">#</a></h2>
+<h3 id="post-api-v1-token"><code>POST /api/v1/token/</code> <a class="heading-anchor" href="#post-api-v1-token">#</a></h3>
+<p><strong>Description:</strong> Obtain access and refresh tokens.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;username&quot;: &quot;akbar&quot;,
+  &quot;password&quot;: &quot;secure_password&quot;
+}</code></pre></div>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;access&quot;: &quot;&lt;jwt_access_token&gt;&quot;,
+  &quot;refresh&quot;: &quot;&lt;jwt_refresh_token&gt;&quot;
+}</code></pre></div>
+<hr/>
+<h3 id="post-api-v1-token-refresh"><code>POST /api/v1/token/refresh/</code> <a class="heading-anchor" href="#post-api-v1-token-refresh">#</a></h3>
+<p><strong>Description:</strong> Refresh an expired access token.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;refresh&quot;: &quot;&lt;jwt_refresh_token&gt;&quot;
+}</code></pre></div>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;access&quot;: &quot;&lt;new_jwt_access_token&gt;&quot;
+}</code></pre></div>
+<hr/>
+<h2 id="user-profile-endpoints">User & Profile Endpoints <a class="heading-anchor" href="#user-profile-endpoints">#</a></h2>
+<h3 id="get-api-v1-account-me"><code>GET /api/v1/account/me/</code> <a class="heading-anchor" href="#get-api-v1-account-me">#</a></h3>
+<p><strong>Description:</strong> Get current authenticated user's profile.</p>
+<p><strong>Access:</strong> All authenticated roles.</p>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;id&quot;: 1,
+  &quot;username&quot;: &quot;akbar&quot;,
+  &quot;first_name&quot;: &quot;Akbar&quot;,
+  &quot;last_name&quot;: &quot;Umarov&quot;,
+  &quot;role&quot;: &quot;mgmt&quot;,
+  &quot;email&quot;: &quot;akbar@ideal.uz&quot;,
+  &quot;phone&quot;: &quot;+998901234567&quot;,
+  &quot;is_verified&quot;: true,
+  &quot;nationality&quot;: null
+}</code></pre></div>
+<hr/>
+<h3 id="patch-api-v1-account-me"><code>PATCH /api/v1/account/me/</code> <a class="heading-anchor" href="#patch-api-v1-account-me">#</a></h3>
+<p><strong>Description:</strong> Update current user's profile (non-sensitive fields).</p>
+<p><strong>Access:</strong> All authenticated roles.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;first_name&quot;: &quot;Akbar&quot;,
+  &quot;last_name&quot;: &quot;Umarov&quot;,
+  &quot;phone&quot;: &quot;+998901234567&quot;
+}</code></pre></div>
+<hr/>
+<h2 id="property-endpoints">Property Endpoints <a class="heading-anchor" href="#property-endpoints">#</a></h2>
+<h3 id="get-api-v1-properties"><code>GET /api/v1/properties/</code> <a class="heading-anchor" href="#get-api-v1-properties">#</a></h3>
+<p><strong>Description:</strong> List all properties (management view). Supports filtering and pagination.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Query Parameters:</strong></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Param</th>
+<th>Type</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>status</code></td>
+<td>string</td>
+<td><code>rented</code>, <code>vacant</code>, <code>maintenance</code></td>
+</tr>
+<tr>
+<td><code>district</code></td>
+<td>string</td>
+<td>District name or ID</td>
+</tr>
+<tr>
+<td><code>owner</code></td>
+<td>integer</td>
+<td>Owner user ID</td>
+</tr>
+<tr>
+<td><code>search</code></td>
+<td>string</td>
+<td>Search by name or address</td>
+</tr>
+<tr>
+<td><code>page</code></td>
+<td>integer</td>
+<td>Page number</td>
+</tr>
+<tr>
+<td><code>page_size</code></td>
+<td>integer</td>
+<td>Items per page</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;count&quot;: 7,
+  &quot;next&quot;: null,
+  &quot;previous&quot;: null,
+  &quot;results&quot;: [
+    {
+      &quot;id&quot;: 1,
+      &quot;name&quot;: &quot;Yunusobod 12-kvartal&quot;,
+      &quot;address&quot;: &quot;Amir Temur 15&quot;,
+      &quot;district&quot;: { &quot;id&quot;: 1, &quot;name&quot;: &quot;Yunusobod&quot;, &quot;city&quot;: &quot;Toshkent&quot; },
+      &quot;rooms&quot;: 2,
+      &quot;area_sqm&quot;: 65,
+      &quot;floor&quot;: 5,
+      &quot;owner&quot;: { &quot;id&quot;: 5, &quot;first_name&quot;: &quot;Bobur&quot;, &quot;last_name&quot;: &quot;Shamsiyev&quot; },
+      &quot;status&quot;: &quot;rented&quot;,
+      &quot;score&quot;: 9.2,
+      &quot;ask_price&quot;: &quot;500.00&quot;,
+      &quot;ask_currency&quot;: &quot;USD&quot;,
+      &quot;owner_guaranteed_price&quot;: &quot;380.00&quot;,
+      &quot;owner_guaranteed_currency&quot;: &quot;USD&quot;,
+      &quot;tenant_charge_price&quot;: &quot;500.00&quot;,
+      &quot;tenant_charge_currency&quot;: &quot;USD&quot;,
+      &quot;map_lat&quot;: &quot;41.2995&quot;,
+      &quot;map_lon&quot;: &quot;69.2401&quot;,
+      &quot;vacant_days&quot;: 0,
+      &quot;created_at&quot;: &quot;2025-01-15T08:00:00Z&quot;
+    }
+  ]
+}</code></pre></div>
+<hr/>
+<h3 id="get-api-v1-properties-id"><code>GET /api/v1/properties/{id}/</code> <a class="heading-anchor" href="#get-api-v1-properties-id">#</a></h3>
+<p><strong>Description:</strong> Retrieve a single property with full details.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h3 id="post-api-v1-properties"><code>POST /api/v1/properties/</code> <a class="heading-anchor" href="#post-api-v1-properties">#</a></h3>
+<p><strong>Description:</strong> Add a new property.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;name&quot;: &quot;Yunusobod 12-kvartal&quot;,
+  &quot;address&quot;: &quot;Amir Temur 15&quot;,
+  &quot;district_id&quot;: 1,
+  &quot;rooms&quot;: 2,
+  &quot;area_sqm&quot;: 65,
+  &quot;floor&quot;: 5,
+  &quot;owner_id&quot;: 5,
+  &quot;ask_price&quot;: &quot;500.00&quot;,
+  &quot;ask_currency&quot;: &quot;USD&quot;,
+  &quot;owner_guaranteed_price&quot;: &quot;380.00&quot;,
+  &quot;owner_guaranteed_currency&quot;: &quot;USD&quot;,
+  &quot;tenant_charge_price&quot;: &quot;500.00&quot;,
+  &quot;tenant_charge_currency&quot;: &quot;USD&quot;,
+  &quot;map_lat&quot;: &quot;41.2995&quot;,
+  &quot;map_lon&quot;: &quot;69.2401&quot;,
+  &quot;tariff&quot;: &quot;standard&quot;
+}</code></pre></div>
+<hr/>
+<h3 id="patch-api-v1-properties-id"><code>PATCH /api/v1/properties/{id}/</code> <a class="heading-anchor" href="#patch-api-v1-properties-id">#</a></h3>
+<p><strong>Description:</strong> Update property details.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h3 id="delete-api-v1-properties-id"><code>DELETE /api/v1/properties/{id}/</code> <a class="heading-anchor" href="#delete-api-v1-properties-id">#</a></h3>
+<p><strong>Description:</strong> Soft-delete a property.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h2 id="contract-lease-endpoints">Contract & Lease Endpoints <a class="heading-anchor" href="#contract-lease-endpoints">#</a></h2>
+<h3 id="get-api-v1-contracts-leases"><code>GET /api/v1/contracts/leases/</code> <a class="heading-anchor" href="#get-api-v1-contracts-leases">#</a></h3>
+<p><strong>Description:</strong> List all leases.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Query Parameters:</strong></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Param</th>
+<th>Type</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>status</code></td>
+<td>string</td>
+<td><code>active</code>, <code>expiring</code>, <code>expired</code>, <code>renewed</code></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td>integer</td>
+<td>Property ID</td>
+</tr>
+<tr>
+<td><code>tenant</code></td>
+<td>integer</td>
+<td>Tenant user ID</td>
+</tr>
+<tr>
+<td><code>expiring_within_days</code></td>
+<td>integer</td>
+<td>Filter leases expiring within N days</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h3 id="get-api-v1-contracts-leases-id"><code>GET /api/v1/contracts/leases/{id}/</code> <a class="heading-anchor" href="#get-api-v1-contracts-leases-id">#</a></h3>
+<p><strong>Description:</strong> Retrieve a single lease.</p>
+<p><strong>Access:</strong> <code>management</code> or the tenant who owns the lease.</p>
+<hr/>
+<h3 id="post-api-v1-contracts-leases"><code>POST /api/v1/contracts/leases/</code> <a class="heading-anchor" href="#post-api-v1-contracts-leases">#</a></h3>
+<p><strong>Description:</strong> Create a new lease.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;property_id&quot;: 1,
+  &quot;tenant_id&quot;: 3,
+  &quot;start_date&quot;: &quot;2025-06-01&quot;,
+  &quot;end_date&quot;: &quot;2026-05-31&quot;,
+  &quot;monthly_rent&quot;: &quot;500.00&quot;,
+  &quot;rent_currency&quot;: &quot;USD&quot;,
+  &quot;nationality&quot;: &quot;UK&quot;,
+  &quot;deposit_amount&quot;: &quot;500.00&quot;,
+  &quot;deposit_currency&quot;: &quot;USD&quot;
+}</code></pre></div>
+<hr/>
+<h3 id="post-api-v1-contracts-leases-id-renew"><code>POST /api/v1/contracts/leases/{id}/renew/</code> <a class="heading-anchor" href="#post-api-v1-contracts-leases-id-renew">#</a></h3>
+<p><strong>Description:</strong> Renew an existing lease. Creates a new lease record and updates the old one.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;new_end_date&quot;: &quot;2027-05-31&quot;,
+  &quot;new_monthly_rent&quot;: &quot;520.00&quot;,
+  &quot;rent_currency&quot;: &quot;USD&quot;
+}</code></pre></div>
+<hr/>
+<h3 id="get-api-v1-contracts-owner-agreements"><code>GET /api/v1/contracts/owner-agreements/</code> <a class="heading-anchor" href="#get-api-v1-contracts-owner-agreements">#</a></h3>
+<p><strong>Description:</strong> List owner agreements.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h3 id="post-api-v1-contracts-owner-agreements"><code>POST /api/v1/contracts/owner-agreements/</code> <a class="heading-anchor" href="#post-api-v1-contracts-owner-agreements">#</a></h3>
+<p><strong>Description:</strong> Create a new owner agreement.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h2 id="finance-payment-endpoints">Finance & Payment Endpoints <a class="heading-anchor" href="#finance-payment-endpoints">#</a></h2>
+<h3 id="get-api-v1-finance-payments"><code>GET /api/v1/finance/payments/</code> <a class="heading-anchor" href="#get-api-v1-finance-payments">#</a></h3>
+<p><strong>Description:</strong> List all payment records.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Query Parameters:</strong></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Param</th>
+<th>Type</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>type</code></td>
+<td>string</td>
+<td><code>tenant_rent</code>, <code>owner_payout</code>, <code>agent_commission</code></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>string</td>
+<td><code>pending</code>, <code>paid</code>, <code>failed</code></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td>integer</td>
+<td>Property ID</td>
+</tr>
+<tr>
+<td><code>period_month</code></td>
+<td>date</td>
+<td><code>YYYY-MM-DD</code> (1st of month)</td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td>integer</td>
+<td>Payer/receiver user ID</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h3 id="post-api-v1-finance-payments"><code>POST /api/v1/finance/payments/</code> <a class="heading-anchor" href="#post-api-v1-finance-payments">#</a></h3>
+<p><strong>Description:</strong> Manually record a payment (admin only).</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;property_id&quot;: 1,
+  &quot;user_id&quot;: 3,
+  &quot;payment_type&quot;: &quot;tenant_rent&quot;,
+  &quot;amount&quot;: &quot;500.00&quot;,
+  &quot;currency&quot;: &quot;USD&quot;,
+  &quot;period_month&quot;: &quot;2025-06-01&quot;,
+  &quot;payment_method&quot;: &quot;bank_transfer&quot;,
+  &quot;reference_number&quot;: &quot;TRX-2025-06-001&quot;,
+  &quot;notes&quot;: &quot;Received via bank transfer&quot;,
+  &quot;paid_at&quot;: &quot;2025-06-05T10:00:00Z&quot;
+}</code></pre></div>
+<hr/>
+<h3 id="patch-api-v1-finance-payments-id"><code>PATCH /api/v1/finance/payments/{id}/</code> <a class="heading-anchor" href="#patch-api-v1-finance-payments-id">#</a></h3>
+<p><strong>Description:</strong> Update a payment record (e.g., change status, add notes).</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h3 id="post-api-v1-finance-payments-id-mark-paid"><code>POST /api/v1/finance/payments/{id}/mark-paid/</code> <a class="heading-anchor" href="#post-api-v1-finance-payments-id-mark-paid">#</a></h3>
+<p><strong>Description:</strong> Mark a pending payment as paid.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;paid_at&quot;: &quot;2025-06-05T10:00:00Z&quot;,
+  &quot;reference_number&quot;: &quot;TRX-2025-06-001&quot;
+}</code></pre></div>
+<hr/>
+<h3 id="get-api-v1-finance-payouts"><code>GET /api/v1/finance/payouts/</code> <a class="heading-anchor" href="#get-api-v1-finance-payouts">#</a></h3>
+<p><strong>Description:</strong> List scheduled owner payouts.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h3 id="get-api-v1-finance-exchange-rates"><code>GET /api/v1/finance/exchange-rates/</code> <a class="heading-anchor" href="#get-api-v1-finance-exchange-rates">#</a></h3>
+<p><strong>Description:</strong> List exchange rates.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h3 id="post-api-v1-finance-exchange-rates"><code>POST /api/v1/finance/exchange-rates/</code> <a class="heading-anchor" href="#post-api-v1-finance-exchange-rates">#</a></h3>
+<p><strong>Description:</strong> Add a new exchange rate.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;from_currency&quot;: &quot;USD&quot;,
+  &quot;to_currency&quot;: &quot;UZS&quot;,
+  &quot;rate&quot;: &quot;12650.00&quot;,
+  &quot;date&quot;: &quot;2025-06-07&quot;
+}</code></pre></div>
+<hr/>
+<h2 id="dashboard-reporting-endpoints">Dashboard & Reporting Endpoints <a class="heading-anchor" href="#dashboard-reporting-endpoints">#</a></h2>
+<h3 id="get-api-v1-finance-dashboard"><code>GET /api/v1/finance/dashboard/</code> <a class="heading-anchor" href="#get-api-v1-finance-dashboard">#</a></h3>
+<p><strong>Description:</strong> Management dashboard statistics.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;properties&quot;: {
+    &quot;total&quot;: 7,
+    &quot;rented&quot;: 4,
+    &quot;vacant&quot;: 2,
+    &quot;maintenance&quot;: 1,
+    &quot;occupancy_rate&quot;: 57
+  },
+  &quot;monthly&quot;: {
+    &quot;gross_revenue&quot;: &quot;2000.00&quot;,
+    &quot;revenue_currency&quot;: &quot;USD&quot;,
+    &quot;owner_payouts&quot;: &quot;1500.00&quot;,
+    &quot;payout_currency&quot;: &quot;USD&quot;,
+    &quot;net_margin&quot;: &quot;500.00&quot;,
+    &quot;margin_currency&quot;: &quot;USD&quot;
+  },
+  &quot;payments&quot;: {
+    &quot;collected&quot;: &quot;1500.00&quot;,
+    &quot;pending&quot;: &quot;500.00&quot;,
+    &quot;currency&quot;: &quot;USD&quot;
+  },
+  &quot;vacancy&quot;: {
+    &quot;vacant_count&quot;: 2,
+    &quot;total_lost&quot;: &quot;350.00&quot;,
+    &quot;currency&quot;: &quot;USD&quot;
+  },
+  &quot;maintenance&quot;: {
+    &quot;open_requests&quot;: 2,
+    &quot;in_progress&quot;: 1,
+    &quot;resolved&quot;: 1
+  }
+}</code></pre></div>
+<hr/>
+<h3 id="get-api-v1-finance-pnl"><code>GET /api/v1/finance/pnl/</code> <a class="heading-anchor" href="#get-api-v1-finance-pnl">#</a></h3>
+<p><strong>Description:</strong> P&L (Profit & Loss) summary.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Query Parameters:</strong></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Param</th>
+<th>Type</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>year</code></td>
+<td>integer</td>
+<td>Filter by year (default: current)</td>
+</tr>
+<tr>
+<td><code>month</code></td>
+<td>integer</td>
+<td>Filter by month (default: current)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;period&quot;: &quot;2025-06&quot;,
+  &quot;gross_revenue&quot;: &quot;2000.00&quot;,
+  &quot;revenue_currency&quot;: &quot;USD&quot;,
+  &quot;owner_payouts&quot;: &quot;1500.00&quot;,
+  &quot;payout_currency&quot;: &quot;USD&quot;,
+  &quot;net_margin&quot;: &quot;500.00&quot;,
+  &quot;margin_currency&quot;: &quot;USD&quot;,
+  &quot;margin_percent&quot;: 25,
+  &quot;tax_liability&quot;: {
+    &quot;tax_rate&quot;: 4,
+    &quot;tax_amount&quot;: &quot;80.00&quot;,
+    &quot;tax_currency&quot;: &quot;USD&quot;,
+    &quot;tax_amount_uzs&quot;: &quot;1012000.00&quot;,
+    &quot;exchange_rate&quot;: &quot;12650.00&quot;
+  },
+  &quot;monthly_breakdown&quot;: [
+    { &quot;month&quot;: &quot;2025-01&quot;, &quot;gross&quot;: &quot;1200.00&quot;, &quot;payouts&quot;: &quot;900.00&quot;, &quot;margin&quot;: &quot;300.00&quot; },
+    { &quot;month&quot;: &quot;2025-02&quot;, &quot;gross&quot;: &quot;1450.00&quot;, &quot;payouts&quot;: &quot;1087.00&quot;, &quot;margin&quot;: &quot;363.00&quot; }
+  ]
+}</code></pre></div>
+<hr/>
+<h2 id="maintenance-endpoints">Maintenance Endpoints <a class="heading-anchor" href="#maintenance-endpoints">#</a></h2>
+<h3 id="get-api-v1-maintenance-requests"><code>GET /api/v1/maintenance/requests/</code> <a class="heading-anchor" href="#get-api-v1-maintenance-requests">#</a></h3>
+<p><strong>Description:</strong> List all service requests.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Query Parameters:</strong></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Param</th>
+<th>Type</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>status</code></td>
+<td>string</td>
+<td><code>open</code>, <code>in_progress</code>, <code>resolved</code>, <code>escalated</code></td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td>string</td>
+<td><code>low</code>, <code>medium</code>, <code>high</code></td>
+</tr>
+<tr>
+<td><code>property</code></td>
+<td>integer</td>
+<td>Property ID</td>
+</tr>
+<tr>
+<td><code>assigned_to</code></td>
+<td>integer</td>
+<td>Technician user ID</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h3 id="get-api-v1-maintenance-requests-id"><code>GET /api/v1/maintenance/requests/{id}/</code> <a class="heading-anchor" href="#get-api-v1-maintenance-requests-id">#</a></h3>
+<p><strong>Description:</strong> Retrieve a single request with full details.</p>
+<p><strong>Access:</strong> <code>management</code> or the tenant who created it.</p>
+<hr/>
+<h3 id="post-api-v1-maintenance-requests"><code>POST /api/v1/maintenance/requests/</code> <a class="heading-anchor" href="#post-api-v1-maintenance-requests">#</a></h3>
+<p><strong>Description:</strong> Create a new service request (tenant-facing).</p>
+<p><strong>Access:</strong> <code>tenant</code> (their own) or <code>management</code>.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;property_id&quot;: 1,
+  &quot;request_type&quot;: &quot;plumbing&quot;,
+  &quot;description&quot;: &quot;Kitchen sink dripping continuously since yesterday.&quot;,
+  &quot;priority&quot;: &quot;high&quot;
+}</code></pre></div>
+<hr/>
+<h3 id="patch-api-v1-maintenance-requests-id-assign"><code>PATCH /api/v1/maintenance/requests/{id}/assign/</code> <a class="heading-anchor" href="#patch-api-v1-maintenance-requests-id-assign">#</a></h3>
+<p><strong>Description:</strong> Assign a technician to a request.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;assigned_to_id&quot;: 7,
+  &quot;notes&quot;: &quot;Please attend today before 6 PM&quot;
+}</code></pre></div>
+<hr/>
+<h3 id="patch-api-v1-maintenance-requests-id-resolve"><code>PATCH /api/v1/maintenance/requests/{id}/resolve/</code> <a class="heading-anchor" href="#patch-api-v1-maintenance-requests-id-resolve">#</a></h3>
+<p><strong>Description:</strong> Mark a request as resolved.</p>
+<p><strong>Access:</strong> <code>management</code> or the assigned technician.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;resolution_notes&quot;: &quot;Replaced faucet washer. Tested OK.&quot;,
+  &quot;cost&quot;: &quot;15.00&quot;,
+  &quot;cost_currency&quot;: &quot;USD&quot;
+}</code></pre></div>
+<hr/>
+<h2 id="marketplace-endpoints">Marketplace Endpoints <a class="heading-anchor" href="#marketplace-endpoints">#</a></h2>
+<h3 id="get-api-v1-marketplace-listings"><code>GET /api/v1/marketplace/listings/</code> <a class="heading-anchor" href="#get-api-v1-marketplace-listings">#</a></h3>
+<p><strong>Description:</strong> Public listing of available properties.</p>
+<p><strong>Access:</strong> Public (no authentication required) or authenticated.</p>
+<p><strong>Query Parameters:</strong></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Param</th>
+<th>Type</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>district</code></td>
+<td>string</td>
+<td>District name or ID</td>
+</tr>
+<tr>
+<td><code>min_price</code></td>
+<td>decimal</td>
+<td>Minimum price</td>
+</tr>
+<tr>
+<td><code>max_price</code></td>
+<td>decimal</td>
+<td>Maximum price</td>
+</tr>
+<tr>
+<td><code>rooms</code></td>
+<td>integer</td>
+<td>Number of rooms</td>
+</tr>
+<tr>
+<td><code>search</code></td>
+<td>string</td>
+<td>Search by name/address</td>
+</tr>
+<tr>
+<td><code>page</code></td>
+<td>integer</td>
+<td>Page number</td>
+</tr>
+<tr>
+<td><code>page_size</code></td>
+<td>integer</td>
+<td>Items per page</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;count&quot;: 2,
+  &quot;results&quot;: [
+    {
+      &quot;id&quot;: 3,
+      &quot;title&quot;: &quot;Sergeli Yangi Uy&quot;,
+      &quot;property&quot;: {
+        &quot;name&quot;: &quot;Sergeli Yangi Uy&quot;,
+        &quot;address&quot;: &quot;Bunyodkor 77&quot;,
+        &quot;district&quot;: &quot;Sergeli&quot;,
+        &quot;rooms&quot;: 1,
+        &quot;area_sqm&quot;: 45,
+        &quot;floor&quot;: 3,
+        &quot;map_lat&quot;: &quot;41.2995&quot;,
+        &quot;map_lon&quot;: &quot;69.2401&quot;
+      },
+      &quot;price&quot;: &quot;350.00&quot;,
+      &quot;currency&quot;: &quot;USD&quot;,
+      &quot;photos&quot;: [&quot;url1&quot;, &quot;url2&quot;]
+    }
+  ]
+}</code></pre></div>
+<hr/>
+<h3 id="get-api-v1-marketplace-listings-id"><code>GET /api/v1/marketplace/listings/{id}/</code> <a class="heading-anchor" href="#get-api-v1-marketplace-listings-id">#</a></h3>
+<p><strong>Description:</strong> Public listing detail.</p>
+<p><strong>Access:</strong> Public.</p>
+<hr/>
+<h3 id="post-api-v1-marketplace-listings-id-book-viewing"><code>POST /api/v1/marketplace/listings/{id}/book-viewing/</code> <a class="heading-anchor" href="#post-api-v1-marketplace-listings-id-book-viewing">#</a></h3>
+<p><strong>Description:</strong> Submit a viewing request for a listing.</p>
+<p><strong>Access:</strong> Public (no authentication required).</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;name&quot;: &quot;James Wilson&quot;,
+  &quot;phone&quot;: &quot;+998901234567&quot;,
+  &quot;email&quot;: &quot;james@example.com&quot;,
+  &quot;preferred_date&quot;: &quot;2025-06-10&quot;,
+  &quot;preferred_time&quot;: &quot;14:00&quot;,
+  &quot;notes&quot;: &quot;Looking for a 2-room apartment&quot;
+}</code></pre></div>
+<hr/>
+<h3 id="get-api-v1-marketplace-listings-map"><code>GET /api/v1/marketplace/listings/map/</code> <a class="heading-anchor" href="#get-api-v1-marketplace-listings-map">#</a></h3>
+<p><strong>Description:</strong> Retrieve properties for map rendering (GeoJSON-like).</p>
+<p><strong>Access:</strong> Public.</p>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;type&quot;: &quot;FeatureCollection&quot;,
+  &quot;features&quot;: [
+    {
+      &quot;type&quot;: &quot;Feature&quot;,
+      &quot;geometry&quot;: { &quot;type&quot;: &quot;Point&quot;, &quot;coordinates&quot;: [69.2401, 41.2995] },
+      &quot;properties&quot;: {
+        &quot;id&quot;: 3,
+        &quot;name&quot;: &quot;Sergeli Yangi Uy&quot;,
+        &quot;status&quot;: &quot;vacant&quot;,
+        &quot;price&quot;: &quot;350.00&quot;,
+        &quot;currency&quot;: &quot;USD&quot;,
+        &quot;rooms&quot;: 1
+      }
+    }
+  ]
+}</code></pre></div>
+<hr/>
+<h2 id="agent-endpoints">Agent Endpoints <a class="heading-anchor" href="#agent-endpoints">#</a></h2>
+<h3 id="get-api-v1-agents"><code>GET /api/v1/agents/</code> <a class="heading-anchor" href="#get-api-v1-agents">#</a></h3>
+<p><strong>Description:</strong> List all agents.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h3 id="get-api-v1-agents-id"><code>GET /api/v1/agents/{id}/</code> <a class="heading-anchor" href="#get-api-v1-agents-id">#</a></h3>
+<p><strong>Description:</strong> Retrieve agent details with deal history.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h3 id="get-api-v1-agents-id-deals"><code>GET /api/v1/agents/{id}/deals/</code> <a class="heading-anchor" href="#get-api-v1-agents-id-deals">#</a></h3>
+<p><strong>Description:</strong> List deals closed by an agent.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<hr/>
+<h3 id="post-api-v1-agents-id-deals"><code>POST /api/v1/agents/{id}/deals/</code> <a class="heading-anchor" href="#post-api-v1-agents-id-deals">#</a></h3>
+<p><strong>Description:</strong> Record a new deal for an agent.</p>
+<p><strong>Access:</strong> <code>management</code> only.</p>
+<p><strong>Request Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;property_id&quot;: 1,
+  &quot;lease_id&quot;: 2,
+  &quot;deal_date&quot;: &quot;2025-06-01&quot;,
+  &quot;commission_amount&quot;: &quot;50.00&quot;,
+  &quot;commission_currency&quot;: &quot;USD&quot;
+}</code></pre></div>
+<hr/>
+<h2 id="owner-facing-endpoints">Owner-Facing Endpoints <a class="heading-anchor" href="#owner-facing-endpoints">#</a></h2>
+<h3 id="get-api-v1-owner-properties"><code>GET /api/v1/owner/properties/</code> <a class="heading-anchor" href="#get-api-v1-owner-properties">#</a></h3>
+<p><strong>Description:</strong> List properties owned by the authenticated user.</p>
+<p><strong>Access:</strong> <code>owner</code> only.</p>
+<hr/>
+<h3 id="get-api-v1-owner-earnings"><code>GET /api/v1/owner/earnings/</code> <a class="heading-anchor" href="#get-api-v1-owner-earnings">#</a></h3>
+<p><strong>Description:</strong> Payment history for the authenticated owner.</p>
+<p><strong>Access:</strong> <code>owner</code> only.</p>
+<p><strong>Query Parameters:</strong></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Param</th>
+<th>Type</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>year</code></td>
+<td>integer</td>
+<td>Filter by year</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;guaranteed_monthly&quot;: &quot;380.00&quot;,
+  &quot;currency&quot;: &quot;USD&quot;,
+  &quot;payment_history&quot;: [
+    {
+      &quot;period_month&quot;: &quot;2025-01&quot;,
+      &quot;amount&quot;: &quot;380.00&quot;,
+      &quot;currency&quot;: &quot;USD&quot;,
+      &quot;paid_date&quot;: &quot;2025-01-25&quot;,
+      &quot;status&quot;: &quot;paid&quot;
+    }
+  ]
+}</code></pre></div>
+<hr/>
+<h3 id="get-api-v1-owner-why"><code>GET /api/v1/owner/why/</code> <a class="heading-anchor" href="#get-api-v1-owner-why">#</a></h3>
+<p><strong>Description:</strong> Educational content explaining why guaranteed rate is lower than market rate.</p>
+<p><strong>Access:</strong> <code>owner</code> only.</p>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;market_price&quot;: &quot;500.00&quot;,
+  &quot;guaranteed_price&quot;: &quot;380.00&quot;,
+  &quot;difference&quot;: &quot;120.00&quot;,
+  &quot;currency&quot;: &quot;USD&quot;,
+  &quot;benefits&quot;: [
+    &quot;Bo&#x27;sh turish xavfi — kvartira bo&#x27;sh tursa ham biz to&#x27;laymiz&quot;,
+    &quot;24/7 texnik xizmat — ijarachi bizga qo&#x27;ng&#x27;iroq qiladi, sizga emas&quot;,
+    &quot;Xalqaro ijarachilar (Britaniya, Germaniya, Yaponiya)&quot;,
+    &quot;Rasmiy shartnoma va himoya&quot;,
+    &quot;Har choralik texnik tekshiruv&quot;
+  ]
+}</code></pre></div>
+<hr/>
+<h2 id="tenant-facing-endpoints">Tenant-Facing Endpoints <a class="heading-anchor" href="#tenant-facing-endpoints">#</a></h2>
+<h3 id="get-api-v1-tenant-home"><code>GET /api/v1/tenant/home/</code> <a class="heading-anchor" href="#get-api-v1-tenant-home">#</a></h3>
+<p><strong>Description:</strong> Current tenant's apartment details.</p>
+<p><strong>Access:</strong> <code>tenant</code> only.</p>
+<p><strong>Response Body:</strong></p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;property&quot;: {
+    &quot;id&quot;: 1,
+    &quot;name&quot;: &quot;Yunusobod 12-kvartal&quot;,
+    &quot;address&quot;: &quot;Amir Temur 15&quot;,
+    &quot;district&quot;: &quot;Yunusobod&quot;,
+    &quot;rooms&quot;: 2,
+    &quot;area_sqm&quot;: 65,
+    &quot;floor&quot;: 5
+  },
+  &quot;lease&quot;: {
+    &quot;start_date&quot;: &quot;2025-06-01&quot;,
+    &quot;end_date&quot;: &quot;2025-12-01&quot;,
+    &quot;days_remaining&quot;: 176,
+    &quot;monthly_rent&quot;: &quot;500.00&quot;,
+    &quot;currency&quot;: &quot;USD&quot;,
+    &quot;status&quot;: &quot;active&quot;
+  },
+  &quot;rent_due&quot;: {
+    &quot;next_due_date&quot;: &quot;2025-07-01&quot;,
+    &quot;amount&quot;: &quot;500.00&quot;,
+    &quot;currency&quot;: &quot;USD&quot;,
+    &quot;status&quot;: &quot;pending&quot;
+  }
+}</code></pre></div>
+<hr/>
+<h3 id="get-api-v1-tenant-payments"><code>GET /api/v1/tenant/payments/</code> <a class="heading-anchor" href="#get-api-v1-tenant-payments">#</a></h3>
+<p><strong>Description:</strong> Tenant's payment history.</p>
+<p><strong>Access:</strong> <code>tenant</code> only.</p>
+<hr/>
+<h3 id="post-api-v1-tenant-payments"><code>POST /api/v1/tenant/payments/</code> <a class="heading-anchor" href="#post-api-v1-tenant-payments">#</a></h3>
+<p><strong>Description:</strong> Record a rent payment (placeholder for future gateway integration).</p>
+<p><strong>Access:</strong> <code>tenant</code> only.</p>
+<p><strong>Note:</strong> In v1, this creates a <code>Payment</code> record with status <code>pending</code> and notifies admin to verify. In v2, it will redirect to payment gateway.</p>
+<hr/>
+<h3 id="get-api-v1-tenant-service-requests"><code>GET /api/v1/tenant/service-requests/</code> <a class="heading-anchor" href="#get-api-v1-tenant-service-requests">#</a></h3>
+<p><strong>Description:</strong> List service requests submitted by the tenant.</p>
+<p><strong>Access:</strong> <code>tenant</code> only.</p>
+<hr/>
+<h3 id="post-api-v1-tenant-service-requests"><code>POST /api/v1/tenant/service-requests/</code> <a class="heading-anchor" href="#post-api-v1-tenant-service-requests">#</a></h3>
+<p><strong>Description:</strong> Submit a new maintenance request.</p>
+<p><strong>Access:</strong> <code>tenant</code> only.</p>
+<hr/>
+<h2 id="error-response-format">Error Response Format <a class="heading-anchor" href="#error-response-format">#</a></h2>
+<p>All errors follow the DMR global error handler format:</p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;VALIDATION_ERROR&quot;,
+    &quot;message&quot;: &quot;One or more fields failed validation&quot;,
+    &quot;details&quot;: {
+      &quot;tenant_charge_price&quot;: [&quot;This field is required.&quot;]
+    }
+  }
+}</code></pre></div>
+<p><strong>Common Error Codes:</strong></p>
+<div class="table-container"><table>
+<thead><tr>
+<th>Code</th>
+<th>HTTP Status</th>
+<th>Meaning</th>
+</tr></thead><tbody>
+<tr>
+<td><code>AUTHENTICATION_ERROR</code></td>
+<td>401</td>
+<td>Missing or invalid token</td>
+</tr>
+<tr>
+<td><code>PERMISSION_DENIED</code></td>
+<td>403</td>
+<td>Authenticated but not authorized for this role/resource</td>
+</tr>
+<tr>
+<td><code>NOT_FOUND</code></td>
+<td>404</td>
+<td>Resource does not exist</td>
+</tr>
+<tr>
+<td><code>VALIDATION_ERROR</code></td>
+<td>422</td>
+<td>Request body failed validation</td>
+</tr>
+<tr>
+<td><code>CONFLICT</code></td>
+<td>409</td>
+<td>Resource already exists or state conflict</td>
+</tr>
+<tr>
+<td><code>SERVER_ERROR</code></td>
+<td>500</td>
+<td>Internal server error</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 id="pagination-standard">Pagination Standard <a class="heading-anchor" href="#pagination-standard">#</a></h2>
+<p>All list endpoints return paginated responses:</p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{
+  &quot;count&quot;: 100,
+  &quot;next&quot;: &quot;/api/v1/properties/?page=2&quot;,
+  &quot;previous&quot;: null,
+  &quot;results&quot;: [...]
+}</code></pre></div>
+<p><strong>Default:</strong> <code>page_size = 20</code>, <code>page = 1</code>.</p>
+<hr/>
+<h2 id="role-based-access-control-summary">Role-Based Access Control Summary <a class="heading-anchor" href="#role-based-access-control-summary">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Endpoint Group</th>
+<th>Management</th>
+<th>Owner</th>
+<th>Tenant</th>
+<th>Agent</th>
+<th>Public</th>
+</tr></thead><tbody>
+<tr>
+<td><code>/token/</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>/account/me/</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>/properties/</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>/contracts/leases/</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>👁️ own</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>/finance/payments/</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>/finance/dashboard/</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>/finance/pnl/</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>/maintenance/requests/</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>👁️/✍️ own</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>/marketplace/listings/</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>/marketplace/listings/{id}/book-viewing/</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>/agents/</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>/owner/*</code></td>
+<td>❌</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>/tenant/*</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Legend:</strong></p>
+<ul>
+<li>✅ = Full access (read + write)</li>
+<li>👁️ = Read-only</li>
+<li>👁️/✍️ = Read + create own</li>
+<li>❌ = No access</li>
+</ul>
+        </section>
+
+        <section class="section-block doc-section" id="realtime-chat">
+            <div class="section-header">
+                <h2><i class="ri-chat-voice-line" style="margin-right: 8px; color: var(--primary);"></i> WebSocket Realtime Protocol</h2>
+            </div>
+            <h1 id="chat-realtime-protocol">Chat realtime protocol <a class="heading-anchor" href="#chat-realtime-protocol">#</a></h1>
+<p>Chat clients connect to <code>GET /ws/v1/chat/</code> using <code>ws://</code> locally and <code>wss://</code></p>
+<p>in production. The upgrade request accepts the existing API access token in the</p>
+<p><code>Authorization: Bearer <access-token></code> header. Browser clients may instead use</p>
+<p>the <code>ideal_access</code> cookie. The server closes unauthenticated connections with</p>
+<p>code <code>4401</code>.</p>
+<p>The endpoint is deliberately an event stream, not a second write API. Clients</p>
+<p>continue to use the documented REST endpoints for sending messages and then</p>
+<p>refresh their authoritative state when an event arrives. This keeps retries,</p>
+<p>idempotency (<code>client_id</code>), validation and error envelopes consistent across</p>
+<p>web and mobile.</p>
+<h2 id="frames">Frames <a class="heading-anchor" href="#frames">#</a></h2>
+<p>After a successful connection the server sends:</p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{&quot;type&quot;:&quot;chat.ready&quot;,&quot;latest_event_id&quot;:184,&quot;heartbeat_seconds&quot;:25}</code></pre></div>
+<p>Clients persist the largest <code>event_id</code>, ignore duplicate or older events, and</p>
+<p>immediately send a sync request:</p>
+<div class="code-block"><div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-json">{&quot;type&quot;:&quot;chat.sync&quot;,&quot;after_event_id&quot;:184}</code></pre></div>
+<p>If an event cursor has expired, the server emits <code>chat.resync_required</code>. The</p>
+<p>client must refresh chat summaries and the active conversation via REST, reset</p>
+<p>its cursor, then send <code>chat.sync</code> again. It must not fill the gap with polling.</p>
+<p>Send <code>{"type":"chat.ping"}</code> at least every 25 seconds while connected.</p>
+<p>The durable event types are <code>chat.message.created</code>, <code>chat.conversation.updated</code>,</p>
+<p><code>chat.conversation.removed</code>, and <code>chat.read.updated</code>. They include an</p>
+<p><code>event_id</code>, <code>conversation_id</code>, <code>conversation_version</code>, and the corresponding</p>
+<p>message or conversation payload. A client should fetch messages after its</p>
+<p>known message ID and refresh the conversation summary rather than assuming an</p>
+<p>event is a complete local snapshot.</p>
+<p>Typing is transient and opt-in. Send</p>
+<p><code>{"type":"chat.typing.set","conversation_id":42,"is_typing":true}</code> and stop</p>
+<p>within five seconds; the server broadcasts <code>chat.typing.updated</code> only to the</p>
+<p>other permitted participant. Typing frames are never persisted or replayed.</p>
+<h2 id="operations-and-deployment">Operations and deployment <a class="heading-anchor" href="#operations-and-deployment">#</a></h2>
+<p>The ASGI server must serve both HTTP and WebSocket traffic, and all instances</p>
+<p>must use the same Redis deployment for <code>CHANNEL_LAYERS</code> and task scheduling.</p>
+<p>The proxy/load balancer must forward WebSocket upgrades and preserve the</p>
+<p><code>Authorization</code> header or the <code>ideal_access</code> cookie. Configure its idle timeout</p>
+<p>above 30 seconds; 60 seconds is the application channel expiry default.</p>
+<p>Required settings are <code>REDIS_URL</code>, optional <code>CHAT_CHANNEL_CAPACITY</code> (default</p>
+<p>200), <code>CHAT_CHANNEL_EXPIRY_SECONDS</code> (default 60),</p>
+<p><code>CHAT_REALTIME_EVENT_RETENTION_DAYS</code> (default 7), and</p>
+<p><code>CHAT_REALTIME_REPLAY_LIMIT</code> (default 500). The daily Django-Q task</p>
+<p><code>prune-chat-realtime-events</code> removes expired durable events. Monitor socket</p>
+<p>connects, reconnects, close codes, Redis channel errors, event backlog, and</p>
+<p>REST refresh failures; alert on sustained replay/resync or authentication</p>
+<p>close-code spikes.</p>
+<p>Read receipts are visibility-based: clients send the highest incoming message</p>
+<p>that has been at least 60% visible while the app is foregrounded. The server</p>
+<p>clamps that watermark to an existing message, recomputes unread counts, and</p>
+<p>broadcasts the changed receipt. Sending and read state are represented; there</p>
+<p>is no delivered state.</p>
+        </section>
+
+        <section class="section-block doc-section" id="django-q2">
+            <div class="section-header">
+                <h2><i class="ri-timer-flash-line" style="margin-right: 8px; color: var(--primary);"></i> Background Tasks & Cron Jobs</h2>
+            </div>
+            <h1 id="background-tasks-django-q2">Background Tasks (Django-Q2) <a class="heading-anchor" href="#background-tasks-django-q2">#</a></h1>
+<p>This project uses <strong>Django-Q2</strong> for background task management.</p>
+<h2 id="defining-tasks">Defining Tasks <a class="heading-anchor" href="#defining-tasks">#</a></h2>
+<p>You can queue any regular Python function as a background task. It's recommended to place them in a <code>tasks.py</code> file within your app.</p>
+<div class="code-block"><div class="code-header"><span>python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def process_data(data_id: int):
+    # Perform background processing
+    print(f&quot;Processing {data_id}...&quot;)
+    return True</code></pre></div>
+<h2 id="initiating-a-task">Initiating a Task <a class="heading-anchor" href="#initiating-a-task">#</a></h2>
+<p>To properly initiate a background task, use <code>async_task</code> from <code>django_q.tasks</code> and pass the function along with its arguments. This sends the task to the queue.</p>
+<div class="code-block"><div class="code-header"><span>python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from django_q.tasks import async_task
+from myapp.tasks import process_data
+
+# Queue the task
+task_id = async_task(process_data, 123)
+
+# For scheduled tasks, you can use the Schedule model or schedule() function
+# from django_q.tasks import schedule
+# schedule(process_data, 123, hook=&#x27;myapp.hooks.print_result&#x27;, schedule_type=&#x27;O&#x27;)</code></pre></div>
+<h2 id="running-the-cluster">Running the Cluster <a class="heading-anchor" href="#running-the-cluster">#</a></h2>
+<p>When using Docker, the <code>qcluster</code> starts automatically. To run it locally:</p>
+<div class="code-block"><div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-bash">python manage.py qcluster</code></pre></div>
+<h2 id="configuration">Configuration <a class="heading-anchor" href="#configuration">#</a></h2>
+<p>The cluster configuration is located in <code>src/config/settings/base.py</code> under the <code>Q_CLUSTER</code> dictionary. It uses Redis as a broker, configured via the <code>REDIS_URL</code> environment variable.</p>
+<h2 id="further-reading">Further Reading <a class="heading-anchor" href="#further-reading">#</a></h2>
+<p>For advanced configuration, scheduled tasks, and cluster monitoring, refer to the <a href="https://django-q2.readthedocs.io/en/master/" target="_blank" rel="noopener">official Django-Q2 documentation</a>.</p>
+        </section>
+
+        <section class="section-block doc-section" id="mobile-booking">
+            <div class="section-header">
+                <h2><i class="ri-smartphone-line" style="margin-right: 8px; color: var(--primary);"></i> Mobile & Marketplace Flow</h2>
+            </div>
+            <h1 id="mobile-booking-rollout">Mobile booking rollout <a class="heading-anchor" href="#mobile-booking-rollout">#</a></h1>
+<h2 id="required-deployment-secrets">Required deployment secrets <a class="heading-anchor" href="#required-deployment-secrets">#</a></h2>
+<ul>
+<li><code>PAYME_ENABLED</code>, <code>PAYME_MERCHANT_ID</code>, <code>PAYME_KEY</code>, <code>PAYME_CHECKOUT_URL</code></li>
+<li><code>CLICK_ENABLED</code>, <code>CLICK_SERVICE_ID</code>, <code>CLICK_MERCHANT_ID</code>, <code>CLICK_SECRET_KEY</code>, <code>CLICK_CHECKOUT_URL</code></li>
+<li><code>STRIPE_ENABLED</code>, <code>STRIPE_SECRET_KEY</code>, <code>STRIPE_WEBHOOK_SECRET</code></li>
+</ul>
+<p>Keep every provider disabled until its credentials and callback registration are</p>
+<p>verified in that provider's sandbox. Stripe must remain disabled in production</p>
+<p>until a supported-jurisdiction merchant account and legal approval are in place.</p>
+<h2 id="callback-registration">Callback registration <a class="heading-anchor" href="#callback-registration">#</a></h2>
+<ul>
+<li>Payme: <code>/api/v1/payment-webhooks/payme/</code></li>
+<li>Click prepare: <code>/api/v1/payment-webhooks/click/prepare/</code></li>
+<li>Click complete: <code>/api/v1/payment-webhooks/click/complete/</code></li>
+<li>Stripe: <code>/api/v1/payment-webhooks/stripe/</code></li>
+</ul>
+<p>The common browser/app return is</p>
+<p><code>https://i-deal.uz/payment-return?checkout=<opaque-token></code>. A return never proves</p>
+<p>payment; Mobile polls the authenticated booking endpoint after returning.</p>
+<h2 id="release-order">Release order <a class="heading-anchor" href="#release-order">#</a></h2>
+<ol>
+<li>Apply schema migrations and deploy booking services.</li>
+<li>Register callbacks and enable the Django-Q cluster schedules.</li>
+<li>Deploy the association files and browser fallback.</li>
+<li>Release Mobile with <code>MOBILE_BOOKING_CHECKOUT_ENABLED</code> disabled.</li>
+<li>Validate Payme and Click on Android and iOS, then enable them independently.</li>
+<li>Enable Stripe only after account and legal readiness.</li>
+</ol>
+<p>Before the app-link deployment, replace every Android fingerprint placeholder</p>
+<p>in Frontend's <code>public/.well-known/assetlinks.json</code> with the release/app-signing</p>
+<p>SHA-256 fingerprint for that flavor.</p>
+        </section>
+
+        <section class="section-block doc-section" id="refactor-audit">
+            <div class="section-header">
+                <h2><i class="ri-shield-check-line" style="margin-right: 8px; color: var(--primary);"></i> Codebase Audit & Standards</h2>
+            </div>
+            <h1 id="backend-refactor-audit">Backend refactor audit <a class="heading-anchor" href="#backend-refactor-audit">#</a></h1>
+<p>Updated: 2026-08-24. This is the migration ledger for the compatible v1</p>
+<p>refactor. A status of <strong>Open</strong> is intentional and is not a silent deferral: it</p>
+<p>names the required phase and completion evidence. Valid documented v1 payloads,</p>
+<p>envelopes, identifiers, authentication transports, callbacks, and background</p>
+<p>timing remain compatible. Unknown query keys remain ignored in v1.</p>
+<h2 id="baseline">Baseline <a class="heading-anchor" href="#baseline">#</a></h2>
+<ul>
+<li>210 resolved routes and 266 exposed application methods.</li>
+<li>8,239 API-view lines; <code>api/v1/management/views.py</code> is 2,435 lines.</li>
+<li>414 direct ORM references and 133 <code>request.GET</code> reads in views.</li>
+<li>36 output/serialization helpers and 88 explicit output <code>model_dump()</code> calls.</li>
+<li>47 service module functions; 28 static and 13 class methods; only five</li>
+</ul>
+<p>service/provider constructors.</p>
+<ul>
+<li>Baseline checks: system check, Ruff, and 258 unit tests passed. Integration</li>
+</ul>
+<p>baseline was 625 passed / 3 failed (the mobile recommendation failures are</p>
+<p>fixed in this slice; the full suite must establish the new baseline).</p>
+<p>Current refactor gate: 891 tests pass, including 262 unit-selected tests; the</p>
+<p>coverage gate is 81.90% against the enforced 80% threshold. The suite gained the</p>
+<p>architecture/verb tests in this change; the prior integration failures are no</p>
+<p>longer reproducible in the full current run.</p>
+<h2 id="ledger">Ledger <a class="heading-anchor" href="#ledger">#</a></h2>
+<div class="table-container"><table>
+<thead><tr>
+<th>Confirmed smell</th>
+<th>Evidence</th>
+<th>Severity</th>
+<th>Phase</th>
+<th>Final status</th>
+</tr></thead><tbody>
+<tr>
+<td>Raw success response dictionaries and <code>JsonResponse</code> bypass DMR</td>
+<td><code>core/api/views.py</code> built dicts and used <code>JsonResponse</code> for explicit statuses</td>
+<td>Critical</td>
+<td>2</td>
+<td><strong>Partially fixed.</strong> Core now emits <code>SuccessResponse</code>/<code>ErrorResponse</code> Pydantic envelopes and uses <code>Controller.to_response</code>/<code>to_error</code>. Remaining view-local raw data construction is <strong>Open</strong>, migrated context by context.</td>
+</tr>
+<tr>
+<td>OpenAPI described bare outputs while runtime wrapped every result</td>
+<td>Runtime envelope in <code>BaseController.ok</code>; bare output annotations throughout API</td>
+<td>Critical</td>
+<td>2–5</td>
+<td><strong>Partially fixed.</strong> Generic controllers and mobile home/favorites now annotate enveloped Pydantic outputs. Every remaining route is <strong>Open</strong> and blocks enabling global response validation.</td>
+</tr>
+<tr>
+<td>Response validation globally disabled</td>
+<td><code>DMR_SETTINGS.validate_responses = False</code></td>
+<td>Critical</td>
+<td>2, 5</td>
+<td><strong>Retained temporarily.</strong> Production fast path is correct; development/test enablement is <strong>Open</strong> until all endpoint annotations and error response specs are migrated. This is a tracked gate, not an exemption.</td>
+</tr>
+<tr>
+<td>Generic lists serialized before slicing</td>
+<td><code>ListAPIView.get</code> materialized <code>to_output</code> for the whole queryset</td>
+<td>High</td>
+<td>2</td>
+<td><strong>Fixed.</strong> <code>build_paginated_response_from_queryset</code> slices first; generic and mobile discovery/favorites use it. Remaining local list implementations are <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Pagination accepted unbounded explicit page sizes</td>
+<td><code>ListQuery.per_page</code> had no bounds</td>
+<td>High</td>
+<td>2–3</td>
+<td><strong>Partially fixed.</strong> Shared and mobile query models enforce 1–100. Other endpoint-specific query models are <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Inline and inconsistent filters</td>
+<td>133 <code>request.GET</code> reads; no <code>FilterSet</code> use despite installed <code>django-filter</code></td>
+<td>High</td>
+<td>2–4</td>
+<td><strong>Partially fixed.</strong> <code>PydanticFilterSet</code> is the query-model-first adapter; <code>ListingFilterSet</code> owns listing filtering/search/order while <code>ListingDiscoveryService</code> owns visibility/availability. All other contexts are <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Known malformed map/filter values silently ignored</td>
+<td><code>ListingFilters</code> swallowed bbox parse errors</td>
+<td>High</td>
+<td>2–3</td>
+<td><strong>Partially fixed.</strong> Mobile map/feed models reject invalid bbox, ranges, enums, page sizes, and ordering with standard 400s; legacy listing callers retain old bbox handling until their slice is migrated (<strong>Open</strong>).</td>
+</tr>
+<tr>
+<td>Non-deterministic ordering</td>
+<td>Listing ordering lacked an ID tie-breaker in several branches</td>
+<td>Medium</td>
+<td>2</td>
+<td><strong>Fixed for listing discovery.</strong> Every <code>ListingFilterSet</code> order ends in <code>-id</code>; other list resources are <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Mobile card/detail/map output helpers dumped intermediate dicts</td>
+<td><code>serialize_mobile_listing_*</code> in <code>mobile/home/views.py</code>; cross-view import from favorites</td>
+<td>High</td>
+<td>3</td>
+<td><strong>Fixed for mobile home/favorites.</strong> <code>MobileListing<em> .from_listing</code> factories return Pydantic objects with explicit request context; the favorites cross-view import is removed. Other <code>serialize_</em></code> helpers are <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Contextual presentation constants lived in an API view and were imported by another API</td>
+<td>mobile home imported <code>RESPONSE_TIME</code> / <code>_verification_checklist</code> from marketplace view</td>
+<td>Medium</td>
+<td>3</td>
+<td><strong>Fixed.</strong> Shared read-only facts moved to <code>marketplace.services.presentation</code>. Other cross-view imports (chat/property upload) are <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Static-only recommendation and favorite services</td>
+<td><code>RecommendationService</code> and <code>FavoriteListingService</code> were static namespaces</td>
+<td>High</td>
+<td>3</td>
+<td><strong>Fixed for these services.</strong> They are instantiable with injectable model/clock/filter dependencies and controllers obtain them through <code>get_service</code>. Booking, account deletion, finance, chat, and remaining static/class-only services are <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Controllers had no service factory seam</td>
+<td>services invoked as module/class globals from views</td>
+<td>High</td>
+<td>2</td>
+<td><strong>Partially fixed.</strong> <code>ServiceControllerMixin</code> and <code>ServiceFactory</code> provide per-request cached construction and test override seam; all controllers not yet migrated are <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Accidental inherited HTTP verbs</td>
+<td><code>OneOffDealActionView(OneOffDealDetailView)</code> exposed GET/PATCH on POST actions</td>
+<td>Critical</td>
+<td>2</td>
+<td><strong>Fixed.</strong> Action base no longer inherits detail handlers; architecture and integration tests assert POST-only/405 behavior. Resolver-wide allowlist for all routes is <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Broad view exception catches collapse programmer/domain errors</td>
+<td>management one-off actions and many other views catch <code>Exception</code></td>
+<td>High</td>
+<td>2–4</td>
+<td><strong>Open.</strong> Central Pydantic error response rendering is in place, but typed application exceptions and removal of broad catches must migrate with each workflow.</td>
+</tr>
+<tr>
+<td>Business workflows split between views, model saves, and signals</td>
+<td>marketplace property→listing signal; finance payment→settlement signal; direct transactions in views</td>
+<td>Critical</td>
+<td>3–4</td>
+<td><strong>Open.</strong> No signal was removed because callers have not yet been migrated to explicit services; remove only after API/admin/task/provider paths are proven to use the service.</td>
+</tr>
+<tr>
+<td>Management controller is a monolith</td>
+<td><code>api/v1/management/views.py</code> is 2,435 lines and combines resource domains</td>
+<td>High</td>
+<td>3–4</td>
+<td><strong>Open.</strong> One-off action inheritance is corrected, but the resource split and all management filters/services remain required.</td>
+</tr>
+<tr>
+<td>Controller ORM access</td>
+<td>414 direct ORM references in views</td>
+<td>High</td>
+<td>3–4</td>
+<td><strong>Open.</strong> Mobile listing discovery/favorites now delegate visibility/filtering and activity behavior; every remaining controller must migrate before a zero-ORM architecture rule can be enforced.</td>
+</tr>
+<tr>
+<td>Output models can cause N+1 queries</td>
+<td>serializers call relations/counts without prepared querysets</td>
+<td>High</td>
+<td>2–4</td>
+<td><strong>Partially fixed.</strong> mobile factories state the prefetch requirement and use selected/prefetched listing querysets. Query-budget tests for every resource remain <strong>Open</strong>.</td>
+</tr>
+<tr>
+<td>Empty legacy serializer modules</td>
+<td><code>inventory/serializers.py</code>, <code>notification/serializers.py</code>, <code>vas/serializers.py</code></td>
+<td>Low</td>
+<td>4</td>
+<td><strong>Open.</strong> Delete only after imports and Bruno docs confirm no consumer.</td>
+</tr>
+<tr>
+<td>Pydantic was only transitive and declared versions diverged from lock</td>
+<td><code>pyproject.toml</code> allowed Django 5.2/DMR 0.8; lock runs Django 6.0.5/DMR 0.10/Pydantic 2.13.4</td>
+<td>Medium</td>
+<td>1</td>
+<td><strong>Fixed.</strong> Pydantic is direct and Django/DMR lower bounds match the lock; <code>uv.lock</code> was regenerated.</td>
+</tr>
+<tr>
+<td><code>just</code> did not use the project runtime</td>
+<td>commands invoked bare <code>python</code>, <code>pytest</code>, and <code>ruff</code></td>
+<td>Medium</td>
+<td>1</td>
+<td><strong>Fixed.</strong> All Python/test/check recipes now use <code>uv run</code>.</td>
+</tr>
+<tr>
+<td>Recommendation activity POST returned inferred 201 instead of v1 200</td>
+<td><code>MobileHomeRecommendedListingsView.post</code> lacked explicit 200</td>
+<td>Medium</td>
+<td>1</td>
+<td><strong>Fixed.</strong> Explicit DMR 200 response and regression coverage.</td>
+</tr>
+<tr>
+<td>Recommendation fixture called an unrelated candidate related through factory defaults</td>
+<td>integration scorer test reused dimensions of its viewed seed</td>
+<td>Medium</td>
+<td>1</td>
+<td><strong>Fixed.</strong> Fixture now differs across district, type, rooms, price, tokens, area, furnishing, and tariff; the any-seed algorithm is unchanged.</td>
+</tr>
+<tr>
+<td>Provider JSON-RPC/webhook endpoints use raw JSON responses</td>
+<td>Payme, Click, and Stripe protocol callbacks</td>
+<td>Medium</td>
+<td>3</td>
+<td><strong>Explicitly retained.</strong> They are external provider protocol surfaces, not v1 DMR envelopes; convert only with provider contract tests and approval.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="architecture-rules-now-enforced">Architecture rules now enforced <a class="heading-anchor" href="#architecture-rules-now-enforced">#</a></h2>
+<ul>
+<li>Pydantic success/error envelopes and typed pagination are the core response</li>
+</ul>
+<p>primitives.</p>
+<ul>
+<li>A controller may construct services only through the per-request factory.</li>
+<li>A migrated query model parses known keys; a <code>PydanticFilterSet</code> applies only</li>
+</ul>
+<p>filtering/search/order to a service-prepared queryset.</p>
+<ul>
+<li>Generic pagination slices before Pydantic output conversion.</li>
+<li>One-off action URLs are POST-only; the ratchet test verifies the controller</li>
+</ul>
+<p>method set and HTTP 405 responses.</p>
+<ul>
+<li>New architecture tests deliberately cover only migrated slices. The test</li>
+</ul>
+<p>suite must grow the ratchet as each bounded context migrates rather than</p>
+<p>falsely allowing the pre-existing repository-wide violations.</p>
+<h2 id="required-gates-before-declaring-the-refactor-complete">Required gates before declaring the refactor complete <a class="heading-anchor" href="#required-gates-before-declaring-the-refactor-complete">#</a></h2>
+<ol>
+<li>Migrate identity/communication, property lifecycle, and operations/finance</li>
+</ol>
+<p>domains (including each public, mobile, and management controller).</p>
+<ol>
+<li>Replace every remaining output helper, raw response dictionary, broad catch,</li>
+</ol>
+<p>direct controller ORM workflow, static-only service, and API cross-import.</p>
+<ol>
+<li>Move cross-aggregate model/signal behavior into application services and</li>
+</ol>
+<p>remove business-critical signals only after all callers are migrated.</p>
+<ol>
+<li>Add resolver-wide method manifest, per-endpoint response/OpenAPI parity,</li>
+</ol>
+<p>full filter matrices, service transaction/idempotency tests, and query-count</p>
+<p>budgets.</p>
+<ol>
+<li>Enable DMR response validation in development/tests, regenerate/validate</li>
+</ol>
+<p>Bruno and browser documentation after each route slice, and run final system</p>
+<p>checks, Ruff, migrations, coverage, and full tests. Existing non-mobile</p>
+<p>integration baseline failures must be reported separately if still present.</p>
+        </section>
+
+    </main>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+            securityLevel: 'loose',
+            flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }
+        });
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('ideal-theme', next);
+            document.getElementById('theme-icon').className = next === 'dark' ? 'ri-moon-line' : 'ri-sun-line';
+            location.reload();
+        }
+
+        const savedTheme = localStorage.getItem('ideal-theme');
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.getElementById('theme-icon').className = savedTheme === 'dark' ? 'ri-moon-line' : 'ri-sun-line';
+        }
+
+        function setActiveNav(element) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        function copyCode(btn) {
+            const codeBlock = btn.closest('.code-block').querySelector('code');
+            navigator.clipboard.writeText(codeBlock.innerText).then(() => {
+                btn.innerText = 'Copied!';
+                setTimeout(() => { btn.innerText = 'Copy'; }, 2000);
+            });
+        }
+
+        function filterDocs() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const sections = document.querySelectorAll('.doc-section');
+            const navItems = document.querySelectorAll('.nav-item');
+
+            sections.forEach((sec, idx) => {
+                const text = sec.innerText.toLowerCase();
+                const match = text.includes(query);
+                sec.style.display = match ? 'block' : 'none';
+                if (navItems[idx]) {
+                    navItems[idx].style.display = match ? 'flex' : 'none';
+                }
+            });
+        }
+
+        function toggleMermaidZoom(btn) {
+            const wrap = btn.closest('.c4-hero-card').querySelector('.mermaid-wrap');
+            if (wrap.style.maxHeight === 'none') {
+                wrap.style.maxHeight = '500px';
+                btn.innerText = 'Expand Diagram';
+            } else {
+                wrap.style.maxHeight = 'none';
+                btn.innerText = 'Collapse Diagram';
+            }
+        }
+    </script>
+</body>
+</html>
