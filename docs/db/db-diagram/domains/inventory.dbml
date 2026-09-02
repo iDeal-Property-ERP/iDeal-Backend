@@ -1,0 +1,75 @@
+// iDeal DBML Domain: Inventory (app: inventory)
+
+Table inventory_acts {
+  id                   bigint                  [pk, increment]
+  created_at           timestamptz             [not null]
+  updated_at           timestamptz             [not null]
+  deleted_at           timestamptz            
+  restored_at          timestamptz            
+  transaction_id       uuid                   
+  property_id          bigint                  [not null, ref: > properties.id]
+  lease_id             bigint                  [ref: > leases.id]
+  act_type             inventory_acts_act_type [not null, default: 'general']
+  status               inventoryact_status     [not null, default: 'finalized']
+  created_by_id        bigint                  [not null, ref: > users.id]
+  notes                text                   
+  finalized_at         timestamptz            
+  acknowledged_by_name varchar(200)           
+  acknowledged_at      timestamptz            
+  acknowledgment_note  text                   
+
+  indexes {
+    created_at
+    deleted_at
+    property_id
+    lease_id
+    created_by_id
+    property_id [name: 'inventory_a_propert_cc7dfa_idx']
+    lease_id [name: 'inventory_a_lease_i_cf64d4_idx']
+    status [name: 'inventory_a_status_37a6cc_idx']
+  }
+
+  Note: 'Digital passportization: a structured condition record (Akt) for a property.'
+}
+
+Table inventory_act_items {
+  id             bigint                        [pk, increment]
+  created_at     timestamptz                   [not null]
+  updated_at     timestamptz                   [not null]
+  deleted_at     timestamptz                  
+  restored_at    timestamptz                  
+  transaction_id uuid                         
+  act_id         bigint                        [not null, ref: > inventory_acts.id]
+  area           varchar(120)                  [not null]
+  condition      inventory_act_items_condition [not null, default: 'good']
+  notes          text                         
+  sort_order     smallint                      [not null, default: 0]
+
+  indexes {
+    created_at
+    deleted_at
+    act_id
+    act_id [name: 'inventory_a_act_id_f4b518_idx']
+  }
+}
+
+Table inventory_act_photos {
+  id             bigint       [pk, increment]
+  created_at     timestamptz  [not null]
+  updated_at     timestamptz  [not null]
+  deleted_at     timestamptz 
+  restored_at    timestamptz 
+  transaction_id uuid        
+  act_id         bigint       [not null, ref: > inventory_acts.id]
+  item_id        bigint       [ref: > inventory_act_items.id]
+  image          varchar(255) [not null]
+  caption        varchar(200)
+
+  indexes {
+    created_at
+    deleted_at
+    act_id
+    item_id
+    act_id [name: 'inventory_a_act_id_a9fcf8_idx']
+  }
+}

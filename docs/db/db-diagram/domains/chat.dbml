@@ -1,0 +1,117 @@
+// iDeal DBML Domain: Chat (app: chat)
+
+Table chat_conversations {
+  id                         bigint      [pk, increment]
+  created_at                 timestamptz [not null]
+  updated_at                 timestamptz [not null]
+  deleted_at                 timestamptz
+  restored_at                timestamptz
+  transaction_id             uuid       
+  listing_id                 bigint      [not null, ref: > listings.id]
+  user_id                    bigint      [not null, ref: > users.id]
+  user_archived_at           timestamptz
+  user_deleted_at            timestamptz
+  user_muted                 boolean     [not null, default: false]
+  user_last_read_message_id  bigint     
+  user_unread_count          integer     [not null, default: 0]
+  staff_archived_at          timestamptz
+  staff_last_read_message_id bigint     
+  staff_unread_count         integer     [not null, default: 0]
+  user_realtime_version      bigint      [not null, default: 0]
+  staff_realtime_version     bigint      [not null, default: 0]
+  is_user_blocked            boolean     [not null, default: false]
+  blocked_by_id              bigint      [ref: > users.id]
+  blocked_at                 timestamptz
+  last_message_id            bigint      [ref: > chat_messages.id]
+  last_message_at            timestamptz
+
+  indexes {
+    created_at
+    deleted_at
+    listing_id
+    user_id
+    user_deleted_at
+    is_user_blocked
+    blocked_by_id
+    last_message_id
+    last_message_at
+    listing_id [name: 'chat_conver_listing_ebea4a_idx']
+    user_id [name: 'chat_conver_user_id_c6ec36_idx']
+    last_message_at [name: 'chat_conver_last_me_2102b2_idx']
+    updated_at [name: 'chat_conver_updated_b5a0fe_idx']
+    (user_id, user_deleted_at) [name: 'chat_conver_user_id_c25098_idx']
+  }
+}
+
+Table chat_messages {
+  id               bigint                    [pk, increment]
+  created_at       timestamptz               [not null]
+  updated_at       timestamptz               [not null]
+  deleted_at       timestamptz              
+  restored_at      timestamptz              
+  transaction_id   uuid                     
+  conversation_id  bigint                    [not null, ref: > chat_conversations.id]
+  sender_id        bigint                    [not null, ref: > users.id]
+  sender_side      chat_messages_sender_side [not null]
+  kind             message_kind              [not null, default: 'text']
+  text             varchar(1024)            
+  image            varchar(255)             
+  image_width      integer                  
+  image_height     integer                  
+  image_size_bytes integer                  
+  client_id        varchar(64)              
+  read_at          timestamptz              
+
+  indexes {
+    created_at
+    deleted_at
+    conversation_id
+    sender_id
+    (conversation_id, id) [name: 'chat_messag_convers_9e0e50_idx']
+    (conversation_id, id) [name: 'chat_messag_convers_9cdf7a_idx']
+    (conversation_id, read_at) [name: 'chat_messag_convers_5cba9b_idx']
+  }
+}
+
+Table chat_conversation_reports {
+  id              bigint                           [pk, increment]
+  created_at      timestamptz                      [not null]
+  updated_at      timestamptz                      [not null]
+  conversation_id bigint                           [not null, ref: > chat_conversations.id]
+  reported_by_id  bigint                           [not null, ref: > users.id]
+  reason          chat_conversation_reports_reason [not null]
+  note            varchar(500)                     [not null, default: '']
+  resolved_at     timestamptz                     
+  resolved_by_id  bigint                           [ref: > users.id]
+
+  indexes {
+    created_at
+    conversation_id
+    reported_by_id
+    resolved_by_id
+    conversation_id [name: 'chat_conver_convers_0b3612_idx']
+    resolved_at [name: 'chat_conver_resolve_19b427_idx']
+  }
+}
+
+Table chat_realtime_events {
+  id                   bigint      [pk, increment]
+  created_at           timestamptz [not null]
+  updated_at           timestamptz [not null]
+  audience             varchar(10) [not null]
+  recipient_user_id    bigint      [ref: > users.id]
+  conversation_id      bigint      [not null]
+  conversation_version bigint      [not null]
+  event_type           varchar(64) [not null]
+  payload              jsonb       [not null]
+
+  indexes {
+    created_at
+    recipient_user_id
+    conversation_id
+    (audience, recipient_user_id, id) [name: 'chat_realti_audienc_584dfa_idx']
+    created_at [name: 'chat_realti_created_340072_idx']
+  }
+
+  Note: 'A short-lived, audience-scoped replay outbox for chat WebSockets.'
+}

@@ -1,0 +1,45 @@
+// iDeal DBML Domain: Agent (app: agent)
+
+Table agents {
+  id              bigint         [pk, increment]
+  created_at      timestamptz    [not null]
+  updated_at      timestamptz    [not null]
+  deleted_at      timestamptz   
+  restored_at     timestamptz   
+  transaction_id  uuid          
+  user_id         bigint         [not null, unique, ref: - users.id]
+  total_deals     integer        [not null, default: 0]
+  total_revenue   decimal(14, 2) [not null, default: 0]
+  commission_rate decimal(5, 2)  [not null, default: 10.0]
+  is_active       boolean        [not null, default: true]
+
+  indexes {
+    created_at
+    deleted_at
+  }
+}
+
+Table agent_deals {
+  id                bigint           [pk, increment]
+  created_at        timestamptz      [not null]
+  updated_at        timestamptz      [not null]
+  deleted_at        timestamptz     
+  restored_at       timestamptz     
+  transaction_id    uuid            
+  agent_id          bigint           [not null, ref: > agents.id]
+  property_id       bigint           [not null, ref: > properties.id]
+  deal_date         date             [not null]
+  rent_amount       decimal(12, 2)   [not null]
+  commission_amount decimal(12, 2)   [not null]
+  status            agentdeal_status [not null, default: 'closed']
+
+  indexes {
+    created_at
+    deleted_at
+    agent_id
+    property_id
+    agent_id [name: 'agent_deals_agent_i_c813e7_idx']
+    property_id [name: 'agent_deals_propert_9bf116_idx']
+    status [name: 'agent_deals_status_09ca1d_idx']
+  }
+}

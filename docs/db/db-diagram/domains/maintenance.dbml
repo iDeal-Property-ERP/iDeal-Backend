@@ -1,0 +1,77 @@
+// iDeal DBML Domain: Maintenance (app: maintenance)
+
+Table service_requests {
+  id               bigint                       [pk, increment]
+  created_at       timestamptz                  [not null]
+  updated_at       timestamptz                  [not null]
+  deleted_at       timestamptz                 
+  restored_at      timestamptz                 
+  transaction_id   uuid                        
+  property_id      bigint                       [not null, ref: > properties.id]
+  tenant_id        bigint                       [not null, ref: > users.id]
+  assigned_to_id   bigint                       [ref: > users.id]
+  title            varchar(200)                 [not null]
+  description      text                         [not null]
+  priority         servicerequest_priority      [not null, default: 'medium']
+  status           servicerequest_status        [not null, default: 'open']
+  cost             decimal(12, 2)              
+  cost_bearer      service_requests_cost_bearer
+  resolution_notes text                        
+  resolved_at      timestamptz                 
+
+  indexes {
+    created_at
+    deleted_at
+    property_id
+    tenant_id
+    assigned_to_id
+    property_id [name: 'service_req_propert_b0e641_idx']
+    tenant_id [name: 'service_req_tenant__37066c_idx']
+    status [name: 'service_req_status_ba17eb_idx']
+    assigned_to_id [name: 'service_req_assigne_a3c572_idx']
+  }
+}
+
+Table service_request_photos {
+  id                 bigint       [pk, increment]
+  created_at         timestamptz  [not null]
+  updated_at         timestamptz  [not null]
+  deleted_at         timestamptz 
+  restored_at        timestamptz 
+  transaction_id     uuid        
+  service_request_id bigint       [not null, ref: > service_requests.id]
+  image              varchar(255) [not null]
+
+  indexes {
+    created_at
+    deleted_at
+    service_request_id
+  }
+}
+
+Table service_request_comments {
+  id                 bigint      [pk, increment]
+  created_at         timestamptz [not null]
+  updated_at         timestamptz [not null]
+  deleted_at         timestamptz
+  restored_at        timestamptz
+  transaction_id     uuid       
+  service_request_id bigint      [not null, ref: > service_requests.id]
+  author_id          bigint      [ref: > users.id]
+  body               text        [not null]
+
+  indexes {
+    created_at
+    deleted_at
+    service_request_id
+    author_id
+    service_request_id [name: 'service_req_service_3f0b79_idx']
+  }
+
+  Note: '''
+  An internal management/technician note on a service request.
+
+Distinct from ``resolution_notes`` (a single post-resolution field): comments
+form the running progress thread shown in the maintenance record panel.
+  '''
+}

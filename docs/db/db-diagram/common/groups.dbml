@@ -1,0 +1,90 @@
+// iDeal Table Groups (Canvas organization by Django application domain)
+
+TableGroup Account {
+  token_blacklist
+  users
+}
+
+TableGroup Agent {
+  agent_deals
+  agents
+}
+
+TableGroup Chat {
+  chat_conversation_reports
+  chat_conversations
+  chat_messages
+  chat_realtime_events
+}
+
+TableGroup Contract {
+  lease_agreement_segments
+  lease_renewals
+  leases
+  owner_agreements
+  owner_onboardings
+  public_offers
+}
+
+TableGroup Finance {
+  exchange_rates
+  owner_settlements
+  payments
+  payout_schedules
+  rent_coverage_allocations
+  rent_receipt_allocations
+}
+
+TableGroup Inventory {
+  inventory_act_items
+  inventory_act_photos
+  inventory_acts
+}
+
+TableGroup Maintenance {
+  service_request_comments
+  service_request_photos
+  service_requests
+}
+
+TableGroup Marketplace {
+  booking_quotes
+  bookings
+  contact_inquiries
+  faq_items
+  favorite_listings
+  listing_view_activities
+  listings
+  payment_checkouts
+  provider_events
+  recent_search_activities
+  viewing_requests
+}
+
+TableGroup Mobile_Config {
+  mobile_critical_update_ranges
+  mobile_update_policies
+}
+
+TableGroup Notification {
+  notification_device_tokens
+  notification_preferences
+  notifications
+}
+
+TableGroup Property {
+  amenities
+  districts
+  one_off_commission_receipt_attachments
+  one_off_commission_receipts
+  one_off_deals
+  properties
+  properties_amenities
+  property_photos
+  verification_visits
+}
+
+TableGroup Vas {
+  vas_catalog_items
+  vas_orders
+}

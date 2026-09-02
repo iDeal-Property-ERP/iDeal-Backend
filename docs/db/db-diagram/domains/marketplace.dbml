@@ -1,0 +1,300 @@
+// iDeal DBML Domain: Marketplace (app: marketplace)
+
+Table listings {
+  id                 bigint                [pk, increment]
+  created_at         timestamptz           [not null]
+  updated_at         timestamptz           [not null]
+  deleted_at         timestamptz          
+  restored_at        timestamptz          
+  transaction_id     uuid                 
+  property_id        bigint                [not null, unique, ref: - properties.id]
+  owner_agreement_id bigint                [ref: > owner_agreements.id]
+  status             listing_status        [not null, default: 'published']
+  is_active          boolean               [not null, default: true]
+  is_featured        boolean               [not null, default: false]
+  description        text                 
+  description_en     text                  [note: 'description [en]']
+  description_uz     text                  [note: 'description [uz]']
+  description_ru     text                  [note: 'description [ru]']
+  listed_price       decimal(12, 2)       
+  monthly_price      decimal(12, 2)       
+  deposit_amount     decimal(12, 2)       
+  currency           varchar(3)            [not null, default: 'USD']
+  minimum_stay       listings_minimum_stay
+  price_includes     jsonb                 [not null]
+  rejection_reason   text                 
+  submitted_at       timestamptz          
+  published_at       timestamptz          
+
+  indexes {
+    created_at
+    deleted_at
+    owner_agreement_id
+    is_active [name: 'listings_is_acti_fd46bf_idx']
+    is_featured [name: 'listings_is_feat_01aa9f_idx']
+    status [name: 'listings_status_c3eaec_idx']
+  }
+}
+
+Table viewing_requests {
+  id             bigint                          [pk, increment]
+  created_at     timestamptz                     [not null]
+  updated_at     timestamptz                     [not null]
+  deleted_at     timestamptz                    
+  restored_at    timestamptz                    
+  transaction_id uuid                           
+  listing_id     bigint                          [not null, ref: > listings.id]
+  full_name      varchar(150)                    [not null]
+  phone          varchar(30)                     [not null]
+  email          varchar(254)                   
+  preferred_date date                            [not null]
+  preferred_time viewing_requests_preferred_time
+  message        text                           
+  status         viewingrequest_status           [not null, default: 'pending']
+
+  indexes {
+    created_at
+    deleted_at
+    listing_id
+    listing_id [name: 'viewing_req_listing_139c85_idx']
+    status [name: 'viewing_req_status_f29dc6_idx']
+  }
+}
+
+Table contact_inquiries {
+  id             bigint                [pk, increment]
+  created_at     timestamptz           [not null]
+  updated_at     timestamptz           [not null]
+  deleted_at     timestamptz          
+  restored_at    timestamptz          
+  transaction_id uuid                 
+  listing_id     bigint                [ref: > listings.id]
+  full_name      varchar(150)          [not null]
+  phone          varchar(30)           [not null]
+  email          varchar(254)         
+  message        text                  [not null]
+  status         contactinquiry_status [not null, default: 'new']
+
+  indexes {
+    created_at
+    deleted_at
+    listing_id
+    status [name: 'contact_inq_status_b7ab91_idx']
+  }
+
+  Note: '''
+  A general "Message iDeal" inquiry from the public marketplace, kept separate from
+ViewingRequest so management\'s viewing queue stays clean.
+  '''
+}
+
+Table faq_items {
+  id          bigint       [pk, increment]
+  created_at  timestamptz  [not null]
+  updated_at  timestamptz  [not null]
+  question    varchar(255) [not null]
+  question_en varchar(255) [note: 'question [en]']
+  question_uz varchar(255) [note: 'question [uz]']
+  question_ru varchar(255) [note: 'question [ru]']
+  answer      text         [not null]
+  answer_en   text         [note: 'answer [en]']
+  answer_uz   text         [note: 'answer [uz]']
+  answer_ru   text         [note: 'answer [ru]']
+  sort_order  smallint     [not null, default: 0]
+  is_active   boolean      [not null, default: true]
+
+  indexes {
+    created_at
+  }
+
+  Note: 'Editable FAQ entry shown on the public "How it works" page.'
+}
+
+Table bookings {
+  id                   bigint         [pk, increment]
+  created_at           timestamptz    [not null]
+  updated_at           timestamptz    [not null]
+  deleted_at           timestamptz   
+  restored_at          timestamptz   
+  transaction_id       uuid          
+  listing_id           bigint         [not null, ref: > listings.id]
+  property_id          bigint         [not null, ref: > properties.id]
+  tenant_id            bigint         [not null, ref: > users.id]
+  requested_start_date date           [not null]
+  requested_end_date   date           [not null]
+  monthly_rent_offer   decimal(12, 2)
+  status               booking_status [not null, default: 'requested']
+  message              text          
+  reviewed_by_id       bigint         [ref: > users.id]
+  converted_lease_id   bigint         [ref: > leases.id]
+
+  indexes {
+    created_at
+    deleted_at
+    listing_id
+    property_id
+    tenant_id
+    reviewed_by_id
+    converted_lease_id
+    listing_id [name: 'bookings_listing_f5464a_idx']
+    tenant_id [name: 'bookings_tenant__51b695_idx']
+    status [name: 'bookings_status_51373b_idx']
+  }
+
+  Note: '''
+  A logged-in tenant\'s reservation request against a listing (Smart Match).
+
+Management approves a booking and converts it into a Lease (reusing the
+existing lease-creation logic, which frees/occupies the property).
+  '''
+}
+
+Table favorite_listings {
+  id             bigint      [pk, increment]
+  created_at     timestamptz [not null]
+  updated_at     timestamptz [not null]
+  deleted_at     timestamptz
+  restored_at    timestamptz
+  transaction_id uuid       
+  user_id        bigint      [not null, ref: > users.id]
+  listing_id     bigint      [not null, ref: > listings.id]
+
+  indexes {
+    created_at
+    deleted_at
+    user_id
+    listing_id
+    (user_id, created_at) [name: 'favorite_li_user_id_5e150f_idx']
+    (listing_id, created_at) [name: 'favorite_li_listing_c857d4_idx']
+  }
+}
+
+Table booking_quotes {
+  id                bigint         [pk, increment]
+  created_at        timestamptz    [not null]
+  updated_at        timestamptz    [not null]
+  deleted_at        timestamptz   
+  restored_at       timestamptz   
+  transaction_id    uuid          
+  listing_id        bigint         [not null, ref: > listings.id]
+  tenant_id         bigint         [not null, ref: > users.id]
+  start_date        date           [not null]
+  end_date          date           [not null]
+  currency          varchar(3)     [not null]
+  monthly_rent      decimal(12, 2) [not null]
+  deposit_amount    decimal(12, 2) [not null]
+  first_period_rent decimal(12, 2) [not null]
+  full_stay_rent    decimal(12, 2) [not null]
+  first_month_total decimal(12, 2) [not null]
+  full_stay_total   decimal(12, 2) [not null]
+  periods           jsonb          [not null]
+  agreement_ids     jsonb          [not null]
+  fx_rate           decimal(18, 6)
+  expires_at        timestamptz    [not null]
+
+  indexes {
+    created_at
+    deleted_at
+    listing_id
+    tenant_id
+    (listing_id, expires_at) [name: 'booking_quo_listing_d87514_idx']
+    (tenant_id, expires_at) [name: 'booking_quo_tenant__0ea199_idx']
+  }
+}
+
+Table payment_checkouts {
+  id                bigint                     [pk, increment]
+  created_at        timestamptz                [not null]
+  updated_at        timestamptz                [not null]
+  deleted_at        timestamptz               
+  restored_at       timestamptz               
+  transaction_id    uuid                      
+  quote_id          bigint                     [not null, ref: > booking_quotes.id]
+  booking_id        bigint                     [not null, unique, ref: - bookings.id]
+  tenant_id         bigint                     [not null, ref: > users.id]
+  public_token      uuid                       [not null, unique, default: `gen_random_uuid()`]
+  idempotency_key   varchar(128)               [not null]
+  provider          payment_checkouts_provider [not null]
+  status            paymentcheckout_status     [not null, default: 'pending']
+  pay_full_stay     boolean                    [not null, default: false]
+  original_amount   decimal(12, 2)             [not null]
+  original_currency varchar(3)                 [not null]
+  provider_amount   decimal(18, 2)             [not null]
+  provider_currency varchar(3)                 [not null]
+  fx_rate           decimal(18, 6)            
+  checkout_url      varchar(1000)              [not null]
+  external_id       varchar(255)              
+  expires_at        timestamptz                [not null]
+  completed_at      timestamptz               
+
+  indexes {
+    created_at
+    deleted_at
+    quote_id
+    tenant_id
+    (status, expires_at) [name: 'payment_che_status_653ff1_idx']
+    (provider, external_id) [name: 'payment_che_provide_6e7802_idx']
+  }
+}
+
+Table provider_events {
+  id                bigint                   [pk, increment]
+  created_at        timestamptz              [not null]
+  updated_at        timestamptz              [not null]
+  deleted_at        timestamptz             
+  restored_at       timestamptz             
+  transaction_id    uuid                    
+  checkout_id       bigint                   [not null, ref: > payment_checkouts.id]
+  provider          provider_events_provider [not null]
+  external_event_id varchar(255)             [not null]
+  event_type        varchar(100)             [not null]
+  payload           jsonb                    [not null]
+  result            jsonb                    [not null]
+
+  indexes {
+    created_at
+    deleted_at
+    checkout_id
+  }
+}
+
+Table recent_search_activities {
+  id             bigint       [pk, increment]
+  created_at     timestamptz  [not null]
+  updated_at     timestamptz  [not null]
+  deleted_at     timestamptz 
+  restored_at    timestamptz 
+  transaction_id uuid        
+  user_id        bigint       [not null, ref: > users.id]
+  query          varchar(255) [not null, default: '']
+  filters        jsonb        [not null]
+  fingerprint    varchar(64)  [not null]
+
+  indexes {
+    created_at
+    deleted_at
+    user_id
+    fingerprint
+    (user_id, updated_at) [name: 'recent_sear_user_id_a4e6a5_idx']
+  }
+}
+
+Table listing_view_activities {
+  id             bigint      [pk, increment]
+  created_at     timestamptz [not null]
+  updated_at     timestamptz [not null]
+  deleted_at     timestamptz
+  restored_at    timestamptz
+  transaction_id uuid       
+  user_id        bigint      [not null, ref: > users.id]
+  listing_id     bigint      [not null, ref: > listings.id]
+
+  indexes {
+    created_at
+    deleted_at
+    user_id
+    listing_id
+    (user_id, updated_at) [name: 'listing_vie_user_id_630077_idx']
+    (listing_id, updated_at) [name: 'listing_vie_listing_1660f9_idx']
+  }
+}

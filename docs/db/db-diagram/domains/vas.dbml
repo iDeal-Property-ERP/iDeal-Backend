@@ -1,0 +1,68 @@
+// iDeal DBML Domain: Vas (app: vas)
+
+Table vas_catalog_items {
+  id              bigint                            [pk, increment]
+  created_at      timestamptz                       [not null]
+  updated_at      timestamptz                       [not null]
+  deleted_at      timestamptz                      
+  restored_at     timestamptz                      
+  transaction_id  uuid                             
+  service_type    vas_catalog_items_service_type    [not null, default: 'other']
+  name            varchar(150)                      [not null]
+  name_en         varchar(150)                      [note: 'Name [en]']
+  name_uz         varchar(150)                      [note: 'Name [uz]']
+  name_ru         varchar(150)                      [note: 'Name [ru]']
+  partner_name    varchar(150)                     
+  description     text                             
+  description_en  text                              [note: 'Description [en]']
+  description_uz  text                              [note: 'Description [uz]']
+  description_ru  text                              [note: 'Description [ru]']
+  base_price      decimal(12, 2)                    [not null]
+  currency        one_off_deals_commission_currency [not null, default: 'USD']
+  commission_rate decimal(5, 2)                     [not null]
+  cashback_rate   decimal(5, 2)                     [not null]
+  is_active       boolean                           [not null, default: true]
+
+  indexes {
+    created_at
+    deleted_at
+    service_type [name: 'vas_catalog_service_c03b12_idx']
+    is_active [name: 'vas_catalog_is_acti_428362_idx']
+  }
+
+  Note: 'A value-added service the platform offers (cleaning, handyman, utilities…).'
+}
+
+Table vas_orders {
+  id                  bigint                            [pk, increment]
+  created_at          timestamptz                       [not null]
+  updated_at          timestamptz                       [not null]
+  deleted_at          timestamptz                      
+  restored_at         timestamptz                      
+  transaction_id      uuid                             
+  catalog_item_id     bigint                            [not null, ref: > vas_catalog_items.id]
+  tenant_id           bigint                            [not null, ref: > users.id]
+  property_id         bigint                            [not null, ref: > properties.id]
+  lease_id            bigint                            [ref: > leases.id]
+  status              serviceorder_status               [not null, default: 'requested']
+  cost                decimal(12, 2)                    [not null]
+  currency            one_off_deals_commission_currency [not null, default: 'USD']
+  commission_earned   decimal(12, 2)                    [not null]
+  cashback_amount     decimal(12, 2)                    [not null]
+  scheduled_for       date                             
+  notes               text                             
+  cancellation_reason text                             
+  completed_at        timestamptz                      
+
+  indexes {
+    created_at
+    deleted_at
+    catalog_item_id
+    tenant_id
+    property_id
+    lease_id
+    tenant_id [name: 'vas_orders_tenant__387c51_idx']
+    property_id [name: 'vas_orders_propert_271ed0_idx']
+    status [name: 'vas_orders_status_d7f358_idx']
+  }
+}

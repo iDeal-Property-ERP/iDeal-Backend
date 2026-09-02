@@ -80,3 +80,20 @@ down-prod:
 
 logs-prod service="web":
     docker compose -f docker-compose.prod.yml logs -f {{service}}
+
+# DBML schema documentation
+dbml-inventory:
+    uv run python .agents/skills/ideal-dbml/scripts/dbml_tool.py inventory
+
+dbml-generate:
+    uv run python .agents/skills/ideal-dbml/scripts/dbml_tool.py generate
+
+dbml-validate:
+    uv run python .agents/skills/ideal-dbml/scripts/dbml_tool.py validate
+
+dbml-sql:
+    uv run python .agents/skills/ideal-dbml/scripts/dbml_tool.py export-sql
+
+dbml-html:
+    uv run python .agents/skills/ideal-dbml/scripts/dbml_tool.py build-html
+

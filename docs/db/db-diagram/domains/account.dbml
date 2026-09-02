@@ -1,0 +1,50 @@
+// iDeal DBML Domain: Account (app: account)
+
+Table users {
+  id                   bigint       [pk, increment]
+  password             varchar(128) [not null]
+  last_login           timestamptz 
+  created_at           timestamptz  [not null]
+  updated_at           timestamptz  [not null]
+  deleted_at           timestamptz 
+  restored_at          timestamptz 
+  transaction_id       uuid        
+  first_name           varchar(30)  [not null]
+  last_name            varchar(30) 
+  patronymic           varchar(100)
+  username             varchar(150) [not null, unique]
+  phone                varchar(15)  [unique]
+  email                varchar(254) [unique]
+  avatar               varchar(255)
+  role                 user_role    [not null, default: 'mgmt']
+  is_verified          boolean      [not null, default: false]
+  nationality          varchar(50) 
+  telegram_id          varchar(100)
+  is_staff             boolean      [not null, default: false]
+  is_superuser         boolean      [not null, default: false]
+  is_active            boolean      [not null, default: true]
+  must_change_password boolean      [not null, default: false]
+
+  indexes {
+    created_at
+    deleted_at
+  }
+}
+
+Table token_blacklist {
+  id         bigint       [pk, increment]
+  created_at timestamptz  [not null]
+  updated_at timestamptz  [not null]
+  jti        varchar(255) [not null, unique]
+  expires_at timestamptz  [note: 'When the underlying token expires; rows past this are safe to prune.']
+
+  indexes {
+    created_at
+  }
+
+  Note: '''
+  Revoked JWT ids (jti). A token whose jti is listed here is rejected by the
+auth layer even if its signature and expiry are still valid. Populated on
+logout and on refresh-token rotation (the consumed refresh token is revoked).
+  '''
+}

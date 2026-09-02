@@ -1,0 +1,305 @@
+// iDeal Database Enums (Auto-generated from Django Model Choices & Constants)
+
+Enum agentdeal_status {
+  closed
+  pending
+  cancelled
+}
+
+Enum booking_status {
+  requested
+  approved
+  rejected
+  converted
+  cancelled
+  payment_pending [note: 'Payment Pending']
+  confirmed
+  payment_failed [note: 'Payment Failed']
+  payment_expired [note: 'Payment Expired']
+  reconciliation_required [note: 'Reconciliation Required']
+}
+
+Enum chat_conversation_reports_reason {
+  spam
+  abuse
+  scam
+  other
+}
+
+Enum chat_messages_sender_side {
+  user
+  staff
+}
+
+Enum contactinquiry_status {
+  new
+  handled
+  closed
+}
+
+Enum devicetoken_platform {
+  android
+  ios
+}
+
+Enum inventory_act_items_condition {
+  excellent
+  good
+  fair
+  poor
+  damaged
+}
+
+Enum inventory_acts_act_type {
+  handover
+  return
+  general
+}
+
+Enum inventoryact_status {
+  finalized
+}
+
+Enum lease_status {
+  pending_signature [note: 'Pending Signature']
+  scheduled
+  active
+  expired
+  renewed
+  terminated
+}
+
+Enum listing_status {
+  pending_review [note: 'Pending Review']
+  published
+  rejected
+  archived
+}
+
+Enum listings_minimum_stay {
+  "1" [note: '1 month']
+  "3" [note: '3 months']
+  "6" [note: '6 months']
+  "12" [note: '12 months']
+}
+
+Enum message_kind {
+  text
+  image
+}
+
+Enum notifications_audience {
+  mobile
+  erp
+  both
+}
+
+Enum notifications_type {
+  payment_due [note: 'Payment Due']
+  payment_paid [note: 'Payment Paid']
+  payout_paid [note: 'Payout Paid']
+  booking_status [note: 'Booking Status']
+  service_request_status [note: 'Service Request Status']
+  lease_renewal [note: 'Lease Renewal']
+  owner_onboarding [note: 'Owner Onboarding']
+  service_order_status [note: 'Service Order Status']
+  chat_message [note: 'Chat Message']
+  general
+}
+
+Enum one_off_deals_agreed_currency {
+  USD
+  UZS
+}
+
+Enum one_off_deals_channel {
+  marketplace
+  off_market [note: 'Off-market']
+}
+
+Enum one_off_deals_commission_currency {
+  USD
+  UZS
+}
+
+Enum one_off_deals_commission_type {
+  none [note: 'No fee']
+  fixed [note: 'Fixed fee']
+  percentage [note: 'Percentage of monthly rent']
+}
+
+Enum oneoffcommissionreceipt_method {
+  cash
+  bank_transfer [note: 'Bank Transfer']
+  online
+  click
+  payme
+  stripe
+  uzum
+}
+
+Enum oneoffdeal_status {
+  active
+  paused
+  closed_won [note: 'Closed won']
+  closed_lost [note: 'Closed lost']
+  archived
+}
+
+Enum owneragreement_status {
+  active
+  expired
+  terminated
+}
+
+Enum owneronboarding_status {
+  submitted
+  offer_accepted [note: 'Offer Accepted']
+  approved
+  rejected
+}
+
+Enum payment_checkouts_provider {
+  payme
+  click
+  stripe
+}
+
+Enum payment_kind {
+  rent
+  deposit
+  other
+}
+
+Enum payment_status {
+  pending
+  paid
+  overdue
+  cancelled
+}
+
+Enum paymentcheckout_status {
+  pending
+  succeeded
+  failed
+  expired
+  reconciliation_required [note: 'Reconciliation Required']
+}
+
+Enum payoutschedule_kind {
+  base [note: 'Base settlement']
+  upside_adjustment [note: 'Late rent upside adjustment']
+}
+
+Enum payoutschedule_method {
+  bank_transfer [note: 'Bank Transfer']
+  card
+  cash
+}
+
+Enum payoutschedule_status {
+  scheduled
+  held
+  paid
+  cancelled
+}
+
+Enum properties_engagement_type {
+  managed
+  one_off [note: 'One-off brokerage']
+}
+
+Enum properties_furnishing {
+  furnished
+  semi_furnished [note: 'Semi-furnished']
+  unfurnished
+}
+
+Enum properties_property_type {
+  apartment
+  house
+  studio
+  room
+}
+
+Enum properties_tariff {
+  standard
+  comfort
+  premium
+}
+
+Enum property_status {
+  rented
+  vacant
+  maintenance
+  pending_review [note: 'Pending Review']
+  archived
+}
+
+Enum provider_events_provider {
+  payme
+  click
+  stripe
+}
+
+Enum service_requests_cost_bearer {
+  owner
+  platform
+}
+
+Enum serviceorder_status {
+  requested
+  confirmed
+  in_progress [note: 'In Progress']
+  completed
+  cancelled
+}
+
+Enum servicerequest_priority {
+  low
+  medium
+  high
+  critical
+}
+
+Enum servicerequest_status {
+  open
+  in_progress [note: 'In Progress']
+  resolved
+  cancelled
+}
+
+Enum user_role {
+  mgmt [note: 'Management']
+  owner
+  tenant
+  agent
+}
+
+Enum vas_catalog_items_service_type {
+  cleaning
+  handyman
+  utility
+  internet
+  moving
+  other
+}
+
+Enum verificationvisit_status {
+  scheduled
+  completed
+  cancelled
+}
+
+Enum viewing_requests_preferred_time {
+  "10:00"
+  "13:00"
+  "15:00"
+  "18:00"
+}
+
+Enum viewingrequest_status {
+  pending
+  confirmed
+  cancelled
+}

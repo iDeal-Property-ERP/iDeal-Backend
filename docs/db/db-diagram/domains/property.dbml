@@ -1,0 +1,251 @@
+// iDeal DBML Domain: Property (app: property)
+
+Table districts {
+  id             bigint       [pk, increment]
+  created_at     timestamptz  [not null]
+  updated_at     timestamptz  [not null]
+  deleted_at     timestamptz 
+  restored_at    timestamptz 
+  transaction_id uuid        
+  name           varchar(100) [not null, unique]
+  name_en        varchar(100) [unique, note: 'name [en]']
+  name_uz        varchar(100) [unique, note: 'name [uz]']
+  name_ru        varchar(100) [unique, note: 'name [ru]']
+  city           varchar(100) [not null, default: 'Toshkent']
+  city_en        varchar(100) [default: 'Toshkent', note: 'city [en]']
+  city_uz        varchar(100) [default: 'Toshkent', note: 'city [uz]']
+  city_ru        varchar(100) [default: 'Toshkent', note: 'city [ru]']
+
+  indexes {
+    created_at
+    deleted_at
+  }
+}
+
+Table amenities {
+  id         bigint       [pk, increment]
+  created_at timestamptz  [not null]
+  updated_at timestamptz  [not null]
+  slug       varchar(50)  [not null, unique]
+  name       varchar(100) [not null]
+  name_en    varchar(100) [note: 'name [en]']
+  name_uz    varchar(100) [note: 'name [uz]']
+  name_ru    varchar(100) [note: 'name [ru]']
+  icon       varchar(50)  [not null]
+  sort_order smallint     [not null, default: 0]
+  is_active  boolean      [not null, default: true]
+
+  indexes {
+    created_at
+  }
+
+  Note: '''
+  Lookup of property amenities — single source of truth for the wizard chip-set
+and the listing-detail labelled grid.
+  '''
+}
+
+Table properties {
+  id                        bigint                     [pk, increment]
+  created_at                timestamptz                [not null]
+  updated_at                timestamptz                [not null]
+  deleted_at                timestamptz               
+  restored_at               timestamptz               
+  transaction_id            uuid                      
+  name                      varchar(200)               [not null]
+  name_en                   varchar(200)               [note: 'name [en]']
+  name_uz                   varchar(200)               [note: 'name [uz]']
+  name_ru                   varchar(200)               [note: 'name [ru]']
+  address                   varchar(255)               [not null, default: '']
+  landmark                  varchar(100)              
+  landmark_en               varchar(100)               [note: 'landmark [en]']
+  landmark_uz               varchar(100)               [note: 'landmark [uz]']
+  landmark_ru               varchar(100)               [note: 'landmark [ru]']
+  district_id               bigint                     [ref: > districts.id]
+  property_type             properties_property_type   [not null, default: 'apartment']
+  rooms                     smallint                  
+  area_sqm                  smallint                  
+  floor                     smallint                  
+  total_floors              smallint                  
+  furnishing                properties_furnishing      [not null, default: 'unfurnished']
+  owner_id                  bigint                     [ref: > users.id]
+  created_by_id             bigint                     [ref: > users.id]
+  contact_phone             varchar(30)               
+  engagement_type           properties_engagement_type [not null, default: 'managed']
+  status                    property_status            [not null, default: 'vacant']
+  is_verified               boolean                    [not null, default: false]
+  verified_at               timestamptz               
+  verified_by_id            bigint                     [ref: > users.id]
+  score                     decimal(3, 1)              [not null, default: 0.0]
+  review_count              integer                    [not null, default: 0]
+  map_lat                   decimal(10, 7)            
+  map_lon                   decimal(10, 7)            
+  description               text                      
+  description_en            text                       [note: 'description [en]']
+  description_uz            text                       [note: 'description [uz]']
+  description_ru            text                       [note: 'description [ru]']
+  tariff                    properties_tariff          [not null, default: 'standard']
+  ask_price                 decimal(12, 2)            
+  ask_currency              varchar(3)                 [not null, default: 'USD']
+  owner_guaranteed_price    decimal(12, 2)            
+  owner_guaranteed_currency varchar(3)                 [not null, default: 'USD']
+  tenant_charge_price       decimal(12, 2)            
+  tenant_charge_currency    varchar(3)                 [not null, default: 'USD']
+  deposit_amount            decimal(12, 2)            
+  deposit_currency          varchar(3)                 [not null, default: 'USD']
+  vacant_since              date                      
+  vacant_days               smallint                   [not null, default: 0]
+
+  indexes {
+    created_at
+    deleted_at
+    district_id
+    owner_id
+    created_by_id
+    engagement_type
+    verified_by_id
+    district_id [name: 'properties_distric_49eaea_idx']
+    owner_id [name: 'properties_owner_i_921947_idx']
+    status [name: 'properties_status_e6008a_idx']
+    (map_lat, map_lon) [name: 'properties_map_lat_6ee7c6_idx']
+    (engagement_type, status) [name: 'properties_engagem_5e9f4f_idx']
+  }
+}
+
+Table one_off_deals {
+  id                         bigint                            [pk, increment]
+  created_at                 timestamptz                       [not null]
+  updated_at                 timestamptz                       [not null]
+  deleted_at                 timestamptz                      
+  restored_at                timestamptz                      
+  transaction_id             uuid                             
+  property_id                bigint                            [not null, unique, ref: - properties.id]
+  seller_name                varchar(150)                      [not null]
+  seller_phone               varchar(30)                       [not null]
+  seller_email               varchar(254)                     
+  renter_name                varchar(150)                     
+  renter_phone               varchar(30)                      
+  renter_email               varchar(254)                     
+  channel                    one_off_deals_channel             [not null]
+  status                     oneoffdeal_status                 [not null, default: 'active']
+  commission_type            one_off_deals_commission_type     [not null, default: 'none']
+  commission_fixed_amount    decimal(12, 2)                   
+  commission_percentage      decimal(5, 2)                    
+  commission_currency        one_off_deals_commission_currency [not null, default: 'USD']
+  agreed_monthly_rent        decimal(12, 2)                   
+  agreed_currency            one_off_deals_agreed_currency     [not null, default: 'USD']
+  close_date                 date                             
+  close_notes                text                              [not null, default: '']
+  evidence                   jsonb                             [not null]
+  commission_amount          decimal(12, 2)                   
+  commission_uzs_amount      decimal(16, 2)                   
+  commission_conversion_rate decimal(18, 6)                   
+  closed_by_id               bigint                            [ref: > users.id]
+
+  indexes {
+    created_at
+    deleted_at
+    status
+    closed_by_id
+    status [name: 'one_off_dea_status_dd8c3d_idx']
+    (channel, status) [name: 'one_off_dea_channel_349c58_idx']
+  }
+
+  Note: 'Staff-operated brokerage deal with contact snapshots, never portal users.'
+}
+
+Table one_off_commission_receipts {
+  id             bigint                            [pk, increment]
+  created_at     timestamptz                       [not null]
+  updated_at     timestamptz                       [not null]
+  deal_id        bigint                            [not null, unique, ref: - one_off_deals.id]
+  amount         decimal(12, 2)                    [not null]
+  currency       one_off_deals_commission_currency [not null]
+  received_date  date                              [not null]
+  method         oneoffcommissionreceipt_method    [not null]
+  reference      varchar(128)                      [not null, default: '']
+  recorded_by_id bigint                            [not null, ref: > users.id]
+
+  indexes {
+    created_at
+    recorded_by_id
+  }
+
+  Note: 'The single full collection for a closed one-off commission.'
+}
+
+Table one_off_commission_receipt_attachments {
+  id           bigint       [pk, increment]
+  created_at   timestamptz  [not null]
+  updated_at   timestamptz  [not null]
+  receipt_id   bigint       [not null, ref: > one_off_commission_receipts.id]
+  file         varchar(255) [not null]
+  filename     varchar(255) [not null]
+  content_type varchar(100) [not null, default: '']
+  size_bytes   integer      [not null, default: 0]
+
+  indexes {
+    created_at
+    receipt_id
+  }
+
+  Note: 'A staff-only source document supporting a received brokerage commission.'
+}
+
+Table property_photos {
+  id            bigint       [pk, increment]
+  created_at    timestamptz  [not null]
+  updated_at    timestamptz  [not null]
+  property_id   bigint       [not null, ref: > properties.id]
+  image         varchar(255) [not null]
+  preview_image varchar(255)
+  display_image varchar(255)
+  caption       varchar(120) [not null, default: '']
+  caption_en    varchar(120) [default: '', note: 'Caption [en]']
+  caption_uz    varchar(120) [default: '', note: 'Caption [uz]']
+  caption_ru    varchar(120) [default: '', note: 'Caption [ru]']
+  is_primary    boolean      [not null, default: false]
+  sort_order    smallint     [not null, default: 0]
+
+  indexes {
+    created_at
+    property_id
+  }
+}
+
+Table verification_visits {
+  id              bigint                   [pk, increment]
+  created_at      timestamptz              [not null]
+  updated_at      timestamptz              [not null]
+  property_id     bigint                   [not null, ref: > properties.id]
+  scheduled_for   timestamptz              [not null]
+  status          verificationvisit_status [not null, default: 'scheduled']
+  scheduled_by_id bigint                   [ref: > users.id]
+  completed_at    timestamptz             
+  notes           text                     [not null, default: '']
+
+  indexes {
+    created_at
+    property_id
+    scheduled_by_id
+  }
+
+  Note: '''
+  A management on-site verification visit scheduled when a property is
+published. Backs the "Save & schedule verification" action and the publish
+checklist\'s verification row.
+  '''
+}
+
+// Junction Tables
+Table properties_amenities {
+  id bigint [pk, increment]
+  property_id bigint [not null, ref: > properties.id]
+  amenity_id bigint [not null, ref: > amenities.id]
+
+  indexes {
+    (property_id, amenity_id) [unique]
+  }
+
+  Note: 'Auto-created junction table for properties.amenities -> amenities'
+}

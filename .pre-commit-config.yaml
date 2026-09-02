@@ -8,3 +8,10 @@ repos:
         always_run: true
         pass_filenames: false
         stages: [pre-commit]
+      - id: build-dbml-web-docs
+        name: Build DBML database schema documentation
+        entry: bash scripts/pre-commit-dbml-docs.sh
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]

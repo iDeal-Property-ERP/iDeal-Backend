@@ -1,0 +1,2098 @@
+-- SQL dump generated using DBML (dbml.dbdiagram.io)
+-- Database: PostgreSQL
+-- Generated at: 2026-09-02T15:10:42.171Z
+
+CREATE TYPE "agentdeal_status" AS ENUM (
+  'closed',
+  'pending',
+  'cancelled'
+);
+
+CREATE TYPE "booking_status" AS ENUM (
+  'requested',
+  'approved',
+  'rejected',
+  'converted',
+  'cancelled',
+  'payment_pending',
+  'confirmed',
+  'payment_failed',
+  'payment_expired',
+  'reconciliation_required'
+);
+
+CREATE TYPE "chat_conversation_reports_reason" AS ENUM (
+  'spam',
+  'abuse',
+  'scam',
+  'other'
+);
+
+CREATE TYPE "chat_messages_sender_side" AS ENUM (
+  'user',
+  'staff'
+);
+
+CREATE TYPE "contactinquiry_status" AS ENUM (
+  'new',
+  'handled',
+  'closed'
+);
+
+CREATE TYPE "devicetoken_platform" AS ENUM (
+  'android',
+  'ios'
+);
+
+CREATE TYPE "inventory_act_items_condition" AS ENUM (
+  'excellent',
+  'good',
+  'fair',
+  'poor',
+  'damaged'
+);
+
+CREATE TYPE "inventory_acts_act_type" AS ENUM (
+  'handover',
+  'return',
+  'general'
+);
+
+CREATE TYPE "inventoryact_status" AS ENUM (
+  'finalized'
+);
+
+CREATE TYPE "lease_status" AS ENUM (
+  'pending_signature',
+  'scheduled',
+  'active',
+  'expired',
+  'renewed',
+  'terminated'
+);
+
+CREATE TYPE "listing_status" AS ENUM (
+  'pending_review',
+  'published',
+  'rejected',
+  'archived'
+);
+
+CREATE TYPE "listings_minimum_stay" AS ENUM (
+  '1',
+  '3',
+  '6',
+  '12'
+);
+
+CREATE TYPE "message_kind" AS ENUM (
+  'text',
+  'image'
+);
+
+CREATE TYPE "notifications_audience" AS ENUM (
+  'mobile',
+  'erp',
+  'both'
+);
+
+CREATE TYPE "notifications_type" AS ENUM (
+  'payment_due',
+  'payment_paid',
+  'payout_paid',
+  'booking_status',
+  'service_request_status',
+  'lease_renewal',
+  'owner_onboarding',
+  'service_order_status',
+  'chat_message',
+  'general'
+);
+
+CREATE TYPE "one_off_deals_agreed_currency" AS ENUM (
+  'USD',
+  'UZS'
+);
+
+CREATE TYPE "one_off_deals_channel" AS ENUM (
+  'marketplace',
+  'off_market'
+);
+
+CREATE TYPE "one_off_deals_commission_currency" AS ENUM (
+  'USD',
+  'UZS'
+);
+
+CREATE TYPE "one_off_deals_commission_type" AS ENUM (
+  'none',
+  'fixed',
+  'percentage'
+);
+
+CREATE TYPE "oneoffcommissionreceipt_method" AS ENUM (
+  'cash',
+  'bank_transfer',
+  'online',
+  'click',
+  'payme',
+  'stripe',
+  'uzum'
+);
+
+CREATE TYPE "oneoffdeal_status" AS ENUM (
+  'active',
+  'paused',
+  'closed_won',
+  'closed_lost',
+  'archived'
+);
+
+CREATE TYPE "owneragreement_status" AS ENUM (
+  'active',
+  'expired',
+  'terminated'
+);
+
+CREATE TYPE "owneronboarding_status" AS ENUM (
+  'submitted',
+  'offer_accepted',
+  'approved',
+  'rejected'
+);
+
+CREATE TYPE "payment_checkouts_provider" AS ENUM (
+  'payme',
+  'click',
+  'stripe'
+);
+
+CREATE TYPE "payment_kind" AS ENUM (
+  'rent',
+  'deposit',
+  'other'
+);
+
+CREATE TYPE "payment_status" AS ENUM (
+  'pending',
+  'paid',
+  'overdue',
+  'cancelled'
+);
+
+CREATE TYPE "paymentcheckout_status" AS ENUM (
+  'pending',
+  'succeeded',
+  'failed',
+  'expired',
+  'reconciliation_required'
+);
+
+CREATE TYPE "payoutschedule_kind" AS ENUM (
+  'base',
+  'upside_adjustment'
+);
+
+CREATE TYPE "payoutschedule_method" AS ENUM (
+  'bank_transfer',
+  'card',
+  'cash'
+);
+
+CREATE TYPE "payoutschedule_status" AS ENUM (
+  'scheduled',
+  'held',
+  'paid',
+  'cancelled'
+);
+
+CREATE TYPE "properties_engagement_type" AS ENUM (
+  'managed',
+  'one_off'
+);
+
+CREATE TYPE "properties_furnishing" AS ENUM (
+  'furnished',
+  'semi_furnished',
+  'unfurnished'
+);
+
+CREATE TYPE "properties_property_type" AS ENUM (
+  'apartment',
+  'house',
+  'studio',
+  'room'
+);
+
+CREATE TYPE "properties_tariff" AS ENUM (
+  'standard',
+  'comfort',
+  'premium'
+);
+
+CREATE TYPE "property_status" AS ENUM (
+  'rented',
+  'vacant',
+  'maintenance',
+  'pending_review',
+  'archived'
+);
+
+CREATE TYPE "provider_events_provider" AS ENUM (
+  'payme',
+  'click',
+  'stripe'
+);
+
+CREATE TYPE "service_requests_cost_bearer" AS ENUM (
+  'owner',
+  'platform'
+);
+
+CREATE TYPE "serviceorder_status" AS ENUM (
+  'requested',
+  'confirmed',
+  'in_progress',
+  'completed',
+  'cancelled'
+);
+
+CREATE TYPE "servicerequest_priority" AS ENUM (
+  'low',
+  'medium',
+  'high',
+  'critical'
+);
+
+CREATE TYPE "servicerequest_status" AS ENUM (
+  'open',
+  'in_progress',
+  'resolved',
+  'cancelled'
+);
+
+CREATE TYPE "user_role" AS ENUM (
+  'mgmt',
+  'owner',
+  'tenant',
+  'agent'
+);
+
+CREATE TYPE "vas_catalog_items_service_type" AS ENUM (
+  'cleaning',
+  'handyman',
+  'utility',
+  'internet',
+  'moving',
+  'other'
+);
+
+CREATE TYPE "verificationvisit_status" AS ENUM (
+  'scheduled',
+  'completed',
+  'cancelled'
+);
+
+CREATE TYPE "viewing_requests_preferred_time" AS ENUM (
+  '10:00',
+  '13:00',
+  '15:00',
+  '18:00'
+);
+
+CREATE TYPE "viewingrequest_status" AS ENUM (
+  'pending',
+  'confirmed',
+  'cancelled'
+);
+
+CREATE TABLE "users" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "password" varchar(128) NOT NULL,
+  "last_login" timestamptz,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "first_name" varchar(30) NOT NULL,
+  "last_name" varchar(30),
+  "patronymic" varchar(100),
+  "username" varchar(150) UNIQUE NOT NULL,
+  "phone" varchar(15) UNIQUE,
+  "email" varchar(254) UNIQUE,
+  "avatar" varchar(255),
+  "role" user_role NOT NULL DEFAULT 'mgmt',
+  "is_verified" boolean NOT NULL DEFAULT false,
+  "nationality" varchar(50),
+  "telegram_id" varchar(100),
+  "is_staff" boolean NOT NULL DEFAULT false,
+  "is_superuser" boolean NOT NULL DEFAULT false,
+  "is_active" boolean NOT NULL DEFAULT true,
+  "must_change_password" boolean NOT NULL DEFAULT false
+);
+
+CREATE TABLE "token_blacklist" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "jti" varchar(255) UNIQUE NOT NULL,
+  "expires_at" timestamptz
+);
+
+CREATE TABLE "agents" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "user_id" bigint UNIQUE NOT NULL,
+  "total_deals" integer NOT NULL DEFAULT 0,
+  "total_revenue" decimal(14,2) NOT NULL DEFAULT 0,
+  "commission_rate" decimal(5,2) NOT NULL DEFAULT 10,
+  "is_active" boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE "agent_deals" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "agent_id" bigint NOT NULL,
+  "property_id" bigint NOT NULL,
+  "deal_date" date NOT NULL,
+  "rent_amount" decimal(12,2) NOT NULL,
+  "commission_amount" decimal(12,2) NOT NULL,
+  "status" agentdeal_status NOT NULL DEFAULT 'closed'
+);
+
+CREATE TABLE "chat_conversations" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "listing_id" bigint NOT NULL,
+  "user_id" bigint NOT NULL,
+  "user_archived_at" timestamptz,
+  "user_deleted_at" timestamptz,
+  "user_muted" boolean NOT NULL DEFAULT false,
+  "user_last_read_message_id" bigint,
+  "user_unread_count" integer NOT NULL DEFAULT 0,
+  "staff_archived_at" timestamptz,
+  "staff_last_read_message_id" bigint,
+  "staff_unread_count" integer NOT NULL DEFAULT 0,
+  "user_realtime_version" bigint NOT NULL DEFAULT 0,
+  "staff_realtime_version" bigint NOT NULL DEFAULT 0,
+  "is_user_blocked" boolean NOT NULL DEFAULT false,
+  "blocked_by_id" bigint,
+  "blocked_at" timestamptz,
+  "last_message_id" bigint,
+  "last_message_at" timestamptz
+);
+
+CREATE TABLE "chat_messages" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "conversation_id" bigint NOT NULL,
+  "sender_id" bigint NOT NULL,
+  "sender_side" chat_messages_sender_side NOT NULL,
+  "kind" message_kind NOT NULL DEFAULT 'text',
+  "text" varchar(1024),
+  "image" varchar(255),
+  "image_width" integer,
+  "image_height" integer,
+  "image_size_bytes" integer,
+  "client_id" varchar(64),
+  "read_at" timestamptz
+);
+
+CREATE TABLE "chat_conversation_reports" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "conversation_id" bigint NOT NULL,
+  "reported_by_id" bigint NOT NULL,
+  "reason" chat_conversation_reports_reason NOT NULL,
+  "note" varchar(500) NOT NULL DEFAULT '',
+  "resolved_at" timestamptz,
+  "resolved_by_id" bigint
+);
+
+CREATE TABLE "chat_realtime_events" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "audience" varchar(10) NOT NULL,
+  "recipient_user_id" bigint,
+  "conversation_id" bigint NOT NULL,
+  "conversation_version" bigint NOT NULL,
+  "event_type" varchar(64) NOT NULL,
+  "payload" jsonb NOT NULL
+);
+
+CREATE TABLE "owner_agreements" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "previous_agreement_id" bigint UNIQUE,
+  "owner_id" bigint NOT NULL,
+  "property_id" bigint NOT NULL,
+  "agreement_number" varchar(50) UNIQUE NOT NULL,
+  "signed_date" date NOT NULL,
+  "start_date" date NOT NULL,
+  "end_date" date NOT NULL,
+  "status" owneragreement_status NOT NULL DEFAULT 'active',
+  "terms" text,
+  "accepted_locale" varchar(10) NOT NULL DEFAULT 'en',
+  "commission_rate" decimal(5,2) NOT NULL,
+  "gross_floor_amount" decimal(12,2) NOT NULL,
+  "currency" varchar(3) NOT NULL DEFAULT 'USD',
+  "payout_day" smallint NOT NULL DEFAULT 25
+);
+
+CREATE TABLE "leases" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "property_id" bigint NOT NULL,
+  "owner_agreement_id" bigint NOT NULL,
+  "tenant_id" bigint NOT NULL,
+  "start_date" date NOT NULL,
+  "end_date" date NOT NULL,
+  "monthly_rent" decimal(12,2) NOT NULL,
+  "deposit" decimal(12,2) NOT NULL,
+  "status" lease_status NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE "lease_agreement_segments" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "lease_id" bigint NOT NULL,
+  "owner_agreement_id" bigint NOT NULL,
+  "start_date" date NOT NULL,
+  "end_date" date NOT NULL
+);
+
+CREATE TABLE "public_offers" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "version" varchar(20) UNIQUE NOT NULL,
+  "body" text NOT NULL,
+  "body_en" text,
+  "body_uz" text,
+  "body_ru" text,
+  "is_active" boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE "owner_onboardings" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "owner_id" bigint NOT NULL,
+  "property_id" bigint NOT NULL,
+  "status" owneronboarding_status NOT NULL DEFAULT 'submitted',
+  "offer_version" varchar(20),
+  "offer_terms_snapshot" text,
+  "offer_accepted_locale" varchar(10) NOT NULL DEFAULT 'en',
+  "offer_accepted_at" timestamptz,
+  "reviewed_by_id" bigint,
+  "review_notes" text,
+  "generated_agreement_id" bigint
+);
+
+CREATE TABLE "lease_renewals" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "previous_lease_id" bigint NOT NULL,
+  "new_lease_id" bigint NOT NULL,
+  "renewal_date" date NOT NULL,
+  "new_start_date" date NOT NULL,
+  "new_end_date" date NOT NULL,
+  "new_monthly_rent" decimal(12,2) NOT NULL
+);
+
+CREATE TABLE "payments" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "checkout_id" bigint,
+  "lease_id" bigint NOT NULL,
+  "tenant_id" bigint NOT NULL,
+  "paid_by_id" bigint NOT NULL,
+  "amount" decimal(12,2) NOT NULL,
+  "currency" one_off_deals_commission_currency NOT NULL DEFAULT 'USD',
+  "payment_date" date NOT NULL,
+  "due_date" date NOT NULL,
+  "rental_period" date,
+  "kind" payment_kind NOT NULL DEFAULT 'rent',
+  "status" payment_status NOT NULL DEFAULT 'pending',
+  "method" oneoffcommissionreceipt_method NOT NULL DEFAULT 'cash',
+  "notes" text,
+  "gateway_ref" varchar(128)
+);
+
+CREATE TABLE "exchange_rates" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "currency" one_off_deals_commission_currency NOT NULL,
+  "rate" decimal(15,4) NOT NULL,
+  "effective_date" date NOT NULL
+);
+
+CREATE TABLE "payout_schedules" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "owner_agreement_id" bigint NOT NULL,
+  "owner_id" bigint NOT NULL,
+  "settlement_id" bigint,
+  "kind" payoutschedule_kind NOT NULL DEFAULT 'base',
+  "amount" decimal(12,2) NOT NULL,
+  "currency" one_off_deals_commission_currency NOT NULL DEFAULT 'USD',
+  "scheduled_date" date NOT NULL,
+  "paid_date" date,
+  "status" payoutschedule_status NOT NULL DEFAULT 'scheduled',
+  "method" payoutschedule_method NOT NULL DEFAULT 'bank_transfer',
+  "status_reason" text
+);
+
+CREATE TABLE "owner_settlements" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "owner_agreement_id" bigint NOT NULL,
+  "owner_id" bigint NOT NULL,
+  "period_start" date NOT NULL,
+  "period_end" date NOT NULL,
+  "covered_days" smallint NOT NULL,
+  "days_in_month" smallint NOT NULL,
+  "gross_floor_amount" decimal(12,2) NOT NULL,
+  "commission_rate" decimal(5,2) NOT NULL,
+  "currency" one_off_deals_commission_currency NOT NULL,
+  "rent_received_amount" decimal(12,2) NOT NULL DEFAULT 0,
+  "settlement_base_amount" decimal(12,2) NOT NULL DEFAULT 0,
+  "commission_amount" decimal(12,2) NOT NULL DEFAULT 0,
+  "owner_payout_amount" decimal(12,2) NOT NULL DEFAULT 0,
+  "ideal_cash_exposure" decimal(12,2) NOT NULL DEFAULT 0
+);
+
+CREATE TABLE "rent_receipt_allocations" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "payment_id" bigint NOT NULL,
+  "settlement_id" bigint NOT NULL,
+  "amount" decimal(12,2) NOT NULL
+);
+
+CREATE TABLE "rent_coverage_allocations" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "payment_id" bigint NOT NULL,
+  "owner_agreement_id" bigint NOT NULL,
+  "start_date" date NOT NULL,
+  "end_date" date NOT NULL,
+  "amount" decimal(12,2) NOT NULL
+);
+
+CREATE TABLE "inventory_acts" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "property_id" bigint NOT NULL,
+  "lease_id" bigint,
+  "act_type" inventory_acts_act_type NOT NULL DEFAULT 'general',
+  "status" inventoryact_status NOT NULL DEFAULT 'finalized',
+  "created_by_id" bigint NOT NULL,
+  "notes" text,
+  "finalized_at" timestamptz,
+  "acknowledged_by_name" varchar(200),
+  "acknowledged_at" timestamptz,
+  "acknowledgment_note" text
+);
+
+CREATE TABLE "inventory_act_items" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "act_id" bigint NOT NULL,
+  "area" varchar(120) NOT NULL,
+  "condition" inventory_act_items_condition NOT NULL DEFAULT 'good',
+  "notes" text,
+  "sort_order" smallint NOT NULL DEFAULT 0
+);
+
+CREATE TABLE "inventory_act_photos" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "act_id" bigint NOT NULL,
+  "item_id" bigint,
+  "image" varchar(255) NOT NULL,
+  "caption" varchar(200)
+);
+
+CREATE TABLE "service_requests" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "property_id" bigint NOT NULL,
+  "tenant_id" bigint NOT NULL,
+  "assigned_to_id" bigint,
+  "title" varchar(200) NOT NULL,
+  "description" text NOT NULL,
+  "priority" servicerequest_priority NOT NULL DEFAULT 'medium',
+  "status" servicerequest_status NOT NULL DEFAULT 'open',
+  "cost" decimal(12,2),
+  "cost_bearer" service_requests_cost_bearer,
+  "resolution_notes" text,
+  "resolved_at" timestamptz
+);
+
+CREATE TABLE "service_request_photos" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "service_request_id" bigint NOT NULL,
+  "image" varchar(255) NOT NULL
+);
+
+CREATE TABLE "service_request_comments" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "service_request_id" bigint NOT NULL,
+  "author_id" bigint,
+  "body" text NOT NULL
+);
+
+CREATE TABLE "listings" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "property_id" bigint UNIQUE NOT NULL,
+  "owner_agreement_id" bigint,
+  "status" listing_status NOT NULL DEFAULT 'published',
+  "is_active" boolean NOT NULL DEFAULT true,
+  "is_featured" boolean NOT NULL DEFAULT false,
+  "description" text,
+  "description_en" text,
+  "description_uz" text,
+  "description_ru" text,
+  "listed_price" decimal(12,2),
+  "monthly_price" decimal(12,2),
+  "deposit_amount" decimal(12,2),
+  "currency" varchar(3) NOT NULL DEFAULT 'USD',
+  "minimum_stay" listings_minimum_stay,
+  "price_includes" jsonb NOT NULL,
+  "rejection_reason" text,
+  "submitted_at" timestamptz,
+  "published_at" timestamptz
+);
+
+CREATE TABLE "viewing_requests" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "listing_id" bigint NOT NULL,
+  "full_name" varchar(150) NOT NULL,
+  "phone" varchar(30) NOT NULL,
+  "email" varchar(254),
+  "preferred_date" date NOT NULL,
+  "preferred_time" viewing_requests_preferred_time,
+  "message" text,
+  "status" viewingrequest_status NOT NULL DEFAULT 'pending'
+);
+
+CREATE TABLE "contact_inquiries" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "listing_id" bigint,
+  "full_name" varchar(150) NOT NULL,
+  "phone" varchar(30) NOT NULL,
+  "email" varchar(254),
+  "message" text NOT NULL,
+  "status" contactinquiry_status NOT NULL DEFAULT 'new'
+);
+
+CREATE TABLE "faq_items" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "question" varchar(255) NOT NULL,
+  "question_en" varchar(255),
+  "question_uz" varchar(255),
+  "question_ru" varchar(255),
+  "answer" text NOT NULL,
+  "answer_en" text,
+  "answer_uz" text,
+  "answer_ru" text,
+  "sort_order" smallint NOT NULL DEFAULT 0,
+  "is_active" boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE "bookings" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "listing_id" bigint NOT NULL,
+  "property_id" bigint NOT NULL,
+  "tenant_id" bigint NOT NULL,
+  "requested_start_date" date NOT NULL,
+  "requested_end_date" date NOT NULL,
+  "monthly_rent_offer" decimal(12,2),
+  "status" booking_status NOT NULL DEFAULT 'requested',
+  "message" text,
+  "reviewed_by_id" bigint,
+  "converted_lease_id" bigint
+);
+
+CREATE TABLE "favorite_listings" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "user_id" bigint NOT NULL,
+  "listing_id" bigint NOT NULL
+);
+
+CREATE TABLE "booking_quotes" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "listing_id" bigint NOT NULL,
+  "tenant_id" bigint NOT NULL,
+  "start_date" date NOT NULL,
+  "end_date" date NOT NULL,
+  "currency" varchar(3) NOT NULL,
+  "monthly_rent" decimal(12,2) NOT NULL,
+  "deposit_amount" decimal(12,2) NOT NULL,
+  "first_period_rent" decimal(12,2) NOT NULL,
+  "full_stay_rent" decimal(12,2) NOT NULL,
+  "first_month_total" decimal(12,2) NOT NULL,
+  "full_stay_total" decimal(12,2) NOT NULL,
+  "periods" jsonb NOT NULL,
+  "agreement_ids" jsonb NOT NULL,
+  "fx_rate" decimal(18,6),
+  "expires_at" timestamptz NOT NULL
+);
+
+CREATE TABLE "payment_checkouts" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "quote_id" bigint NOT NULL,
+  "booking_id" bigint UNIQUE NOT NULL,
+  "tenant_id" bigint NOT NULL,
+  "public_token" uuid UNIQUE NOT NULL DEFAULT (gen_random_uuid()),
+  "idempotency_key" varchar(128) NOT NULL,
+  "provider" payment_checkouts_provider NOT NULL,
+  "status" paymentcheckout_status NOT NULL DEFAULT 'pending',
+  "pay_full_stay" boolean NOT NULL DEFAULT false,
+  "original_amount" decimal(12,2) NOT NULL,
+  "original_currency" varchar(3) NOT NULL,
+  "provider_amount" decimal(18,2) NOT NULL,
+  "provider_currency" varchar(3) NOT NULL,
+  "fx_rate" decimal(18,6),
+  "checkout_url" varchar(1000) NOT NULL,
+  "external_id" varchar(255),
+  "expires_at" timestamptz NOT NULL,
+  "completed_at" timestamptz
+);
+
+CREATE TABLE "provider_events" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "checkout_id" bigint NOT NULL,
+  "provider" provider_events_provider NOT NULL,
+  "external_event_id" varchar(255) NOT NULL,
+  "event_type" varchar(100) NOT NULL,
+  "payload" jsonb NOT NULL,
+  "result" jsonb NOT NULL
+);
+
+CREATE TABLE "recent_search_activities" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "user_id" bigint NOT NULL,
+  "query" varchar(255) NOT NULL DEFAULT '',
+  "filters" jsonb NOT NULL,
+  "fingerprint" varchar(64) NOT NULL
+);
+
+CREATE TABLE "listing_view_activities" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "user_id" bigint NOT NULL,
+  "listing_id" bigint NOT NULL
+);
+
+CREATE TABLE "mobile_update_policies" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "platform" devicetoken_platform NOT NULL,
+  "latest_version" varchar(32) NOT NULL,
+  "store_url" varchar(500) NOT NULL,
+  "is_active" boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE "mobile_critical_update_ranges" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "policy_id" bigint NOT NULL,
+  "minimum_version" varchar(32) NOT NULL,
+  "maximum_version" varchar(32) NOT NULL,
+  "is_active" boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE "notifications" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "recipient_id" bigint NOT NULL,
+  "type" notifications_type NOT NULL DEFAULT 'general',
+  "audience" notifications_audience NOT NULL DEFAULT 'both',
+  "title" varchar(200) NOT NULL,
+  "title_en" varchar(200),
+  "title_uz" varchar(200),
+  "title_ru" varchar(200),
+  "body" text,
+  "body_en" text,
+  "body_uz" text,
+  "body_ru" text,
+  "related_object_type" varchar(50),
+  "related_object_id" integer,
+  "is_read" boolean NOT NULL DEFAULT false,
+  "read_at" timestamptz
+);
+
+CREATE TABLE "notification_device_tokens" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "user_id" bigint NOT NULL,
+  "token" text UNIQUE NOT NULL,
+  "platform" devicetoken_platform NOT NULL,
+  "device_id" varchar(255),
+  "app_version" varchar(50),
+  "locale" varchar(10),
+  "is_active" boolean NOT NULL DEFAULT true,
+  "last_seen_at" timestamptz
+);
+
+CREATE TABLE "notification_preferences" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "user_id" bigint UNIQUE NOT NULL,
+  "push_enabled" boolean NOT NULL DEFAULT true,
+  "payments_enabled" boolean NOT NULL DEFAULT true,
+  "bookings_enabled" boolean NOT NULL DEFAULT true,
+  "maintenance_enabled" boolean NOT NULL DEFAULT true,
+  "leases_enabled" boolean NOT NULL DEFAULT true,
+  "messages_enabled" boolean NOT NULL DEFAULT true,
+  "general_enabled" boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE "districts" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "name" varchar(100) UNIQUE NOT NULL,
+  "name_en" varchar(100) UNIQUE,
+  "name_uz" varchar(100) UNIQUE,
+  "name_ru" varchar(100) UNIQUE,
+  "city" varchar(100) NOT NULL DEFAULT 'Toshkent',
+  "city_en" varchar(100) DEFAULT 'Toshkent',
+  "city_uz" varchar(100) DEFAULT 'Toshkent',
+  "city_ru" varchar(100) DEFAULT 'Toshkent'
+);
+
+CREATE TABLE "amenities" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "slug" varchar(50) UNIQUE NOT NULL,
+  "name" varchar(100) NOT NULL,
+  "name_en" varchar(100),
+  "name_uz" varchar(100),
+  "name_ru" varchar(100),
+  "icon" varchar(50) NOT NULL,
+  "sort_order" smallint NOT NULL DEFAULT 0,
+  "is_active" boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE "properties" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "name" varchar(200) NOT NULL,
+  "name_en" varchar(200),
+  "name_uz" varchar(200),
+  "name_ru" varchar(200),
+  "address" varchar(255) NOT NULL DEFAULT '',
+  "landmark" varchar(100),
+  "landmark_en" varchar(100),
+  "landmark_uz" varchar(100),
+  "landmark_ru" varchar(100),
+  "district_id" bigint,
+  "property_type" properties_property_type NOT NULL DEFAULT 'apartment',
+  "rooms" smallint,
+  "area_sqm" smallint,
+  "floor" smallint,
+  "total_floors" smallint,
+  "furnishing" properties_furnishing NOT NULL DEFAULT 'unfurnished',
+  "owner_id" bigint,
+  "created_by_id" bigint,
+  "contact_phone" varchar(30),
+  "engagement_type" properties_engagement_type NOT NULL DEFAULT 'managed',
+  "status" property_status NOT NULL DEFAULT 'vacant',
+  "is_verified" boolean NOT NULL DEFAULT false,
+  "verified_at" timestamptz,
+  "verified_by_id" bigint,
+  "score" decimal(3,1) NOT NULL DEFAULT 0,
+  "review_count" integer NOT NULL DEFAULT 0,
+  "map_lat" decimal(10,7),
+  "map_lon" decimal(10,7),
+  "description" text,
+  "description_en" text,
+  "description_uz" text,
+  "description_ru" text,
+  "tariff" properties_tariff NOT NULL DEFAULT 'standard',
+  "ask_price" decimal(12,2),
+  "ask_currency" varchar(3) NOT NULL DEFAULT 'USD',
+  "owner_guaranteed_price" decimal(12,2),
+  "owner_guaranteed_currency" varchar(3) NOT NULL DEFAULT 'USD',
+  "tenant_charge_price" decimal(12,2),
+  "tenant_charge_currency" varchar(3) NOT NULL DEFAULT 'USD',
+  "deposit_amount" decimal(12,2),
+  "deposit_currency" varchar(3) NOT NULL DEFAULT 'USD',
+  "vacant_since" date,
+  "vacant_days" smallint NOT NULL DEFAULT 0
+);
+
+CREATE TABLE "one_off_deals" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "property_id" bigint UNIQUE NOT NULL,
+  "seller_name" varchar(150) NOT NULL,
+  "seller_phone" varchar(30) NOT NULL,
+  "seller_email" varchar(254),
+  "renter_name" varchar(150),
+  "renter_phone" varchar(30),
+  "renter_email" varchar(254),
+  "channel" one_off_deals_channel NOT NULL,
+  "status" oneoffdeal_status NOT NULL DEFAULT 'active',
+  "commission_type" one_off_deals_commission_type NOT NULL DEFAULT 'none',
+  "commission_fixed_amount" decimal(12,2),
+  "commission_percentage" decimal(5,2),
+  "commission_currency" one_off_deals_commission_currency NOT NULL DEFAULT 'USD',
+  "agreed_monthly_rent" decimal(12,2),
+  "agreed_currency" one_off_deals_agreed_currency NOT NULL DEFAULT 'USD',
+  "close_date" date,
+  "close_notes" text NOT NULL DEFAULT '',
+  "evidence" jsonb NOT NULL,
+  "commission_amount" decimal(12,2),
+  "commission_uzs_amount" decimal(16,2),
+  "commission_conversion_rate" decimal(18,6),
+  "closed_by_id" bigint
+);
+
+CREATE TABLE "one_off_commission_receipts" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deal_id" bigint UNIQUE NOT NULL,
+  "amount" decimal(12,2) NOT NULL,
+  "currency" one_off_deals_commission_currency NOT NULL,
+  "received_date" date NOT NULL,
+  "method" oneoffcommissionreceipt_method NOT NULL,
+  "reference" varchar(128) NOT NULL DEFAULT '',
+  "recorded_by_id" bigint NOT NULL
+);
+
+CREATE TABLE "one_off_commission_receipt_attachments" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "receipt_id" bigint NOT NULL,
+  "file" varchar(255) NOT NULL,
+  "filename" varchar(255) NOT NULL,
+  "content_type" varchar(100) NOT NULL DEFAULT '',
+  "size_bytes" integer NOT NULL DEFAULT 0
+);
+
+CREATE TABLE "property_photos" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "property_id" bigint NOT NULL,
+  "image" varchar(255) NOT NULL,
+  "preview_image" varchar(255),
+  "display_image" varchar(255),
+  "caption" varchar(120) NOT NULL DEFAULT '',
+  "caption_en" varchar(120) DEFAULT '',
+  "caption_uz" varchar(120) DEFAULT '',
+  "caption_ru" varchar(120) DEFAULT '',
+  "is_primary" boolean NOT NULL DEFAULT false,
+  "sort_order" smallint NOT NULL DEFAULT 0
+);
+
+CREATE TABLE "verification_visits" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "property_id" bigint NOT NULL,
+  "scheduled_for" timestamptz NOT NULL,
+  "status" verificationvisit_status NOT NULL DEFAULT 'scheduled',
+  "scheduled_by_id" bigint,
+  "completed_at" timestamptz,
+  "notes" text NOT NULL DEFAULT ''
+);
+
+CREATE TABLE "properties_amenities" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "property_id" bigint NOT NULL,
+  "amenity_id" bigint NOT NULL
+);
+
+CREATE TABLE "vas_catalog_items" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "service_type" vas_catalog_items_service_type NOT NULL DEFAULT 'other',
+  "name" varchar(150) NOT NULL,
+  "name_en" varchar(150),
+  "name_uz" varchar(150),
+  "name_ru" varchar(150),
+  "partner_name" varchar(150),
+  "description" text,
+  "description_en" text,
+  "description_uz" text,
+  "description_ru" text,
+  "base_price" decimal(12,2) NOT NULL,
+  "currency" one_off_deals_commission_currency NOT NULL DEFAULT 'USD',
+  "commission_rate" decimal(5,2) NOT NULL,
+  "cashback_rate" decimal(5,2) NOT NULL,
+  "is_active" boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE "vas_orders" (
+  "id" BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "created_at" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  "deleted_at" timestamptz,
+  "restored_at" timestamptz,
+  "transaction_id" uuid,
+  "catalog_item_id" bigint NOT NULL,
+  "tenant_id" bigint NOT NULL,
+  "property_id" bigint NOT NULL,
+  "lease_id" bigint,
+  "status" serviceorder_status NOT NULL DEFAULT 'requested',
+  "cost" decimal(12,2) NOT NULL,
+  "currency" one_off_deals_commission_currency NOT NULL DEFAULT 'USD',
+  "commission_earned" decimal(12,2) NOT NULL,
+  "cashback_amount" decimal(12,2) NOT NULL,
+  "scheduled_for" date,
+  "notes" text,
+  "cancellation_reason" text,
+  "completed_at" timestamptz
+);
+
+CREATE INDEX ON "users" ("created_at");
+
+CREATE INDEX ON "users" ("deleted_at");
+
+CREATE INDEX ON "token_blacklist" ("created_at");
+
+CREATE INDEX ON "agents" ("created_at");
+
+CREATE INDEX ON "agents" ("deleted_at");
+
+CREATE INDEX ON "agent_deals" ("created_at");
+
+CREATE INDEX ON "agent_deals" ("deleted_at");
+
+CREATE INDEX ON "agent_deals" ("agent_id");
+
+CREATE INDEX ON "agent_deals" ("property_id");
+
+CREATE INDEX "agent_deals_agent_i_c813e7_idx" ON "agent_deals" ("agent_id");
+
+CREATE INDEX "agent_deals_propert_9bf116_idx" ON "agent_deals" ("property_id");
+
+CREATE INDEX "agent_deals_status_09ca1d_idx" ON "agent_deals" ("status");
+
+CREATE INDEX ON "chat_conversations" ("created_at");
+
+CREATE INDEX ON "chat_conversations" ("deleted_at");
+
+CREATE INDEX ON "chat_conversations" ("listing_id");
+
+CREATE INDEX ON "chat_conversations" ("user_id");
+
+CREATE INDEX ON "chat_conversations" ("user_deleted_at");
+
+CREATE INDEX ON "chat_conversations" ("is_user_blocked");
+
+CREATE INDEX ON "chat_conversations" ("blocked_by_id");
+
+CREATE INDEX ON "chat_conversations" ("last_message_id");
+
+CREATE INDEX ON "chat_conversations" ("last_message_at");
+
+CREATE INDEX "chat_conver_listing_ebea4a_idx" ON "chat_conversations" ("listing_id");
+
+CREATE INDEX "chat_conver_user_id_c6ec36_idx" ON "chat_conversations" ("user_id");
+
+CREATE INDEX "chat_conver_last_me_2102b2_idx" ON "chat_conversations" ("last_message_at");
+
+CREATE INDEX "chat_conver_updated_b5a0fe_idx" ON "chat_conversations" ("updated_at");
+
+CREATE INDEX "chat_conver_user_id_c25098_idx" ON "chat_conversations" ("user_id", "user_deleted_at");
+
+CREATE INDEX ON "chat_messages" ("created_at");
+
+CREATE INDEX ON "chat_messages" ("deleted_at");
+
+CREATE INDEX ON "chat_messages" ("conversation_id");
+
+CREATE INDEX ON "chat_messages" ("sender_id");
+
+CREATE INDEX "chat_messag_convers_9e0e50_idx" ON "chat_messages" ("conversation_id", "id");
+
+CREATE INDEX "chat_messag_convers_9cdf7a_idx" ON "chat_messages" ("conversation_id", "id");
+
+CREATE INDEX "chat_messag_convers_5cba9b_idx" ON "chat_messages" ("conversation_id", "read_at");
+
+CREATE INDEX ON "chat_conversation_reports" ("created_at");
+
+CREATE INDEX ON "chat_conversation_reports" ("conversation_id");
+
+CREATE INDEX ON "chat_conversation_reports" ("reported_by_id");
+
+CREATE INDEX ON "chat_conversation_reports" ("resolved_by_id");
+
+CREATE INDEX "chat_conver_convers_0b3612_idx" ON "chat_conversation_reports" ("conversation_id");
+
+CREATE INDEX "chat_conver_resolve_19b427_idx" ON "chat_conversation_reports" ("resolved_at");
+
+CREATE INDEX ON "chat_realtime_events" ("created_at");
+
+CREATE INDEX ON "chat_realtime_events" ("recipient_user_id");
+
+CREATE INDEX ON "chat_realtime_events" ("conversation_id");
+
+CREATE INDEX "chat_realti_audienc_584dfa_idx" ON "chat_realtime_events" ("audience", "recipient_user_id", "id");
+
+CREATE INDEX "chat_realti_created_340072_idx" ON "chat_realtime_events" ("created_at");
+
+CREATE INDEX ON "owner_agreements" ("created_at");
+
+CREATE INDEX ON "owner_agreements" ("deleted_at");
+
+CREATE INDEX ON "owner_agreements" ("owner_id");
+
+CREATE INDEX ON "owner_agreements" ("property_id");
+
+CREATE INDEX "owner_agree_owner_i_5a4a43_idx" ON "owner_agreements" ("owner_id");
+
+CREATE INDEX "owner_agree_propert_af61e0_idx" ON "owner_agreements" ("property_id");
+
+CREATE INDEX "owner_agree_status_d3a79b_idx" ON "owner_agreements" ("status");
+
+CREATE INDEX ON "leases" ("created_at");
+
+CREATE INDEX ON "leases" ("deleted_at");
+
+CREATE INDEX ON "leases" ("property_id");
+
+CREATE INDEX ON "leases" ("owner_agreement_id");
+
+CREATE INDEX ON "leases" ("tenant_id");
+
+CREATE INDEX "leases_propert_07dfa4_idx" ON "leases" ("property_id");
+
+CREATE INDEX "leases_tenant__c311df_idx" ON "leases" ("tenant_id");
+
+CREATE INDEX "leases_status_3db7e6_idx" ON "leases" ("status");
+
+CREATE INDEX ON "lease_agreement_segments" ("created_at");
+
+CREATE INDEX ON "lease_agreement_segments" ("deleted_at");
+
+CREATE INDEX ON "lease_agreement_segments" ("lease_id");
+
+CREATE INDEX ON "lease_agreement_segments" ("owner_agreement_id");
+
+CREATE INDEX ON "public_offers" ("created_at");
+
+CREATE INDEX ON "public_offers" ("deleted_at");
+
+CREATE INDEX ON "owner_onboardings" ("created_at");
+
+CREATE INDEX ON "owner_onboardings" ("deleted_at");
+
+CREATE INDEX ON "owner_onboardings" ("owner_id");
+
+CREATE INDEX ON "owner_onboardings" ("property_id");
+
+CREATE INDEX ON "owner_onboardings" ("reviewed_by_id");
+
+CREATE INDEX ON "owner_onboardings" ("generated_agreement_id");
+
+CREATE INDEX "owner_onboa_owner_i_85ae21_idx" ON "owner_onboardings" ("owner_id");
+
+CREATE INDEX "owner_onboa_propert_ce188b_idx" ON "owner_onboardings" ("property_id");
+
+CREATE INDEX "owner_onboa_status_e80546_idx" ON "owner_onboardings" ("status");
+
+CREATE INDEX ON "lease_renewals" ("created_at");
+
+CREATE INDEX ON "lease_renewals" ("deleted_at");
+
+CREATE INDEX ON "lease_renewals" ("previous_lease_id");
+
+CREATE INDEX ON "lease_renewals" ("new_lease_id");
+
+CREATE INDEX "lease_renew_previou_092051_idx" ON "lease_renewals" ("previous_lease_id");
+
+CREATE INDEX "lease_renew_new_lea_913456_idx" ON "lease_renewals" ("new_lease_id");
+
+CREATE INDEX ON "payments" ("created_at");
+
+CREATE INDEX ON "payments" ("deleted_at");
+
+CREATE INDEX ON "payments" ("checkout_id");
+
+CREATE INDEX ON "payments" ("lease_id");
+
+CREATE INDEX ON "payments" ("tenant_id");
+
+CREATE INDEX ON "payments" ("paid_by_id");
+
+CREATE INDEX "payments_lease_i_bbeb30_idx" ON "payments" ("lease_id");
+
+CREATE INDEX "payments_tenant__d18216_idx" ON "payments" ("tenant_id");
+
+CREATE INDEX "payments_status_d621e5_idx" ON "payments" ("status");
+
+CREATE INDEX ON "exchange_rates" ("created_at");
+
+CREATE INDEX ON "exchange_rates" ("deleted_at");
+
+CREATE INDEX ON "payout_schedules" ("created_at");
+
+CREATE INDEX ON "payout_schedules" ("deleted_at");
+
+CREATE INDEX ON "payout_schedules" ("owner_agreement_id");
+
+CREATE INDEX ON "payout_schedules" ("owner_id");
+
+CREATE INDEX ON "payout_schedules" ("settlement_id");
+
+CREATE INDEX "payout_sche_owner_i_9adddb_idx" ON "payout_schedules" ("owner_id");
+
+CREATE INDEX "payout_sche_status_ebc505_idx" ON "payout_schedules" ("status");
+
+CREATE INDEX ON "owner_settlements" ("created_at");
+
+CREATE INDEX ON "owner_settlements" ("deleted_at");
+
+CREATE INDEX ON "owner_settlements" ("owner_agreement_id");
+
+CREATE INDEX ON "owner_settlements" ("owner_id");
+
+CREATE INDEX "owner_settl_owner_i_6f41b8_idx" ON "owner_settlements" ("owner_id", "period_start");
+
+CREATE INDEX ON "rent_receipt_allocations" ("created_at");
+
+CREATE INDEX ON "rent_receipt_allocations" ("payment_id");
+
+CREATE INDEX ON "rent_receipt_allocations" ("settlement_id");
+
+CREATE INDEX ON "rent_coverage_allocations" ("created_at");
+
+CREATE INDEX ON "rent_coverage_allocations" ("payment_id");
+
+CREATE INDEX ON "rent_coverage_allocations" ("owner_agreement_id");
+
+CREATE INDEX ON "inventory_acts" ("created_at");
+
+CREATE INDEX ON "inventory_acts" ("deleted_at");
+
+CREATE INDEX ON "inventory_acts" ("property_id");
+
+CREATE INDEX ON "inventory_acts" ("lease_id");
+
+CREATE INDEX ON "inventory_acts" ("created_by_id");
+
+CREATE INDEX "inventory_a_propert_cc7dfa_idx" ON "inventory_acts" ("property_id");
+
+CREATE INDEX "inventory_a_lease_i_cf64d4_idx" ON "inventory_acts" ("lease_id");
+
+CREATE INDEX "inventory_a_status_37a6cc_idx" ON "inventory_acts" ("status");
+
+CREATE INDEX ON "inventory_act_items" ("created_at");
+
+CREATE INDEX ON "inventory_act_items" ("deleted_at");
+
+CREATE INDEX ON "inventory_act_items" ("act_id");
+
+CREATE INDEX "inventory_a_act_id_f4b518_idx" ON "inventory_act_items" ("act_id");
+
+CREATE INDEX ON "inventory_act_photos" ("created_at");
+
+CREATE INDEX ON "inventory_act_photos" ("deleted_at");
+
+CREATE INDEX ON "inventory_act_photos" ("act_id");
+
+CREATE INDEX ON "inventory_act_photos" ("item_id");
+
+CREATE INDEX "inventory_a_act_id_a9fcf8_idx" ON "inventory_act_photos" ("act_id");
+
+CREATE INDEX ON "service_requests" ("created_at");
+
+CREATE INDEX ON "service_requests" ("deleted_at");
+
+CREATE INDEX ON "service_requests" ("property_id");
+
+CREATE INDEX ON "service_requests" ("tenant_id");
+
+CREATE INDEX ON "service_requests" ("assigned_to_id");
+
+CREATE INDEX "service_req_propert_b0e641_idx" ON "service_requests" ("property_id");
+
+CREATE INDEX "service_req_tenant__37066c_idx" ON "service_requests" ("tenant_id");
+
+CREATE INDEX "service_req_status_ba17eb_idx" ON "service_requests" ("status");
+
+CREATE INDEX "service_req_assigne_a3c572_idx" ON "service_requests" ("assigned_to_id");
+
+CREATE INDEX ON "service_request_photos" ("created_at");
+
+CREATE INDEX ON "service_request_photos" ("deleted_at");
+
+CREATE INDEX ON "service_request_photos" ("service_request_id");
+
+CREATE INDEX ON "service_request_comments" ("created_at");
+
+CREATE INDEX ON "service_request_comments" ("deleted_at");
+
+CREATE INDEX ON "service_request_comments" ("service_request_id");
+
+CREATE INDEX ON "service_request_comments" ("author_id");
+
+CREATE INDEX "service_req_service_3f0b79_idx" ON "service_request_comments" ("service_request_id");
+
+CREATE INDEX ON "listings" ("created_at");
+
+CREATE INDEX ON "listings" ("deleted_at");
+
+CREATE INDEX ON "listings" ("owner_agreement_id");
+
+CREATE INDEX "listings_is_acti_fd46bf_idx" ON "listings" ("is_active");
+
+CREATE INDEX "listings_is_feat_01aa9f_idx" ON "listings" ("is_featured");
+
+CREATE INDEX "listings_status_c3eaec_idx" ON "listings" ("status");
+
+CREATE INDEX ON "viewing_requests" ("created_at");
+
+CREATE INDEX ON "viewing_requests" ("deleted_at");
+
+CREATE INDEX ON "viewing_requests" ("listing_id");
+
+CREATE INDEX "viewing_req_listing_139c85_idx" ON "viewing_requests" ("listing_id");
+
+CREATE INDEX "viewing_req_status_f29dc6_idx" ON "viewing_requests" ("status");
+
+CREATE INDEX ON "contact_inquiries" ("created_at");
+
+CREATE INDEX ON "contact_inquiries" ("deleted_at");
+
+CREATE INDEX ON "contact_inquiries" ("listing_id");
+
+CREATE INDEX "contact_inq_status_b7ab91_idx" ON "contact_inquiries" ("status");
+
+CREATE INDEX ON "faq_items" ("created_at");
+
+CREATE INDEX ON "bookings" ("created_at");
+
+CREATE INDEX ON "bookings" ("deleted_at");
+
+CREATE INDEX ON "bookings" ("listing_id");
+
+CREATE INDEX ON "bookings" ("property_id");
+
+CREATE INDEX ON "bookings" ("tenant_id");
+
+CREATE INDEX ON "bookings" ("reviewed_by_id");
+
+CREATE INDEX ON "bookings" ("converted_lease_id");
+
+CREATE INDEX "bookings_listing_f5464a_idx" ON "bookings" ("listing_id");
+
+CREATE INDEX "bookings_tenant__51b695_idx" ON "bookings" ("tenant_id");
+
+CREATE INDEX "bookings_status_51373b_idx" ON "bookings" ("status");
+
+CREATE INDEX ON "favorite_listings" ("created_at");
+
+CREATE INDEX ON "favorite_listings" ("deleted_at");
+
+CREATE INDEX ON "favorite_listings" ("user_id");
+
+CREATE INDEX ON "favorite_listings" ("listing_id");
+
+CREATE INDEX "favorite_li_user_id_5e150f_idx" ON "favorite_listings" ("user_id", "created_at");
+
+CREATE INDEX "favorite_li_listing_c857d4_idx" ON "favorite_listings" ("listing_id", "created_at");
+
+CREATE INDEX ON "booking_quotes" ("created_at");
+
+CREATE INDEX ON "booking_quotes" ("deleted_at");
+
+CREATE INDEX ON "booking_quotes" ("listing_id");
+
+CREATE INDEX ON "booking_quotes" ("tenant_id");
+
+CREATE INDEX "booking_quo_listing_d87514_idx" ON "booking_quotes" ("listing_id", "expires_at");
+
+CREATE INDEX "booking_quo_tenant__0ea199_idx" ON "booking_quotes" ("tenant_id", "expires_at");
+
+CREATE INDEX ON "payment_checkouts" ("created_at");
+
+CREATE INDEX ON "payment_checkouts" ("deleted_at");
+
+CREATE INDEX ON "payment_checkouts" ("quote_id");
+
+CREATE INDEX ON "payment_checkouts" ("tenant_id");
+
+CREATE INDEX "payment_che_status_653ff1_idx" ON "payment_checkouts" ("status", "expires_at");
+
+CREATE INDEX "payment_che_provide_6e7802_idx" ON "payment_checkouts" ("provider", "external_id");
+
+CREATE INDEX ON "provider_events" ("created_at");
+
+CREATE INDEX ON "provider_events" ("deleted_at");
+
+CREATE INDEX ON "provider_events" ("checkout_id");
+
+CREATE INDEX ON "recent_search_activities" ("created_at");
+
+CREATE INDEX ON "recent_search_activities" ("deleted_at");
+
+CREATE INDEX ON "recent_search_activities" ("user_id");
+
+CREATE INDEX ON "recent_search_activities" ("fingerprint");
+
+CREATE INDEX "recent_sear_user_id_a4e6a5_idx" ON "recent_search_activities" ("user_id", "updated_at");
+
+CREATE INDEX ON "listing_view_activities" ("created_at");
+
+CREATE INDEX ON "listing_view_activities" ("deleted_at");
+
+CREATE INDEX ON "listing_view_activities" ("user_id");
+
+CREATE INDEX ON "listing_view_activities" ("listing_id");
+
+CREATE INDEX "listing_vie_user_id_630077_idx" ON "listing_view_activities" ("user_id", "updated_at");
+
+CREATE INDEX "listing_vie_listing_1660f9_idx" ON "listing_view_activities" ("listing_id", "updated_at");
+
+CREATE INDEX ON "mobile_update_policies" ("created_at");
+
+CREATE INDEX ON "mobile_update_policies" ("platform");
+
+CREATE INDEX ON "mobile_update_policies" ("is_active");
+
+CREATE INDEX ON "mobile_critical_update_ranges" ("created_at");
+
+CREATE INDEX ON "mobile_critical_update_ranges" ("policy_id");
+
+CREATE INDEX ON "mobile_critical_update_ranges" ("is_active");
+
+CREATE INDEX ON "notifications" ("created_at");
+
+CREATE INDEX ON "notifications" ("deleted_at");
+
+CREATE INDEX ON "notifications" ("recipient_id");
+
+CREATE INDEX ON "notifications" ("audience");
+
+CREATE INDEX ON "notifications" ("is_read");
+
+CREATE INDEX "notificatio_recipie_1dd18d_idx" ON "notifications" ("recipient_id");
+
+CREATE INDEX "notificatio_is_read_3f8c44_idx" ON "notifications" ("is_read");
+
+CREATE INDEX "notificatio_type_8a8a78_idx" ON "notifications" ("type");
+
+CREATE INDEX ON "notification_device_tokens" ("created_at");
+
+CREATE INDEX ON "notification_device_tokens" ("deleted_at");
+
+CREATE INDEX ON "notification_device_tokens" ("user_id");
+
+CREATE INDEX ON "notification_device_tokens" ("is_active");
+
+CREATE INDEX "notificatio_user_id_77f2f2_idx" ON "notification_device_tokens" ("user_id");
+
+CREATE INDEX "notificatio_user_id_93f131_idx" ON "notification_device_tokens" ("user_id", "is_active");
+
+CREATE INDEX ON "notification_preferences" ("created_at");
+
+CREATE INDEX ON "notification_preferences" ("deleted_at");
+
+CREATE INDEX ON "districts" ("created_at");
+
+CREATE INDEX ON "districts" ("deleted_at");
+
+CREATE INDEX ON "amenities" ("created_at");
+
+CREATE INDEX ON "properties" ("created_at");
+
+CREATE INDEX ON "properties" ("deleted_at");
+
+CREATE INDEX ON "properties" ("district_id");
+
+CREATE INDEX ON "properties" ("owner_id");
+
+CREATE INDEX ON "properties" ("created_by_id");
+
+CREATE INDEX ON "properties" ("engagement_type");
+
+CREATE INDEX ON "properties" ("verified_by_id");
+
+CREATE INDEX "properties_distric_49eaea_idx" ON "properties" ("district_id");
+
+CREATE INDEX "properties_owner_i_921947_idx" ON "properties" ("owner_id");
+
+CREATE INDEX "properties_status_e6008a_idx" ON "properties" ("status");
+
+CREATE INDEX "properties_map_lat_6ee7c6_idx" ON "properties" ("map_lat", "map_lon");
+
+CREATE INDEX "properties_engagem_5e9f4f_idx" ON "properties" ("engagement_type", "status");
+
+CREATE INDEX ON "one_off_deals" ("created_at");
+
+CREATE INDEX ON "one_off_deals" ("deleted_at");
+
+CREATE INDEX ON "one_off_deals" ("status");
+
+CREATE INDEX ON "one_off_deals" ("closed_by_id");
+
+CREATE INDEX "one_off_dea_status_dd8c3d_idx" ON "one_off_deals" ("status");
+
+CREATE INDEX "one_off_dea_channel_349c58_idx" ON "one_off_deals" ("channel", "status");
+
+CREATE INDEX ON "one_off_commission_receipts" ("created_at");
+
+CREATE INDEX ON "one_off_commission_receipts" ("recorded_by_id");
+
+CREATE INDEX ON "one_off_commission_receipt_attachments" ("created_at");
+
+CREATE INDEX ON "one_off_commission_receipt_attachments" ("receipt_id");
+
+CREATE INDEX ON "property_photos" ("created_at");
+
+CREATE INDEX ON "property_photos" ("property_id");
+
+CREATE INDEX ON "verification_visits" ("created_at");
+
+CREATE INDEX ON "verification_visits" ("property_id");
+
+CREATE INDEX ON "verification_visits" ("scheduled_by_id");
+
+CREATE UNIQUE INDEX ON "properties_amenities" ("property_id", "amenity_id");
+
+CREATE INDEX ON "vas_catalog_items" ("created_at");
+
+CREATE INDEX ON "vas_catalog_items" ("deleted_at");
+
+CREATE INDEX "vas_catalog_service_c03b12_idx" ON "vas_catalog_items" ("service_type");
+
+CREATE INDEX "vas_catalog_is_acti_428362_idx" ON "vas_catalog_items" ("is_active");
+
+CREATE INDEX ON "vas_orders" ("created_at");
+
+CREATE INDEX ON "vas_orders" ("deleted_at");
+
+CREATE INDEX ON "vas_orders" ("catalog_item_id");
+
+CREATE INDEX ON "vas_orders" ("tenant_id");
+
+CREATE INDEX ON "vas_orders" ("property_id");
+
+CREATE INDEX ON "vas_orders" ("lease_id");
+
+CREATE INDEX "vas_orders_tenant__387c51_idx" ON "vas_orders" ("tenant_id");
+
+CREATE INDEX "vas_orders_propert_271ed0_idx" ON "vas_orders" ("property_id");
+
+CREATE INDEX "vas_orders_status_d7f358_idx" ON "vas_orders" ("status");
+
+COMMENT ON TABLE "token_blacklist" IS '  Revoked JWT ids (jti). A token whose jti is listed here is rejected by the
+auth layer even if its signature and expiry are still valid. Populated on
+logout and on refresh-token rotation (the consumed refresh token is revoked).
+  ';
+
+COMMENT ON COLUMN "token_blacklist"."expires_at" IS 'When the underlying token expires; rows past this are safe to prune.';
+
+COMMENT ON TABLE "chat_realtime_events" IS 'A short-lived, audience-scoped replay outbox for chat WebSockets.';
+
+COMMENT ON TABLE "public_offers" IS 'Versioned public offer (oferta) an owner accepts during onboarding.';
+
+COMMENT ON COLUMN "public_offers"."body_en" IS 'Body [en]';
+
+COMMENT ON COLUMN "public_offers"."body_uz" IS 'Body [uz]';
+
+COMMENT ON COLUMN "public_offers"."body_ru" IS 'Body [ru]';
+
+COMMENT ON TABLE "owner_onboardings" IS '  An owner''s self-service request to put a property under management.
+
+The owner submits a property (created in PENDING_REVIEW) and digitally
+accepts the public offer. Management then approves (generating an
+OwnerAgreement) or rejects.
+  ';
+
+COMMENT ON COLUMN "payments"."checkout_id" IS 'Payment Checkout';
+
+COMMENT ON COLUMN "payments"."gateway_ref" IS 'Gateway Reference';
+
+COMMENT ON TABLE "owner_settlements" IS 'Immutable monthly contract snapshot and its transparent calculation.';
+
+COMMENT ON TABLE "rent_receipt_allocations" IS 'Append-only allocation of paid rent to one agreement month.';
+
+COMMENT ON TABLE "rent_coverage_allocations" IS 'Agreement/date allocation for one anniversary-period rent payment.';
+
+COMMENT ON TABLE "inventory_acts" IS 'Digital passportization: a structured condition record (Akt) for a property.';
+
+COMMENT ON TABLE "service_request_comments" IS '  An internal management/technician note on a service request.
+
+Distinct from ``resolution_notes`` (a single post-resolution field): comments
+form the running progress thread shown in the maintenance record panel.
+  ';
+
+COMMENT ON COLUMN "listings"."description_en" IS 'description [en]';
+
+COMMENT ON COLUMN "listings"."description_uz" IS 'description [uz]';
+
+COMMENT ON COLUMN "listings"."description_ru" IS 'description [ru]';
+
+COMMENT ON TABLE "contact_inquiries" IS '  A general "Message iDeal" inquiry from the public marketplace, kept separate from
+ViewingRequest so management''s viewing queue stays clean.
+  ';
+
+COMMENT ON TABLE "faq_items" IS 'Editable FAQ entry shown on the public "How it works" page.';
+
+COMMENT ON COLUMN "faq_items"."question_en" IS 'question [en]';
+
+COMMENT ON COLUMN "faq_items"."question_uz" IS 'question [uz]';
+
+COMMENT ON COLUMN "faq_items"."question_ru" IS 'question [ru]';
+
+COMMENT ON COLUMN "faq_items"."answer_en" IS 'answer [en]';
+
+COMMENT ON COLUMN "faq_items"."answer_uz" IS 'answer [uz]';
+
+COMMENT ON COLUMN "faq_items"."answer_ru" IS 'answer [ru]';
+
+COMMENT ON TABLE "bookings" IS '  A logged-in tenant''s reservation request against a listing (Smart Match).
+
+Management approves a booking and converts it into a Lease (reusing the
+existing lease-creation logic, which frees/occupies the property).
+  ';
+
+COMMENT ON COLUMN "notifications"."title_en" IS 'Title [en]';
+
+COMMENT ON COLUMN "notifications"."title_uz" IS 'Title [uz]';
+
+COMMENT ON COLUMN "notifications"."title_ru" IS 'Title [ru]';
+
+COMMENT ON COLUMN "notifications"."body_en" IS 'Body [en]';
+
+COMMENT ON COLUMN "notifications"."body_uz" IS 'Body [uz]';
+
+COMMENT ON COLUMN "notifications"."body_ru" IS 'Body [ru]';
+
+COMMENT ON COLUMN "districts"."name_en" IS 'name [en]';
+
+COMMENT ON COLUMN "districts"."name_uz" IS 'name [uz]';
+
+COMMENT ON COLUMN "districts"."name_ru" IS 'name [ru]';
+
+COMMENT ON COLUMN "districts"."city_en" IS 'city [en]';
+
+COMMENT ON COLUMN "districts"."city_uz" IS 'city [uz]';
+
+COMMENT ON COLUMN "districts"."city_ru" IS 'city [ru]';
+
+COMMENT ON TABLE "amenities" IS '  Lookup of property amenities — single source of truth for the wizard chip-set
+and the listing-detail labelled grid.
+  ';
+
+COMMENT ON COLUMN "amenities"."name_en" IS 'name [en]';
+
+COMMENT ON COLUMN "amenities"."name_uz" IS 'name [uz]';
+
+COMMENT ON COLUMN "amenities"."name_ru" IS 'name [ru]';
+
+COMMENT ON COLUMN "properties"."name_en" IS 'name [en]';
+
+COMMENT ON COLUMN "properties"."name_uz" IS 'name [uz]';
+
+COMMENT ON COLUMN "properties"."name_ru" IS 'name [ru]';
+
+COMMENT ON COLUMN "properties"."landmark_en" IS 'landmark [en]';
+
+COMMENT ON COLUMN "properties"."landmark_uz" IS 'landmark [uz]';
+
+COMMENT ON COLUMN "properties"."landmark_ru" IS 'landmark [ru]';
+
+COMMENT ON COLUMN "properties"."description_en" IS 'description [en]';
+
+COMMENT ON COLUMN "properties"."description_uz" IS 'description [uz]';
+
+COMMENT ON COLUMN "properties"."description_ru" IS 'description [ru]';
+
+COMMENT ON TABLE "one_off_deals" IS 'Staff-operated brokerage deal with contact snapshots, never portal users.';
+
+COMMENT ON TABLE "one_off_commission_receipts" IS 'The single full collection for a closed one-off commission.';
+
+COMMENT ON TABLE "one_off_commission_receipt_attachments" IS 'A staff-only source document supporting a received brokerage commission.';
+
+COMMENT ON COLUMN "property_photos"."caption_en" IS 'Caption [en]';
+
+COMMENT ON COLUMN "property_photos"."caption_uz" IS 'Caption [uz]';
+
+COMMENT ON COLUMN "property_photos"."caption_ru" IS 'Caption [ru]';
+
+COMMENT ON TABLE "verification_visits" IS '  A management on-site verification visit scheduled when a property is
+published. Backs the "Save & schedule verification" action and the publish
+checklist''s verification row.
+  ';
+
+COMMENT ON TABLE "properties_amenities" IS 'Auto-created junction table for properties.amenities -> amenities';
+
+COMMENT ON TABLE "vas_catalog_items" IS 'A value-added service the platform offers (cleaning, handyman, utilities…).';
+
+COMMENT ON COLUMN "vas_catalog_items"."name_en" IS 'Name [en]';
+
+COMMENT ON COLUMN "vas_catalog_items"."name_uz" IS 'Name [uz]';
+
+COMMENT ON COLUMN "vas_catalog_items"."name_ru" IS 'Name [ru]';
+
+COMMENT ON COLUMN "vas_catalog_items"."description_en" IS 'Description [en]';
+
+COMMENT ON COLUMN "vas_catalog_items"."description_uz" IS 'Description [uz]';
+
+COMMENT ON COLUMN "vas_catalog_items"."description_ru" IS 'Description [ru]';
+
+ALTER TABLE "agents" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "agent_deals" ADD FOREIGN KEY ("agent_id") REFERENCES "agents" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "agent_deals" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_conversations" ADD FOREIGN KEY ("listing_id") REFERENCES "listings" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_conversations" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_conversations" ADD FOREIGN KEY ("blocked_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_conversations" ADD FOREIGN KEY ("last_message_id") REFERENCES "chat_messages" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_messages" ADD FOREIGN KEY ("conversation_id") REFERENCES "chat_conversations" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_messages" ADD FOREIGN KEY ("sender_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_conversation_reports" ADD FOREIGN KEY ("conversation_id") REFERENCES "chat_conversations" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_conversation_reports" ADD FOREIGN KEY ("reported_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_conversation_reports" ADD FOREIGN KEY ("resolved_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "chat_realtime_events" ADD FOREIGN KEY ("recipient_user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "owner_agreements" ADD FOREIGN KEY ("previous_agreement_id") REFERENCES "owner_agreements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "owner_agreements" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "owner_agreements" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "leases" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "leases" ADD FOREIGN KEY ("owner_agreement_id") REFERENCES "owner_agreements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "leases" ADD FOREIGN KEY ("tenant_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "lease_agreement_segments" ADD FOREIGN KEY ("lease_id") REFERENCES "leases" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "lease_agreement_segments" ADD FOREIGN KEY ("owner_agreement_id") REFERENCES "owner_agreements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "owner_onboardings" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "owner_onboardings" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "owner_onboardings" ADD FOREIGN KEY ("reviewed_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "owner_onboardings" ADD FOREIGN KEY ("generated_agreement_id") REFERENCES "owner_agreements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "lease_renewals" ADD FOREIGN KEY ("previous_lease_id") REFERENCES "leases" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "lease_renewals" ADD FOREIGN KEY ("new_lease_id") REFERENCES "leases" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payments" ADD FOREIGN KEY ("checkout_id") REFERENCES "payment_checkouts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payments" ADD FOREIGN KEY ("lease_id") REFERENCES "leases" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payments" ADD FOREIGN KEY ("tenant_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payments" ADD FOREIGN KEY ("paid_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payout_schedules" ADD FOREIGN KEY ("owner_agreement_id") REFERENCES "owner_agreements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payout_schedules" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payout_schedules" ADD FOREIGN KEY ("settlement_id") REFERENCES "owner_settlements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "owner_settlements" ADD FOREIGN KEY ("owner_agreement_id") REFERENCES "owner_agreements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "owner_settlements" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "rent_receipt_allocations" ADD FOREIGN KEY ("payment_id") REFERENCES "payments" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "rent_receipt_allocations" ADD FOREIGN KEY ("settlement_id") REFERENCES "owner_settlements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "rent_coverage_allocations" ADD FOREIGN KEY ("payment_id") REFERENCES "payments" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "rent_coverage_allocations" ADD FOREIGN KEY ("owner_agreement_id") REFERENCES "owner_agreements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "inventory_acts" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "inventory_acts" ADD FOREIGN KEY ("lease_id") REFERENCES "leases" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "inventory_acts" ADD FOREIGN KEY ("created_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "inventory_act_items" ADD FOREIGN KEY ("act_id") REFERENCES "inventory_acts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "inventory_act_photos" ADD FOREIGN KEY ("act_id") REFERENCES "inventory_acts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "inventory_act_photos" ADD FOREIGN KEY ("item_id") REFERENCES "inventory_act_items" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "service_requests" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "service_requests" ADD FOREIGN KEY ("tenant_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "service_requests" ADD FOREIGN KEY ("assigned_to_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "service_request_photos" ADD FOREIGN KEY ("service_request_id") REFERENCES "service_requests" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "service_request_comments" ADD FOREIGN KEY ("service_request_id") REFERENCES "service_requests" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "service_request_comments" ADD FOREIGN KEY ("author_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "listings" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "listings" ADD FOREIGN KEY ("owner_agreement_id") REFERENCES "owner_agreements" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "viewing_requests" ADD FOREIGN KEY ("listing_id") REFERENCES "listings" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "contact_inquiries" ADD FOREIGN KEY ("listing_id") REFERENCES "listings" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "bookings" ADD FOREIGN KEY ("listing_id") REFERENCES "listings" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "bookings" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "bookings" ADD FOREIGN KEY ("tenant_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "bookings" ADD FOREIGN KEY ("reviewed_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "bookings" ADD FOREIGN KEY ("converted_lease_id") REFERENCES "leases" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "favorite_listings" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "favorite_listings" ADD FOREIGN KEY ("listing_id") REFERENCES "listings" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "booking_quotes" ADD FOREIGN KEY ("listing_id") REFERENCES "listings" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "booking_quotes" ADD FOREIGN KEY ("tenant_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payment_checkouts" ADD FOREIGN KEY ("quote_id") REFERENCES "booking_quotes" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payment_checkouts" ADD FOREIGN KEY ("booking_id") REFERENCES "bookings" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payment_checkouts" ADD FOREIGN KEY ("tenant_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "provider_events" ADD FOREIGN KEY ("checkout_id") REFERENCES "payment_checkouts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "recent_search_activities" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "listing_view_activities" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "listing_view_activities" ADD FOREIGN KEY ("listing_id") REFERENCES "listings" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "mobile_critical_update_ranges" ADD FOREIGN KEY ("policy_id") REFERENCES "mobile_update_policies" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "notifications" ADD FOREIGN KEY ("recipient_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "notification_device_tokens" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "notification_preferences" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "properties" ADD FOREIGN KEY ("district_id") REFERENCES "districts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "properties" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "properties" ADD FOREIGN KEY ("created_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "properties" ADD FOREIGN KEY ("verified_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "one_off_deals" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "one_off_deals" ADD FOREIGN KEY ("closed_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "one_off_commission_receipts" ADD FOREIGN KEY ("deal_id") REFERENCES "one_off_deals" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "one_off_commission_receipts" ADD FOREIGN KEY ("recorded_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "one_off_commission_receipt_attachments" ADD FOREIGN KEY ("receipt_id") REFERENCES "one_off_commission_receipts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "property_photos" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "verification_visits" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "verification_visits" ADD FOREIGN KEY ("scheduled_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "properties_amenities" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "properties_amenities" ADD FOREIGN KEY ("amenity_id") REFERENCES "amenities" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "vas_orders" ADD FOREIGN KEY ("catalog_item_id") REFERENCES "vas_catalog_items" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "vas_orders" ADD FOREIGN KEY ("tenant_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "vas_orders" ADD FOREIGN KEY ("property_id") REFERENCES "properties" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "vas_orders" ADD FOREIGN KEY ("lease_id") REFERENCES "leases" ("id") DEFERRABLE INITIALLY IMMEDIATE;

@@ -1,0 +1,167 @@
+// iDeal DBML Domain: Contract (app: contract)
+
+Table owner_agreements {
+  id                    bigint                [pk, increment]
+  created_at            timestamptz           [not null]
+  updated_at            timestamptz           [not null]
+  deleted_at            timestamptz          
+  restored_at           timestamptz          
+  transaction_id        uuid                 
+  previous_agreement_id bigint                [unique, ref: - owner_agreements.id]
+  owner_id              bigint                [not null, ref: > users.id]
+  property_id           bigint                [not null, ref: > properties.id]
+  agreement_number      varchar(50)           [not null, unique]
+  signed_date           date                  [not null]
+  start_date            date                  [not null]
+  end_date              date                  [not null]
+  status                owneragreement_status [not null, default: 'active']
+  terms                 text                 
+  accepted_locale       varchar(10)           [not null, default: 'en']
+  commission_rate       decimal(5, 2)         [not null]
+  gross_floor_amount    decimal(12, 2)        [not null]
+  currency              varchar(3)            [not null, default: 'USD']
+  payout_day            smallint              [not null, default: 25]
+
+  indexes {
+    created_at
+    deleted_at
+    owner_id
+    property_id
+    owner_id [name: 'owner_agree_owner_i_5a4a43_idx']
+    property_id [name: 'owner_agree_propert_af61e0_idx']
+    status [name: 'owner_agree_status_d3a79b_idx']
+  }
+}
+
+Table leases {
+  id                 bigint         [pk, increment]
+  created_at         timestamptz    [not null]
+  updated_at         timestamptz    [not null]
+  deleted_at         timestamptz   
+  restored_at        timestamptz   
+  transaction_id     uuid          
+  property_id        bigint         [not null, ref: > properties.id]
+  owner_agreement_id bigint         [not null, ref: > owner_agreements.id]
+  tenant_id          bigint         [not null, ref: > users.id]
+  start_date         date           [not null]
+  end_date           date           [not null]
+  monthly_rent       decimal(12, 2) [not null]
+  deposit            decimal(12, 2) [not null]
+  status             lease_status   [not null, default: 'active']
+
+  indexes {
+    created_at
+    deleted_at
+    property_id
+    owner_agreement_id
+    tenant_id
+    property_id [name: 'leases_propert_07dfa4_idx']
+    tenant_id [name: 'leases_tenant__c311df_idx']
+    status [name: 'leases_status_3db7e6_idx']
+  }
+}
+
+Table lease_agreement_segments {
+  id                 bigint      [pk, increment]
+  created_at         timestamptz [not null]
+  updated_at         timestamptz [not null]
+  deleted_at         timestamptz
+  restored_at        timestamptz
+  transaction_id     uuid       
+  lease_id           bigint      [not null, ref: > leases.id]
+  owner_agreement_id bigint      [not null, ref: > owner_agreements.id]
+  start_date         date        [not null]
+  end_date           date        [not null]
+
+  indexes {
+    created_at
+    deleted_at
+    lease_id
+    owner_agreement_id
+  }
+}
+
+Table public_offers {
+  id             bigint      [pk, increment]
+  created_at     timestamptz [not null]
+  updated_at     timestamptz [not null]
+  deleted_at     timestamptz
+  restored_at    timestamptz
+  transaction_id uuid       
+  version        varchar(20) [not null, unique]
+  body           text        [not null]
+  body_en        text        [note: 'Body [en]']
+  body_uz        text        [note: 'Body [uz]']
+  body_ru        text        [note: 'Body [ru]']
+  is_active      boolean     [not null, default: true]
+
+  indexes {
+    created_at
+    deleted_at
+  }
+
+  Note: 'Versioned public offer (oferta) an owner accepts during onboarding.'
+}
+
+Table owner_onboardings {
+  id                     bigint                 [pk, increment]
+  created_at             timestamptz            [not null]
+  updated_at             timestamptz            [not null]
+  deleted_at             timestamptz           
+  restored_at            timestamptz           
+  transaction_id         uuid                  
+  owner_id               bigint                 [not null, ref: > users.id]
+  property_id            bigint                 [not null, ref: > properties.id]
+  status                 owneronboarding_status [not null, default: 'submitted']
+  offer_version          varchar(20)           
+  offer_terms_snapshot   text                  
+  offer_accepted_locale  varchar(10)            [not null, default: 'en']
+  offer_accepted_at      timestamptz           
+  reviewed_by_id         bigint                 [ref: > users.id]
+  review_notes           text                  
+  generated_agreement_id bigint                 [ref: > owner_agreements.id]
+
+  indexes {
+    created_at
+    deleted_at
+    owner_id
+    property_id
+    reviewed_by_id
+    generated_agreement_id
+    owner_id [name: 'owner_onboa_owner_i_85ae21_idx']
+    property_id [name: 'owner_onboa_propert_ce188b_idx']
+    status [name: 'owner_onboa_status_e80546_idx']
+  }
+
+  Note: '''
+  An owner\'s self-service request to put a property under management.
+
+The owner submits a property (created in PENDING_REVIEW) and digitally
+accepts the public offer. Management then approves (generating an
+OwnerAgreement) or rejects.
+  '''
+}
+
+Table lease_renewals {
+  id                bigint         [pk, increment]
+  created_at        timestamptz    [not null]
+  updated_at        timestamptz    [not null]
+  deleted_at        timestamptz   
+  restored_at       timestamptz   
+  transaction_id    uuid          
+  previous_lease_id bigint         [not null, ref: > leases.id]
+  new_lease_id      bigint         [not null, ref: > leases.id]
+  renewal_date      date           [not null]
+  new_start_date    date           [not null]
+  new_end_date      date           [not null]
+  new_monthly_rent  decimal(12, 2) [not null]
+
+  indexes {
+    created_at
+    deleted_at
+    previous_lease_id
+    new_lease_id
+    previous_lease_id [name: 'lease_renew_previou_092051_idx']
+    new_lease_id [name: 'lease_renew_new_lea_913456_idx']
+  }
+}

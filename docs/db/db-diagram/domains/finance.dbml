@@ -1,0 +1,152 @@
+// iDeal DBML Domain: Finance (app: finance)
+
+Table payments {
+  id             bigint                            [pk, increment]
+  created_at     timestamptz                       [not null]
+  updated_at     timestamptz                       [not null]
+  deleted_at     timestamptz                      
+  restored_at    timestamptz                      
+  transaction_id uuid                             
+  checkout_id    bigint                            [ref: > payment_checkouts.id, note: 'Payment Checkout']
+  lease_id       bigint                            [not null, ref: > leases.id]
+  tenant_id      bigint                            [not null, ref: > users.id]
+  paid_by_id     bigint                            [not null, ref: > users.id]
+  amount         decimal(12, 2)                    [not null]
+  currency       one_off_deals_commission_currency [not null, default: 'USD']
+  payment_date   date                              [not null]
+  due_date       date                              [not null]
+  rental_period  date                             
+  kind           payment_kind                      [not null, default: 'rent']
+  status         payment_status                    [not null, default: 'pending']
+  method         oneoffcommissionreceipt_method    [not null, default: 'cash']
+  notes          text                             
+  gateway_ref    varchar(128)                      [note: 'Gateway Reference']
+
+  indexes {
+    created_at
+    deleted_at
+    checkout_id
+    lease_id
+    tenant_id
+    paid_by_id
+    lease_id [name: 'payments_lease_i_bbeb30_idx']
+    tenant_id [name: 'payments_tenant__d18216_idx']
+    status [name: 'payments_status_d621e5_idx']
+  }
+}
+
+Table exchange_rates {
+  id             bigint                            [pk, increment]
+  created_at     timestamptz                       [not null]
+  updated_at     timestamptz                       [not null]
+  deleted_at     timestamptz                      
+  restored_at    timestamptz                      
+  transaction_id uuid                             
+  currency       one_off_deals_commission_currency [not null]
+  rate           decimal(15, 4)                    [not null]
+  effective_date date                              [not null]
+
+  indexes {
+    created_at
+    deleted_at
+  }
+}
+
+Table payout_schedules {
+  id                 bigint                            [pk, increment]
+  created_at         timestamptz                       [not null]
+  updated_at         timestamptz                       [not null]
+  deleted_at         timestamptz                      
+  restored_at        timestamptz                      
+  transaction_id     uuid                             
+  owner_agreement_id bigint                            [not null, ref: > owner_agreements.id]
+  owner_id           bigint                            [not null, ref: > users.id]
+  settlement_id      bigint                            [ref: > owner_settlements.id]
+  kind               payoutschedule_kind               [not null, default: 'base']
+  amount             decimal(12, 2)                    [not null]
+  currency           one_off_deals_commission_currency [not null, default: 'USD']
+  scheduled_date     date                              [not null]
+  paid_date          date                             
+  status             payoutschedule_status             [not null, default: 'scheduled']
+  method             payoutschedule_method             [not null, default: 'bank_transfer']
+  status_reason      text                             
+
+  indexes {
+    created_at
+    deleted_at
+    owner_agreement_id
+    owner_id
+    settlement_id
+    owner_id [name: 'payout_sche_owner_i_9adddb_idx']
+    status [name: 'payout_sche_status_ebc505_idx']
+  }
+}
+
+Table owner_settlements {
+  id                     bigint                            [pk, increment]
+  created_at             timestamptz                       [not null]
+  updated_at             timestamptz                       [not null]
+  deleted_at             timestamptz                      
+  restored_at            timestamptz                      
+  transaction_id         uuid                             
+  owner_agreement_id     bigint                            [not null, ref: > owner_agreements.id]
+  owner_id               bigint                            [not null, ref: > users.id]
+  period_start           date                              [not null]
+  period_end             date                              [not null]
+  covered_days           smallint                          [not null]
+  days_in_month          smallint                          [not null]
+  gross_floor_amount     decimal(12, 2)                    [not null]
+  commission_rate        decimal(5, 2)                     [not null]
+  currency               one_off_deals_commission_currency [not null]
+  rent_received_amount   decimal(12, 2)                    [not null, default: 0]
+  settlement_base_amount decimal(12, 2)                    [not null, default: 0]
+  commission_amount      decimal(12, 2)                    [not null, default: 0]
+  owner_payout_amount    decimal(12, 2)                    [not null, default: 0]
+  ideal_cash_exposure    decimal(12, 2)                    [not null, default: 0]
+
+  indexes {
+    created_at
+    deleted_at
+    owner_agreement_id
+    owner_id
+    (owner_id, period_start) [name: 'owner_settl_owner_i_6f41b8_idx']
+  }
+
+  Note: 'Immutable monthly contract snapshot and its transparent calculation.'
+}
+
+Table rent_receipt_allocations {
+  id            bigint         [pk, increment]
+  created_at    timestamptz    [not null]
+  updated_at    timestamptz    [not null]
+  payment_id    bigint         [not null, ref: > payments.id]
+  settlement_id bigint         [not null, ref: > owner_settlements.id]
+  amount        decimal(12, 2) [not null]
+
+  indexes {
+    created_at
+    payment_id
+    settlement_id
+  }
+
+  Note: 'Append-only allocation of paid rent to one agreement month.'
+}
+
+Table rent_coverage_allocations {
+  id                 bigint         [pk, increment]
+  created_at         timestamptz    [not null]
+  updated_at         timestamptz    [not null]
+  payment_id         bigint         [not null, ref: > payments.id]
+  owner_agreement_id bigint         [not null, ref: > owner_agreements.id]
+  start_date         date           [not null]
+  end_date           date           [not null]
+  amount             decimal(12, 2) [not null]
+
+  indexes {
+    created_at
+    payment_id
+    owner_agreement_id
+  }
+
+  Note: 'Agreement/date allocation for one anniversary-period rent payment.'
+}

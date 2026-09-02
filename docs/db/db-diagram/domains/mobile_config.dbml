@@ -1,0 +1,33 @@
+// iDeal DBML Domain: Mobile_config (app: mobile_config)
+
+Table mobile_update_policies {
+  id             bigint               [pk, increment]
+  created_at     timestamptz          [not null]
+  updated_at     timestamptz          [not null]
+  platform       devicetoken_platform [not null]
+  latest_version varchar(32)          [not null]
+  store_url      varchar(500)         [not null]
+  is_active      boolean              [not null, default: true]
+
+  indexes {
+    created_at
+    platform
+    is_active
+  }
+}
+
+Table mobile_critical_update_ranges {
+  id              bigint      [pk, increment]
+  created_at      timestamptz [not null]
+  updated_at      timestamptz [not null]
+  policy_id       bigint      [not null, ref: > mobile_update_policies.id]
+  minimum_version varchar(32) [not null]
+  maximum_version varchar(32) [not null]
+  is_active       boolean     [not null, default: true]
+
+  indexes {
+    created_at
+    policy_id
+    is_active
+  }
+}

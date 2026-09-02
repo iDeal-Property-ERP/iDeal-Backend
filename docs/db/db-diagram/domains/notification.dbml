@@ -1,0 +1,84 @@
+// iDeal DBML Domain: Notification (app: notification)
+
+Table notifications {
+  id                  bigint                 [pk, increment]
+  created_at          timestamptz            [not null]
+  updated_at          timestamptz            [not null]
+  deleted_at          timestamptz           
+  restored_at         timestamptz           
+  transaction_id      uuid                  
+  recipient_id        bigint                 [not null, ref: > users.id]
+  type                notifications_type     [not null, default: 'general']
+  audience            notifications_audience [not null, default: 'both']
+  title               varchar(200)           [not null]
+  title_en            varchar(200)           [note: 'Title [en]']
+  title_uz            varchar(200)           [note: 'Title [uz]']
+  title_ru            varchar(200)           [note: 'Title [ru]']
+  body                text                  
+  body_en             text                   [note: 'Body [en]']
+  body_uz             text                   [note: 'Body [uz]']
+  body_ru             text                   [note: 'Body [ru]']
+  related_object_type varchar(50)           
+  related_object_id   integer               
+  is_read             boolean                [not null, default: false]
+  read_at             timestamptz           
+
+  indexes {
+    created_at
+    deleted_at
+    recipient_id
+    audience
+    is_read
+    recipient_id [name: 'notificatio_recipie_1dd18d_idx']
+    is_read [name: 'notificatio_is_read_3f8c44_idx']
+    type [name: 'notificatio_type_8a8a78_idx']
+  }
+}
+
+Table notification_device_tokens {
+  id             bigint               [pk, increment]
+  created_at     timestamptz          [not null]
+  updated_at     timestamptz          [not null]
+  deleted_at     timestamptz         
+  restored_at    timestamptz         
+  transaction_id uuid                
+  user_id        bigint               [not null, ref: > users.id]
+  token          text                 [not null, unique]
+  platform       devicetoken_platform [not null]
+  device_id      varchar(255)        
+  app_version    varchar(50)         
+  locale         varchar(10)         
+  is_active      boolean              [not null, default: true]
+  last_seen_at   timestamptz         
+
+  indexes {
+    created_at
+    deleted_at
+    user_id
+    is_active
+    user_id [name: 'notificatio_user_id_77f2f2_idx']
+    (user_id, is_active) [name: 'notificatio_user_id_93f131_idx']
+  }
+}
+
+Table notification_preferences {
+  id                  bigint      [pk, increment]
+  created_at          timestamptz [not null]
+  updated_at          timestamptz [not null]
+  deleted_at          timestamptz
+  restored_at         timestamptz
+  transaction_id      uuid       
+  user_id             bigint      [not null, unique, ref: - users.id]
+  push_enabled        boolean     [not null, default: true]
+  payments_enabled    boolean     [not null, default: true]
+  bookings_enabled    boolean     [not null, default: true]
+  maintenance_enabled boolean     [not null, default: true]
+  leases_enabled      boolean     [not null, default: true]
+  messages_enabled    boolean     [not null, default: true]
+  general_enabled     boolean     [not null, default: true]
+
+  indexes {
+    created_at
+    deleted_at
+  }
+}
