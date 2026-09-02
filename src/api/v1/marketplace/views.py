@@ -89,6 +89,8 @@ def _build_listing_output(listing, request=None):
 def _build_listing_detail(listing, request=None):
     """Enriched detail payload: full photo gallery, labelled amenities, specs, price card
     and a static verification block."""
+    from django.conf import settings
+
     prop = listing.property
     photos = ordered_photos(prop)
     monthly_price = listing.monthly_price if listing.monthly_price is not None else listing.listed_price
@@ -96,6 +98,7 @@ def _build_listing_detail(listing, request=None):
     output = _build_listing_output(listing, request)
     output.update(
         {
+            "contact_phone": getattr(settings, "PLATFORM_CONTACT_PHONE", "") or None,
             "photos": [
                 {
                     "id": p.id,

@@ -134,10 +134,20 @@ class TestPublicListingAPI:
         assert data["property"]["review_count"] == listing.property.review_count
         # Enriched detail blocks.
         assert "photos" in data
+        assert "contact_phone" in data
         assert data["specs"]["rooms"] == listing.property.rooms
         assert "price_card" in data
         assert data["verification"]["is_verified"] == listing.property.is_verified
         assert len(data["verification"]["checklist"]) == 4
+
+    def test_retrieve_listing_returns_platform_contact_phone(self, api_client):
+        listing = _make_vacant_listing()
+        from django.test import override_settings
+
+        with override_settings(PLATFORM_CONTACT_PHONE="+998937244041"):
+            response = api_client.get(f"/api/v1/marketplace/listings/{listing.id}/")
+            assert response.status_code == 200
+            assert response.json()["data"]["contact_phone"] == "+998937244041"
 
     def test_retrieve_listing_hides_verification_checklist_when_unverified(self, api_client):
         listing = _make_vacant_listing()
