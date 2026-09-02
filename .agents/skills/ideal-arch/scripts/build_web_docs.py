@@ -332,7 +332,7 @@ graph TB
 </div>
 """
 
-    html_template = """<!DOCTYPE html>
+    html_template = f"""<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
