@@ -55,6 +55,32 @@ class TestPropertyCreate:
         assert body["success"] is True
         assert body["data"]["name"] == "Test Property"
         assert body["data"]["status"] == "vacant"
+        assert body["data"]["created_by_id"] == management.id
+        assert body["data"]["contact_phone"] == management.phone
+
+    def test_create_property_with_custom_contact_phone_normalizes(self, api_client, management, owner):
+        district = DistrictFactory()
+        response = api_client.post(
+            "/api/v1/properties/",
+            _create_payload(district, owner, contact_phone="+998 (90) 123-45-67"),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 201
+        body = response.json()
+        assert body["data"]["contact_phone"] == "+998901234567"
+        assert body["data"]["created_by_id"] == management.id
+
+    def test_create_property_with_invalid_contact_phone_rejected(self, api_client, management, owner):
+        district = DistrictFactory()
+        response = api_client.post(
+            "/api/v1/properties/",
+            _create_payload(district, owner, contact_phone="invalid-phone"),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 400
+        assert response.json()["success"] is False
 
     def test_create_property_requires_auth(self, api_client, owner):
         district = DistrictFactory()
@@ -234,6 +260,51 @@ class TestPropertyUpdate:
         body = response.json()
         assert body["success"] is False
         assert any("owner_id" in str(e.get("loc", [])) for e in body.get("error", []))
+
+    def test_partial_update_contact_phone(self, api_client, management, property_obj):
+        response = api_client.patch(
+            f"/api/v1/properties/{property_obj.id}/",
+            json.dumps({"contact_phone": "+998 97 765 43 21"}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 200
+        assert response.json()["data"]["contact_phone"] == "+998977654321"
+        property_obj.refresh_from_db()
+        assert property_obj.contact_phone == "+998977654321"
+
+    def test_partial_update_clear_contact_phone(self, api_client, management, property_obj):
+        property_obj.contact_phone = "+998901234567"
+        property_obj.save(update_fields=["contact_phone"])
+
+        response = api_client.patch(
+            f"/api/v1/properties/{property_obj.id}/",
+            json.dumps({"contact_phone": None}),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 200
+        assert response.json()["data"]["contact_phone"] is None
+        property_obj.refresh_from_db()
+        assert property_obj.contact_phone is None
+
+    def test_manager_profile_phone_update_does_not_mutate_property_contact_phone(self, api_client, management, owner):
+        district = DistrictFactory()
+        response = api_client.post(
+            "/api/v1/properties/",
+            _create_payload(district, owner),
+            content_type="application/json",
+            **_make_jwt(management),
+        )
+        assert response.status_code == 201
+        prop_id = response.json()["data"]["id"]
+
+        # Mutate manager profile phone
+        management.phone = "+998999999999"
+        management.save(update_fields=["phone"])
+
+        prop = Property.objects.get(pk=prop_id)
+        assert prop.contact_phone != "+998999999999"
 
     def test_partial_update_rejects_floor_above_persisted_total_floors(self, api_client, management, property_obj):
         property_obj.total_floors = 5

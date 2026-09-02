@@ -98,7 +98,7 @@ def _build_listing_detail(listing, request=None):
     output = _build_listing_output(listing, request)
     output.update(
         {
-            "contact_phone": getattr(settings, "PLATFORM_CONTACT_PHONE", "") or None,
+            "contact_phone": prop.contact_phone or getattr(settings, "PLATFORM_CONTACT_PHONE", "") or None,
             "photos": [
                 {
                     "id": p.id,

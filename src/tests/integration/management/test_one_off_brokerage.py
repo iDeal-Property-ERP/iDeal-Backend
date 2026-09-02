@@ -76,6 +76,19 @@ class TestOneOffBrokerageAPI:
         assert prop.owner_id is None
         assert deal["status"] == OneOffDealStatus.ACTIVE
 
+    def test_create_one_off_deal_sets_created_by_and_snapshots_contact_phone(self, api_client, management):
+        resp_default = _create_one_off(api_client, management, channel="off_market")
+        assert resp_default.status_code == 201
+        prop_default = Property.objects.get(pk=resp_default.json()["data"]["property_id"])
+        assert prop_default.created_by == management
+        assert prop_default.contact_phone == management.phone
+
+        resp_custom = _create_one_off(api_client, management, channel="off_market", contact_phone="+998 (97) 111-22-33")
+        assert resp_custom.status_code == 201
+        prop_custom = Property.objects.get(pk=resp_custom.json()["data"]["property_id"])
+        assert prop_custom.created_by == management
+        assert prop_custom.contact_phone == "+998971112233"
+
     def test_closing_archives_listing_and_receipt_reconciles_commission(self, api_client, management):
         ExchangeRateFactory(currency="USD", rate=12500)
         district = DistrictFactory()

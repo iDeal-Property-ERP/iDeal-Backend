@@ -185,6 +185,30 @@ class TestPropertyCsvImport:
         assert prop.district_id == district.id
         assert prop.owner_id == owner.id
         assert str(prop.tenant_charge_price) == "550.00"
+        assert prop.created_by == mgmt
+        assert prop.contact_phone == mgmt.phone
+
+    def test_import_with_custom_contact_phone_column(self, api_client):
+        mgmt = _mgmt_user()
+        district = DistrictFactory()
+        owner = OwnerFactory()
+        csv_text = (
+            "name,address,district_id,rooms,area_sqm,floor,total_floors,owner_id,"
+            "ask_price,owner_guaranteed_price,tenant_charge_price,contact_phone\n"
+            f"Imported With Phone,14 Amir Temur,{district.id},2,55,3,5,{owner.id},500,450,550,+998901112233\n"
+        )
+        upload = SimpleUploadedFile("props.csv", csv_text.encode(), content_type="text/csv")
+
+        response = api_client.post("/api/v1/management/properties/import/", {"file": upload}, **_make_jwt(mgmt))
+        assert response.status_code in (200, 201)
+        data = response.json()["data"]
+        assert data["created"] == 1
+
+        from property.models import Property
+
+        prop = Property.objects.get(name="Imported With Phone")
+        assert prop.created_by == mgmt
+        assert prop.contact_phone == "+998901112233"
 
     def test_import_requires_a_file_or_text(self, api_client):
         mgmt = _mgmt_user()

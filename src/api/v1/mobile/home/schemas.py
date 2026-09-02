@@ -184,7 +184,10 @@ class MobileListingMapItem(MobileListingCard):
         card = MobileListingCard.from_listing(listing, request=request, favorite_ids=favorite_ids)
         return cls(
             **card.__dict__,
-            contact_phone=contact_phone or getattr(settings, "PLATFORM_CONTACT_PHONE", "") or None,
+            contact_phone=listing.property.contact_phone
+            or contact_phone
+            or getattr(settings, "PLATFORM_CONTACT_PHONE", "")
+            or None,
         )
 
 
@@ -314,7 +317,10 @@ class MobileListingDetail(APIModel):
                 checklist=[MobileVerificationItem(**item) for item in verification_checklist(prop)],
             ),
             can_message=listing.status == "published" and listing.deleted_at is None,
-            contact_phone=contact_phone or getattr(settings, "PLATFORM_CONTACT_PHONE", "") or None,
+            contact_phone=prop.contact_phone
+            or contact_phone
+            or getattr(settings, "PLATFORM_CONTACT_PHONE", "")
+            or None,
             booking=BookingService().eligibility(listing),
         )
 

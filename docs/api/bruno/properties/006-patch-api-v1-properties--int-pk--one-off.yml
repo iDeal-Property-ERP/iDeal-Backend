@@ -22,8 +22,8 @@ http:
       standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
       : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
       : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\":\
-      \ \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
-      : {}\n}"
+      \ \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"contact_phone\": \"+998901234567\"\
+      ,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
 settings:
   encodeUrl: true
   timeout: 0
@@ -119,6 +119,9 @@ docs: '# PATCH /api/v1/properties/<int:pk>/one-off/
   | `vacant_days` | no | yes | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
+  | `contact_phone` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
   | `translations` | no | yes | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
@@ -152,8 +155,8 @@ examples:
         standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
         : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
         : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
-        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
-        : {}\n}"
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"contact_phone\": \"+998901234567\"\
+        ,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
   response:
     status: 200
     statusText: OK
@@ -183,8 +186,8 @@ examples:
         standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
         : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
         : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
-        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
-        : {}\n}"
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"contact_phone\": \"+998901234567\"\
+        ,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
   response:
     status: 400
     statusText: Error
@@ -215,8 +218,8 @@ examples:
         standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
         : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
         : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
-        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
-        : {}\n}"
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"contact_phone\": \"+998901234567\"\
+        ,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
   response:
     status: 401
     statusText: Error
@@ -247,8 +250,8 @@ examples:
         standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
         : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
         : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
-        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
-        : {}\n}"
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"contact_phone\": \"+998901234567\"\
+        ,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
   response:
     status: 404
     statusText: Error
@@ -279,8 +282,8 @@ examples:
         standard\",\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"owner_guaranteed_price\"\
         : 1,\n  \"owner_guaranteed_currency\": \"fixture-value\",\n  \"tenant_charge_price\"\
         : 1,\n  \"tenant_charge_currency\": \"fixture-value\",\n  \"vacant_since\"\
-        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"translations\": {},\n  \"brokerage\"\
-        : {}\n}"
+        : \"2026-01-01\",\n  \"vacant_days\": 1,\n  \"contact_phone\": \"+998901234567\"\
+        ,\n  \"translations\": {},\n  \"brokerage\": {}\n}"
   response:
     status: 409
     statusText: Error

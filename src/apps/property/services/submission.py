@@ -130,6 +130,7 @@ class PropertySubmissionService:
                 prop_desc = data.get("description", "")
                 prop_landmark = validate_and_normalize_landmark(data.get("landmark"))
                 content_locale = data.get("content_locale") or "en"
+                contact_phone = data.get("contact_phone") or getattr(user, "phone", None) or None
                 prop = Property.objects.create(
                     name=prop_name,
                     name_en=prop_name,
@@ -148,6 +149,8 @@ class PropertySubmissionService:
                     total_floors=total_floors,
                     furnishing=data.get("furnishing", FurnishingType.UNFURNISHED),
                     owner=owner,
+                    created_by=user,
+                    contact_phone=contact_phone,
                     engagement_type=PropertyEngagementType.MANAGED,
                     status=PropertyStatus.VACANT,
                     description=prop_desc,
@@ -296,6 +299,7 @@ class PropertySubmissionService:
                 prop_name = data.get("name") or f"{data.get('rooms')}-room property in {district.name}"
                 prop_desc = data.get("description", "")
                 prop_landmark = validate_and_normalize_landmark(data.get("landmark"))
+                contact_phone = data.get("contact_phone") or getattr(user, "phone", None) or None
                 prop = Property.objects.create(
                     name=prop_name,
                     name_en=prop_name,
@@ -314,6 +318,8 @@ class PropertySubmissionService:
                     total_floors=total_floors,
                     furnishing=data.get("furnishing", FurnishingType.UNFURNISHED),
                     owner=None,
+                    created_by=user,
+                    contact_phone=contact_phone,
                     engagement_type=PropertyEngagementType.ONE_OFF,
                     status=PropertyStatus.VACANT,
                     description=prop_desc,

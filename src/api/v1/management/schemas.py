@@ -69,6 +69,9 @@ class ManagementPropertyOutput(pydantic.BaseModel):
     map_lon: Decimal | None
     description: str | None
     score: Decimal
+    created_by_id: int | None = None
+    created_by_name: str | None = None
+    contact_phone: str | None = None
     # Tenant / vacancy enrichment (populated from the active-lease prefetch;
     # None when the view didn't prefetch or the state doesn't apply).
     tenant_name: str | None = None
@@ -145,6 +148,11 @@ class ManagementPropertyOutput(pydantic.BaseModel):
             "map_lon": v.map_lon,
             "description": v.description,
             "score": v.score,
+            "created_by_id": v.created_by_id,
+            "created_by_name": (
+                f"{v.created_by.first_name} {v.created_by.last_name or ''}".strip() if v.created_by else None
+            ),
+            "contact_phone": v.contact_phone,
             "tenant_name": tenant_name,
             "tenant_since": tenant_since,
             "vacancy_loss_per_day": vacancy_loss_per_day,
@@ -186,12 +194,22 @@ class OneOffDealCreateInput(pydantic.BaseModel):
     map_lon: Decimal | None = None
     ask_price: Decimal | None = pydantic.Field(default=None, gt=0)
     ask_currency: str = Currency.USD
+    contact_phone: str | None = None
     seller: OneOffContactInput
     channel: str
     commission_type: str = BrokerageCommissionType.NONE
     commission_fixed_amount: Decimal | None = pydantic.Field(default=None, gt=0)
     commission_percentage: Decimal | None = pydantic.Field(default=None, gt=0, le=100)
     commission_currency: str = Currency.USD
+
+    @field_validator("contact_phone")
+    @classmethod
+    def normalize_contact_phone(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        from core.utils.phone import normalize_uzbekistan_phone
+
+        return normalize_uzbekistan_phone(v)
 
     @field_validator("channel")
     @classmethod

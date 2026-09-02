@@ -14,11 +14,12 @@ http:
       : 1,\n  \"property_type\": \"apartment\",\n  \"rooms\": 1,\n  \"area_sqm\":\
       \ 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"furnishing\": \"unfurnished\"\
       ,\n  \"description\": \"fixture-value\",\n  \"map_lat\": 1,\n  \"map_lon\":\
-      \ 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"seller\": {\n \
-      \   \"name\": \"fixture-value\",\n    \"phone\": \"+998901234567\",\n    \"\
-      email\": \"fixture@example.com\"\n  },\n  \"channel\": \"fixture-value\",\n\
-      \  \"commission_type\": \"none\",\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\"\
-      : 1,\n  \"commission_currency\": \"USD\"\n}"
+      \ 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"contact_phone\"\
+      : \"+998901234567\",\n  \"seller\": {\n    \"name\": \"fixture-value\",\n  \
+      \  \"phone\": \"+998901234567\",\n    \"email\": \"fixture@example.com\"\n \
+      \ },\n  \"channel\": \"fixture-value\",\n  \"commission_type\": \"none\",\n\
+      \  \"commission_fixed_amount\": 1,\n  \"commission_percentage\": 1,\n  \"commission_currency\"\
+      : \"USD\"\n}"
 settings:
   encodeUrl: true
   timeout: 0
@@ -82,6 +83,9 @@ docs: '# POST /api/v1/management/one-off-deals/
   | `ask_currency` | no | no | default=''USD''; replace fixture values with domain-valid
   data before runtime execution. |
 
+  | `contact_phone` | no | yes | fixture value; replace fixture values with domain-valid
+  data before runtime execution. |
+
   | `seller` | yes | no | fixture value; replace fixture values with domain-valid
   data before runtime execution. |
 
@@ -131,11 +135,12 @@ examples:
         : 1,\n  \"property_type\": \"apartment\",\n  \"rooms\": 1,\n  \"area_sqm\"\
         : 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"furnishing\": \"unfurnished\"\
         ,\n  \"description\": \"fixture-value\",\n  \"map_lat\": 1,\n  \"map_lon\"\
-        : 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"seller\": {\n\
-        \    \"name\": \"fixture-value\",\n    \"phone\": \"+998901234567\",\n   \
-        \ \"email\": \"fixture@example.com\"\n  },\n  \"channel\": \"fixture-value\"\
-        ,\n  \"commission_type\": \"none\",\n  \"commission_fixed_amount\": 1,\n \
-        \ \"commission_percentage\": 1,\n  \"commission_currency\": \"USD\"\n}"
+        : 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"contact_phone\"\
+        : \"+998901234567\",\n  \"seller\": {\n    \"name\": \"fixture-value\",\n\
+        \    \"phone\": \"+998901234567\",\n    \"email\": \"fixture@example.com\"\
+        \n  },\n  \"channel\": \"fixture-value\",\n  \"commission_type\": \"none\"\
+        ,\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\": 1,\n  \"\
+        commission_currency\": \"USD\"\n}"
   response:
     status: 201
     statusText: OK
@@ -160,11 +165,12 @@ examples:
         : 1,\n  \"property_type\": \"apartment\",\n  \"rooms\": 1,\n  \"area_sqm\"\
         : 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"furnishing\": \"unfurnished\"\
         ,\n  \"description\": \"fixture-value\",\n  \"map_lat\": 1,\n  \"map_lon\"\
-        : 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"seller\": {\n\
-        \    \"name\": \"fixture-value\",\n    \"phone\": \"+998901234567\",\n   \
-        \ \"email\": \"fixture@example.com\"\n  },\n  \"channel\": \"fixture-value\"\
-        ,\n  \"commission_type\": \"none\",\n  \"commission_fixed_amount\": 1,\n \
-        \ \"commission_percentage\": 1,\n  \"commission_currency\": \"USD\"\n}"
+        : 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"contact_phone\"\
+        : \"+998901234567\",\n  \"seller\": {\n    \"name\": \"fixture-value\",\n\
+        \    \"phone\": \"+998901234567\",\n    \"email\": \"fixture@example.com\"\
+        \n  },\n  \"channel\": \"fixture-value\",\n  \"commission_type\": \"none\"\
+        ,\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\": 1,\n  \"\
+        commission_currency\": \"USD\"\n}"
   response:
     status: 400
     statusText: Error
@@ -190,11 +196,12 @@ examples:
         : 1,\n  \"property_type\": \"apartment\",\n  \"rooms\": 1,\n  \"area_sqm\"\
         : 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"furnishing\": \"unfurnished\"\
         ,\n  \"description\": \"fixture-value\",\n  \"map_lat\": 1,\n  \"map_lon\"\
-        : 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"seller\": {\n\
-        \    \"name\": \"fixture-value\",\n    \"phone\": \"+998901234567\",\n   \
-        \ \"email\": \"fixture@example.com\"\n  },\n  \"channel\": \"fixture-value\"\
-        ,\n  \"commission_type\": \"none\",\n  \"commission_fixed_amount\": 1,\n \
-        \ \"commission_percentage\": 1,\n  \"commission_currency\": \"USD\"\n}"
+        : 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"contact_phone\"\
+        : \"+998901234567\",\n  \"seller\": {\n    \"name\": \"fixture-value\",\n\
+        \    \"phone\": \"+998901234567\",\n    \"email\": \"fixture@example.com\"\
+        \n  },\n  \"channel\": \"fixture-value\",\n  \"commission_type\": \"none\"\
+        ,\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\": 1,\n  \"\
+        commission_currency\": \"USD\"\n}"
   response:
     status: 401
     statusText: Error
@@ -220,11 +227,12 @@ examples:
         : 1,\n  \"property_type\": \"apartment\",\n  \"rooms\": 1,\n  \"area_sqm\"\
         : 1,\n  \"floor\": 1,\n  \"total_floors\": 1,\n  \"furnishing\": \"unfurnished\"\
         ,\n  \"description\": \"fixture-value\",\n  \"map_lat\": 1,\n  \"map_lon\"\
-        : 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"seller\": {\n\
-        \    \"name\": \"fixture-value\",\n    \"phone\": \"+998901234567\",\n   \
-        \ \"email\": \"fixture@example.com\"\n  },\n  \"channel\": \"fixture-value\"\
-        ,\n  \"commission_type\": \"none\",\n  \"commission_fixed_amount\": 1,\n \
-        \ \"commission_percentage\": 1,\n  \"commission_currency\": \"USD\"\n}"
+        : 1,\n  \"ask_price\": 1,\n  \"ask_currency\": \"USD\",\n  \"contact_phone\"\
+        : \"+998901234567\",\n  \"seller\": {\n    \"name\": \"fixture-value\",\n\
+        \    \"phone\": \"+998901234567\",\n    \"email\": \"fixture@example.com\"\
+        \n  },\n  \"channel\": \"fixture-value\",\n  \"commission_type\": \"none\"\
+        ,\n  \"commission_fixed_amount\": 1,\n  \"commission_percentage\": 1,\n  \"\
+        commission_currency\": \"USD\"\n}"
   response:
     status: 409
     statusText: Error

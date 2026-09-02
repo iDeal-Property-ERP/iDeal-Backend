@@ -734,7 +734,7 @@ class ManagementPropertyListView(ManagementView, ListAPIView):
         from core.constants import LeaseStatus
 
         qs = (
-            Property.objects.select_related("district", "owner")
+            Property.objects.select_related("district", "owner", "created_by")
             .prefetch_related(
                 Prefetch(
                     "leases",
@@ -802,6 +802,7 @@ class OneOffDealListCreateView(ManagementView, ListAPIView):
 
         data = parsed_body.model_dump()
         seller = data.pop("seller")
+        contact_phone = data.pop("contact_phone", None) or getattr(self.request.user, "phone", None) or None
         try:
             validate_floor_bounds(data["floor"], data["total_floors"])
         except ValueError as err:
@@ -822,6 +823,8 @@ class OneOffDealListCreateView(ManagementView, ListAPIView):
                 map_lon=data["map_lon"],
                 ask_price=data["ask_price"],
                 ask_currency=data["ask_currency"],
+                created_by=self.request.user,
+                contact_phone=contact_phone,
                 engagement_type=PropertyEngagementType.ONE_OFF,
                 status=PropertyStatus.VACANT,
             )
@@ -1045,7 +1048,7 @@ class ManagementPropertyMapView(ManagementView):
 
         params = self.request.GET
         qs = (
-            Property.objects.select_related("district", "owner")
+            Property.objects.select_related("district", "owner", "created_by")
             .exclude(Q(map_lat__isnull=True) | Q(map_lon__isnull=True))
             .prefetch_related(
                 Prefetch(
@@ -1160,6 +1163,9 @@ class ManagementPropertyImportView(ManagementView):
                 data = validated.model_dump()
                 data.pop("translations", None)
                 data.pop("content_locale", None)
+                if not data.get("contact_phone"):
+                    data["contact_phone"] = getattr(self.request.user, "phone", None) or None
+                data["created_by"] = self.request.user
                 with transaction.atomic():
                     Property.objects.create(**data)
             except Exception as err:  # noqa: BLE001 — per-row report, never a 500

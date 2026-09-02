@@ -82,6 +82,14 @@ class Property(TimestampedModel, SoftDeleteModel):
     owner = models.ForeignKey(
         "account.User", on_delete=models.PROTECT, related_name="owned_properties", null=True, blank=True
     )
+    created_by = models.ForeignKey(
+        "account.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_properties",
+    )
+    contact_phone = models.CharField(max_length=30, null=True, blank=True)
     engagement_type = models.CharField(
         max_length=20,
         choices=PropertyEngagementType.choices,
@@ -183,17 +191,20 @@ class Property(TimestampedModel, SoftDeleteModel):
                 raise ValidationError({"landmark": str(err)}) from err
 
     def save(self, *args, **kwargs):
-        """Keep engagement immutable once a property becomes commercially active."""
+        """Keep engagement immutable once a property becomes commercially active, and keep creator immutable."""
         if self.pk:
-            old = type(self).objects.filter(pk=self.pk).values("engagement_type", "status").first()
-            if old and old["engagement_type"] != self.engagement_type:
-                has_history = (
-                    OneOffDeal.objects.filter(property_id=self.pk).exists()
-                    or self.owner_agreements.exists()
-                    or self.leases.exists()
-                )
-                if has_history:
-                    raise ValidationError(_("A property's engagement type cannot change after activation."))
+            old = type(self).objects.filter(pk=self.pk).values("engagement_type", "status", "created_by_id").first()
+            if old:
+                if old["engagement_type"] != self.engagement_type:
+                    has_history = (
+                        OneOffDeal.objects.filter(property_id=self.pk).exists()
+                        or self.owner_agreements.exists()
+                        or self.leases.exists()
+                    )
+                    if has_history:
+                        raise ValidationError(_("A property's engagement type cannot change after activation."))
+                if old["created_by_id"] is not None and self.created_by_id != old["created_by_id"]:
+                    raise ValidationError(_("Property creator cannot be changed."))
         if self.engagement_type == PropertyEngagementType.ONE_OFF and self.owner_id is not None:
             raise ValidationError(_("One-off brokerage properties cannot have an owner account."))
         return super().save(*args, **kwargs)

@@ -78,3 +78,19 @@ class TestPropertyModel:
 
         with pytest.raises(IntegrityError):
             Property.objects.filter(pk=prop.pk).update(floor=99)
+
+    def test_property_created_by_and_contact_phone_persistence(self, management):
+        prop = PropertyFactory(created_by=management, contact_phone="+998901234567")
+        assert prop.created_by == management
+        assert prop.contact_phone == "+998901234567"
+
+    def test_property_creator_protect_on_delete(self, management):
+        PropertyFactory(created_by=management)
+        with pytest.raises(IntegrityError):
+            management.delete()
+
+    def test_property_creator_is_immutable(self, management, owner):
+        prop = PropertyFactory(created_by=management)
+        prop.created_by = owner
+        with pytest.raises(ValidationError, match="Property creator cannot be changed"):
+            prop.save()

@@ -117,6 +117,9 @@ class PropertyOutput(pydantic.BaseModel):
     tenant_charge_currency: str
     vacant_since: date | None
     vacant_days: int
+    created_by_id: int | None = None
+    created_by_name: str | None = None
+    contact_phone: str | None = None
     translations: PropertyTranslationMap | None = pydantic.Field(default=None, validation_alias="_translations")
     # Injected by the view (reverse managers can't be validated from attributes);
     # aliased so `model_validate(property)` doesn't try to read the manager.
@@ -155,7 +158,17 @@ class PropertyCreateInput(pydantic.BaseModel):
     tenant_charge_currency: str = "USD"
     vacant_since: date | None = None
     vacant_days: int = pydantic.Field(default=0, ge=0)
+    contact_phone: str | None = None
     translations: PropertyTranslationMap | None = None
+
+    @field_validator("contact_phone")
+    @classmethod
+    def normalize_contact_phone(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        from core.utils.phone import normalize_uzbekistan_phone
+
+        return normalize_uzbekistan_phone(v)
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):
@@ -212,7 +225,17 @@ class PropertyUpdateInput(pydantic.BaseModel):
     tenant_charge_currency: str | None = None
     vacant_since: date | None = None
     vacant_days: int | None = pydantic.Field(default=None, ge=0)
+    contact_phone: str | None = None
     translations: PropertyTranslationMap | None = None
+
+    @field_validator("contact_phone")
+    @classmethod
+    def normalize_contact_phone(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        from core.utils.phone import normalize_uzbekistan_phone
+
+        return normalize_uzbekistan_phone(v)
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):
@@ -290,7 +313,17 @@ class PropertySubmissionInput(pydantic.BaseModel):
     content_locale: Literal["en", "uz", "ru"] | None = None
     translations: PropertyTranslationMap | None = None
     schedule_verification_at: str | None = None
+    contact_phone: str | None = None
     brokerage: OneOffDealInput | None = None
+
+    @field_validator("contact_phone")
+    @classmethod
+    def normalize_contact_phone(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        from core.utils.phone import normalize_uzbekistan_phone
+
+        return normalize_uzbekistan_phone(v)
 
     @field_validator("landmark")
     @classmethod

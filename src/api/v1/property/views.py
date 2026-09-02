@@ -85,6 +85,11 @@ def _property_output(prop, request) -> dict:
             }
         except OneOffDeal.DoesNotExist:
             data["one_off_deal"] = None
+    data["created_by_id"] = prop.created_by_id
+    data["created_by_name"] = (
+        f"{prop.created_by.first_name} {prop.created_by.last_name or ''}".strip() if prop.created_by else None
+    )
+    data["contact_phone"] = prop.contact_phone
     data["photos"] = photos
     if prop.engagement_type != PropertyEngagementType.ONE_OFF and next_visit is not None:
         data["verification"] = {
@@ -100,7 +105,7 @@ def _property_output(prop, request) -> dict:
 
 
 def _base_property_qs(user):
-    qs = Property.objects.select_related("district", "owner", "one_off_deal").prefetch_related(
+    qs = Property.objects.select_related("district", "owner", "created_by", "one_off_deal").prefetch_related(
         "photos", "verification_visits"
     )
     if user.role == UserRole.OWNER:
@@ -124,6 +129,10 @@ class PropertyListCreateView(CreateAPIView, ListAPIView):
         from core.services.localization import LocalizedContentService
 
         translations = validated_data.pop("translations", None)
+        user = self.request.user
+        if not validated_data.get("contact_phone"):
+            validated_data["contact_phone"] = getattr(user, "phone", None) or None
+        validated_data["created_by"] = user
         prop = super().perform_create(validated_data)
         if translations:
             LocalizedContentService().apply_translations(prop, translations, ["name", "description"])
@@ -281,6 +290,7 @@ ONE_OFF_CLOSED_EDITABLE_FIELDS = {
     "map_lon",
     "description",
     "tariff",
+    "contact_phone",
 }
 
 
@@ -341,7 +351,7 @@ class ManagementPropertyView(GenericController):
     def get_queryset(self):
         # No prefetch: these are single-object views that mutate photos/visits,
         # so the output builder must read fresh relations, not a stale cache.
-        return Property.objects.select_related("district", "owner")
+        return Property.objects.select_related("district", "owner", "created_by")
 
     def to_output(self, instance):
         return _property_output(instance, self.request)

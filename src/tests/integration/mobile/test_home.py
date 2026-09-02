@@ -655,6 +655,19 @@ class TestMobileHomeListingMap:
         assert urlparse(item["cover_preview_url"]).path.endswith("map-preview.webp")
         assert urlparse(item["cover_display_url"]).path.endswith("map-display.webp")
 
+    def test_item_prefers_property_contact_phone_over_platform_setting(self, api_client):
+        listing = _make_vacant_listing(monthly_price=850, listed_price=900)
+        self._set_coordinates(listing)
+        listing.property.contact_phone = "+998901234567"
+        listing.property.save(update_fields=["contact_phone"])
+
+        with override_settings(PLATFORM_CONTACT_PHONE="+998 71 200 00 00"):
+            response = api_client.get(MAP_URL, {"bbox": self.BBOX})
+
+        assert response.status_code == 200
+        item = response.json()["data"]["items"][0]
+        assert item["contact_phone"] == "+998901234567"
+
     def test_empty_platform_contact_is_null(self, api_client):
         listing = _make_vacant_listing()
         self._set_coordinates(listing)
@@ -902,6 +915,17 @@ class TestMobileHomeListingDetail:
         assert empty_response.json()["data"]["contact_phone"] is None
         assert configured_response.status_code == 200
         assert configured_response.json()["data"]["contact_phone"] == "+998 71 200 00 00"
+
+    def test_detail_contact_phone_prefers_property_snapshot(self, api_client):
+        listing = _make_vacant_listing()
+        listing.property.contact_phone = "+998901234567"
+        listing.property.save(update_fields=["contact_phone"])
+
+        with override_settings(PLATFORM_CONTACT_PHONE="+998 71 200 00 00"):
+            response = api_client.get(f"{LISTING_DETAIL_URL}{listing.id}/")
+
+        assert response.status_code == 200
+        assert response.json()["data"]["contact_phone"] == "+998901234567"
 
 
 class TestMobileHomeFilters:

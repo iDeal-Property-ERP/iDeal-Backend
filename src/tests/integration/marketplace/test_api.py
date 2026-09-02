@@ -140,6 +140,17 @@ class TestPublicListingAPI:
         assert data["verification"]["is_verified"] == listing.property.is_verified
         assert len(data["verification"]["checklist"]) == 4
 
+    def test_retrieve_listing_returns_custom_property_contact_phone(self, api_client):
+        listing = _make_vacant_listing()
+        listing.property.contact_phone = "+998901234567"
+        listing.property.save(update_fields=["contact_phone"])
+        from django.test import override_settings
+
+        with override_settings(PLATFORM_CONTACT_PHONE="+998937244041"):
+            response = api_client.get(f"/api/v1/marketplace/listings/{listing.id}/")
+            assert response.status_code == 200
+            assert response.json()["data"]["contact_phone"] == "+998901234567"
+
     def test_retrieve_listing_returns_platform_contact_phone(self, api_client):
         listing = _make_vacant_listing()
         from django.test import override_settings
