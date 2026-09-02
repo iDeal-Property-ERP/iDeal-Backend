@@ -116,6 +116,8 @@ DROP FUNCTION IF EXISTS check_listing_photos_count();
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [
         ("property", "0012_propertyphoto_preview_image_propertyphoto_display_image"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
