@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from account.services.auth.otp import OTPMessagePurpose
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -19,6 +20,32 @@ def clear_cache():
 
 def _post(api_client, path, payload, **headers):
     return api_client.post(path, data=json.dumps(payload), content_type="application/json", **headers)
+
+
+@pytest.mark.django_db
+def test_deletion_otp_request_dispatches_account_deletion_message_purpose(api_client, jwt_header, user, monkeypatch):
+    dispatched = []
+    monkeypatch.setattr(account_views.otp_service, "generate_otp", lambda: "123456")
+    monkeypatch.setattr(
+        account_views.otp_service,
+        "dispatch",
+        lambda *args, **kwargs: dispatched.append((args, kwargs)),
+    )
+
+    response = _post(
+        api_client,
+        "/api/v1/mobile/account/deletion/otp/request/",
+        {"channel": "telegram"},
+        **jwt_header,
+    )
+
+    assert response.status_code == 200
+    assert dispatched == [
+        (
+            (user.phone, "123456", "telegram"),
+            {"purpose": OTPMessagePurpose.ACCOUNT_DELETION},
+        )
+    ]
 
 
 @pytest.mark.django_db

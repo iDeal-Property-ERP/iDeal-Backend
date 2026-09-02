@@ -3,6 +3,7 @@ import json
 import jwt
 import pytest
 from account.models import User
+from account.services.auth.otp import OTPMessagePurpose
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.storage import default_storage
@@ -93,6 +94,26 @@ def test_request_and_verify_provisions_user_and_returns_valid_jwt(api_client, mo
     assert authenticated_response.status_code == 200
     assert authenticated_response.json()["data"]["phone"] == "+998901234567"
     assert authenticated_response.json()["data"]["email"] is None
+
+
+def test_otp_request_dispatches_login_message_purpose(api_client, monkeypatch):
+    dispatched = []
+    monkeypatch.setattr(views.otp_service, "generate_otp", lambda: "123456")
+    monkeypatch.setattr(
+        views.otp_service,
+        "dispatch",
+        lambda *args, **kwargs: dispatched.append((args, kwargs)),
+    )
+
+    response = _request_otp(api_client)
+
+    assert response.status_code == 200
+    assert dispatched == [
+        (
+            ("+998901234567", "123456", "telegram"),
+            {"purpose": OTPMessagePurpose.LOGIN},
+        )
+    ]
 
 
 def test_invalid_code_is_rejected(api_client, monkeypatch):
@@ -485,6 +506,25 @@ class TestPhoneChangeAPI:
         assert account_views.otp_service.get_otp("+998901234567", purpose=f"phone-change:{user.pk}") == "999999"
         assert account_views.otp_service.get_otp("+998901234567") is None
 
+    def test_request_dispatches_phone_change_message_purpose(self, api_client, jwt_header, monkeypatch):
+        dispatched = []
+        monkeypatch.setattr(account_views.otp_service, "generate_otp", lambda: "123456")
+        monkeypatch.setattr(
+            account_views.otp_service,
+            "dispatch",
+            lambda *args, **kwargs: dispatched.append((args, kwargs)),
+        )
+
+        response = self._request(api_client, "+998901234567", **jwt_header)
+
+        assert response.status_code == 200
+        assert dispatched == [
+            (
+                ("+998901234567", "123456", "telegram"),
+                {"purpose": OTPMessagePurpose.PHONE_CHANGE},
+            )
+        ]
+
     def test_request_rejects_invalid_current_and_occupied_numbers_before_dispatch(
         self, api_client, jwt_header, user, monkeypatch
     ):
@@ -512,7 +552,7 @@ class TestPhoneChangeAPI:
             disabled_response = self._request(api_client, phone, **jwt_header)
         assert disabled_response.status_code == 400
 
-        def fail_dispatch(*_args):
+        def fail_dispatch(*_args, **_kwargs):
             raise account_views.OTPDeliveryError("provider unavailable")
 
         monkeypatch.setattr(account_views.otp_service, "dispatch", fail_dispatch)

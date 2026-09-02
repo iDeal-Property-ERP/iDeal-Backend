@@ -5,6 +5,7 @@ from account.models import User
 from account.services.auth.otp import (
     OTP_ATTEMPT_LIMIT,
     OTPDeliveryError,
+    OTPMessagePurpose,
     OTPService,
 )
 from django.conf import settings
@@ -84,7 +85,7 @@ class OTPRequestView(BaseController):
         otp_service.clear_otp_attempts(phone)
         otp_service.set_otp(phone, code)
         try:
-            otp_service.dispatch(phone, code, parsed_body.channel)
+            otp_service.dispatch(phone, code, parsed_body.channel, purpose=OTPMessagePurpose.LOGIN)
         except OTPDeliveryError:
             otp_service.pop_otp(phone)
             return self.fail(

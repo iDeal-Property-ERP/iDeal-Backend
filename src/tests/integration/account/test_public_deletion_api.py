@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from account.services.auth.otp import OTPMessagePurpose
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -53,7 +54,13 @@ class TestPublicAccountDeletionAPI:
 
     def test_public_deletion_otp_request_success(self, api_client, monkeypatch):
         user = TenantFactory(phone="+998901234567")
+        dispatched = []
         monkeypatch.setattr(account_views.otp_service, "generate_otp", lambda: "123456")
+        monkeypatch.setattr(
+            account_views.otp_service,
+            "dispatch",
+            lambda *args, **kwargs: dispatched.append((args, kwargs)),
+        )
 
         response = _post(
             api_client,
@@ -66,6 +73,12 @@ class TestPublicAccountDeletionAPI:
         assert body["data"]["channel"] == "telegram"
         assert body["data"]["expires_in"] == 300
         assert body["data"]["resend_after"] == 60
+        assert dispatched == [
+            (
+                (user.phone, "123456", "telegram"),
+                {"purpose": OTPMessagePurpose.ACCOUNT_DELETION},
+            )
+        ]
 
         cached_otp = account_views.otp_service.get_otp(
             user.phone, purpose=account_views.PUBLIC_ACCOUNT_DELETION_OTP_PURPOSE

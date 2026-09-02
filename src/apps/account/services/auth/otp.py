@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import requests
-from account.services.auth.providers.base import OTPDeliveryError, OTPMessage, OTPProvider
+from account.services.auth.providers.base import OTPDeliveryError, OTPMessage, OTPMessagePurpose, OTPProvider
 from account.services.auth.providers.eskiz import EskizGateway
 from account.services.auth.providers.telegram import TelegramGateway
 from django.conf import settings
@@ -86,7 +86,14 @@ class OTPService:
     def clear_otp_attempts(self, phone: str, *, purpose: str = "login") -> None:
         self.cache.delete(self._otp_attempts_cache_key(phone, purpose))
 
-    def dispatch(self, phone: str, code: str, channel: str) -> None:
+    def dispatch(
+        self,
+        phone: str,
+        code: str,
+        channel: str,
+        *,
+        purpose: OTPMessagePurpose = OTPMessagePurpose.LOGIN,
+    ) -> None:
         if channel not in self.get_available_channels():
             raise OTPDeliveryError("Unsupported or disabled OTP channel")
 
@@ -97,12 +104,13 @@ class OTPService:
         provider = self.providers.get(channel)
         if provider is None:
             raise OTPDeliveryError("Unsupported OTP channel")
-        provider.send(OTPMessage(phone=phone, code=code))
+        provider.send(OTPMessage(phone=phone, code=code, purpose=purpose))
 
 
 __all__ = [
     "OTP_ATTEMPT_LIMIT",
     "OTPDeliveryError",
     "OTPMessage",
+    "OTPMessagePurpose",
     "OTPService",
 ]

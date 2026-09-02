@@ -1,8 +1,8 @@
 import pytest
 import requests
 from account.services.auth.otp import OTPDeliveryError
-from account.services.auth.providers.base import OTPMessage
-from account.services.auth.providers.eskiz import ESKIZ_TOKEN_CACHE_KEY, EskizGateway
+from account.services.auth.providers.base import OTPMessage, OTPMessagePurpose
+from account.services.auth.providers.eskiz import ESKIZ_TOKEN_CACHE_KEY, SMS_TEXT_TEMPLATES, EskizGateway
 from account.services.auth.providers.telegram import TelegramGateway
 from django.test import override_settings
 
@@ -73,7 +73,21 @@ def test_provider_network_error_is_normalized():
         gateway.send(OTPMessage(phone="+998901234567", code="123456"))
 
 
-def test_eskiz_uses_cached_token_without_login():
+@pytest.mark.parametrize(
+    ("purpose", "expected_text"),
+    [
+        (OTPMessagePurpose.LOGIN, "iDeal ilovasiga kirish uchun tasdiqlash kodi: 123456"),
+        (
+            OTPMessagePurpose.PHONE_CHANGE,
+            "iDeal ilovasida telefon raqamingizni o‘zgartirish uchun tasdiqlash kodi: 123456",
+        ),
+        (
+            OTPMessagePurpose.ACCOUNT_DELETION,
+            "iDeal ilovasidagi akkauntingizni o‘chirish uchun tasdiqlash kodi: 123456",
+        ),
+    ],
+)
+def test_eskiz_uses_moderation_ready_text_for_each_purpose(purpose, expected_text):
     cache = FakeCache()
     cache.set(ESKIZ_TOKEN_CACHE_KEY, "cached-token")
     http = FakeHTTPClient(FakeResponse(200, {"success": True}))
@@ -85,10 +99,15 @@ def test_eskiz_uses_cached_token_without_login():
         ESKIZ_BASE_URL="https://eskiz.example/api",
         ESKIZ_FROM="4546",
     ):
-        gateway.send(OTPMessage(phone="+998901234567", code="123456"))
+        gateway.send(OTPMessage(phone="+998901234567", code="123456", purpose=purpose))
 
     assert len(http.calls) == 1
     assert http.calls[0][1]["headers"] == {"Authorization": "Bearer cached-token"}
+    assert http.calls[0][1]["data"]["message"] == expected_text
+
+
+def test_eskiz_sms_text_templates_cover_every_otp_message_purpose():
+    assert set(SMS_TEXT_TEMPLATES) == set(OTPMessagePurpose)
 
 
 def test_eskiz_refreshes_token_once_after_unauthorized_message():

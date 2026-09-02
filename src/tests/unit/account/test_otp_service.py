@@ -1,7 +1,14 @@
 from dataclasses import FrozenInstanceError
 
 import pytest
-from account.services.auth.otp import OTP_ATTEMPT_LIMIT, OTPDeliveryError, OTPMessage, OTPProvider, OTPService
+from account.services.auth.otp import (
+    OTP_ATTEMPT_LIMIT,
+    OTPDeliveryError,
+    OTPMessage,
+    OTPMessagePurpose,
+    OTPProvider,
+    OTPService,
+)
 from django.test import override_settings
 
 
@@ -70,14 +77,25 @@ def test_cache_lifecycle_and_attempts_are_bounded():
     assert service.get_otp_attempts("+998901234567") == 0
 
 
-def test_dispatch_sends_immutable_message_to_injected_provider():
+def test_dispatch_sends_immutable_message_with_selected_purpose_to_injected_provider():
     provider = RecordingProvider()
     service = OTPService(cache_backend=FakeCache(), providers={"future": provider})
 
     with override_settings(OTP_DEV_BYPASS_CODE=""):
-        service.dispatch("+998901234567", "123456", "future")
+        service.dispatch(
+            "+998901234567",
+            "123456",
+            "future",
+            purpose=OTPMessagePurpose.PHONE_CHANGE,
+        )
 
-    assert provider.messages == [OTPMessage(phone="+998901234567", code="123456")]
+    assert provider.messages == [
+        OTPMessage(
+            phone="+998901234567",
+            code="123456",
+            purpose=OTPMessagePurpose.PHONE_CHANGE,
+        )
+    ]
 
 
 def test_dispatch_rejects_unknown_channel():

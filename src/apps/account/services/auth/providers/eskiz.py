@@ -1,11 +1,15 @@
 import requests
-from account.services.auth.providers.base import OTPDeliveryError, OTPMessage, OTPProvider
+from account.services.auth.providers.base import OTPDeliveryError, OTPMessage, OTPMessagePurpose, OTPProvider
 from django.conf import settings
 from django.core.cache import cache
-from django.utils.translation import gettext_lazy as _
 
 ESKIZ_TOKEN_TTL = 60 * 60 * 24 * 25
 ESKIZ_TOKEN_CACHE_KEY = "otp:eskiz:token"
+SMS_TEXT_TEMPLATES = {
+    OTPMessagePurpose.LOGIN: "iDeal ilovasiga kirish uchun tasdiqlash kodi: {code}",
+    OTPMessagePurpose.PHONE_CHANGE: "iDeal ilovasida telefon raqamingizni o‘zgartirish uchun tasdiqlash kodi: {code}",
+    OTPMessagePurpose.ACCOUNT_DELETION: "iDeal ilovasidagi akkauntingizni o‘chirish uchun tasdiqlash kodi: {code}",
+}
 
 
 class EskizGateway(OTPProvider):
@@ -47,7 +51,7 @@ class EskizGateway(OTPProvider):
 
     def _send_message(self, token: str, message: OTPMessage):
         base_url = settings.ESKIZ_BASE_URL.rstrip("/")
-        text = str(_("iDeal tasdiqlash kodi: %(code)s")) % {"code": message.code}
+        text = SMS_TEXT_TEMPLATES[message.purpose].format(code=message.code)
         return self._post(
             f"{base_url}/message/sms/send",
             headers={"Authorization": f"Bearer {token}"},

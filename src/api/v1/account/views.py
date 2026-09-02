@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 from account.models import User
-from account.services.auth.otp import OTP_ATTEMPT_LIMIT, OTPDeliveryError, OTPService
+from account.services.auth.otp import OTP_ATTEMPT_LIMIT, OTPDeliveryError, OTPMessagePurpose, OTPService
 from account.services.deletion import AccountDeletionService
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -73,7 +73,7 @@ class PublicAccountDeletionOTPRequestView(BaseController):
         otp_service.clear_otp_attempts(phone, purpose=PUBLIC_ACCOUNT_DELETION_OTP_PURPOSE)
         otp_service.set_otp(phone, code, purpose=PUBLIC_ACCOUNT_DELETION_OTP_PURPOSE)
         try:
-            otp_service.dispatch(phone, code, parsed_body.channel)
+            otp_service.dispatch(phone, code, parsed_body.channel, purpose=OTPMessagePurpose.ACCOUNT_DELETION)
         except OTPDeliveryError:
             otp_service.pop_otp(phone, purpose=PUBLIC_ACCOUNT_DELETION_OTP_PURPOSE)
             return self.fail(

@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 import requests
@@ -10,10 +11,17 @@ logger = logging.getLogger(__name__)
 OTP_PROVIDER_TIMEOUT = 10
 
 
+class OTPMessagePurpose(StrEnum):
+    LOGIN = "login"
+    PHONE_CHANGE = "phone_change"
+    ACCOUNT_DELETION = "account_deletion"
+
+
 @dataclass(frozen=True, slots=True)
 class OTPMessage:
     phone: str
     code: str
+    purpose: OTPMessagePurpose = OTPMessagePurpose.LOGIN
 
 
 class OTPDeliveryError(Exception):

@@ -2,7 +2,7 @@ from http import HTTPStatus
 from io import BytesIO
 
 from account.models import TokenBlacklist, User
-from account.services.auth.otp import OTP_ATTEMPT_LIMIT, OTPDeliveryError, OTPService
+from account.services.auth.otp import OTP_ATTEMPT_LIMIT, OTPDeliveryError, OTPMessagePurpose, OTPService
 from account.services.deletion import AccountDeletionService
 from django.conf import settings
 from django.db import IntegrityError, transaction
@@ -149,7 +149,7 @@ class PhoneChangeOTPRequestView(BaseController):
         otp_service.clear_otp_attempts(phone, purpose=purpose)
         otp_service.set_otp(phone, code, purpose=purpose)
         try:
-            otp_service.dispatch(phone, code, parsed_body.channel)
+            otp_service.dispatch(phone, code, parsed_body.channel, purpose=OTPMessagePurpose.PHONE_CHANGE)
         except OTPDeliveryError:
             otp_service.pop_otp(phone, purpose=purpose)
             return self.fail(
@@ -229,7 +229,7 @@ class AccountDeletionOTPRequestView(BaseController):
         otp_service.clear_otp_attempts(phone, purpose=ACCOUNT_DELETION_OTP_PURPOSE)
         otp_service.set_otp(phone, code, purpose=ACCOUNT_DELETION_OTP_PURPOSE)
         try:
-            otp_service.dispatch(phone, code, parsed_body.channel)
+            otp_service.dispatch(phone, code, parsed_body.channel, purpose=OTPMessagePurpose.ACCOUNT_DELETION)
         except OTPDeliveryError:
             otp_service.pop_otp(phone, purpose=ACCOUNT_DELETION_OTP_PURPOSE)
             return self.fail(
