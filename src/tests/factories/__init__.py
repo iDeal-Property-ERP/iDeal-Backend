@@ -12,7 +12,7 @@ from .finance import ExchangeRateFactory, PaymentFactory, PayoutScheduleFactory
 from .inventory import InventoryActFactory, InventoryActItemFactory, InventoryActPhotoFactory
 from .maintenance import ServiceRequestCommentFactory, ServiceRequestFactory, ServiceRequestPhotoFactory
 from .marketplace import BookingFactory, FaqItemFactory, FavoriteListingFactory, ListingFactory, ViewingRequestFactory
-from .mobile_config import MobileCriticalUpdateRangeFactory, MobileUpdatePolicyFactory
+from .mobile_config import MobileCriticalUpdateRangeFactory, MobileHomeBannerFactory, MobileUpdatePolicyFactory
 from .notification import DeviceTokenFactory, NotificationFactory, NotificationPreferenceFactory
 from .property import AmenityFactory, DistrictFactory, PropertyFactory, PropertyPhotoFactory, VerificationVisitFactory
 from .vas import ServiceCatalogItemFactory, ServiceOrderFactory
@@ -56,6 +56,7 @@ __all__ = [
     "InventoryActPhotoFactory",
     "MobileUpdatePolicyFactory",
     "MobileCriticalUpdateRangeFactory",
+    "MobileHomeBannerFactory",
     "ServiceCatalogItemFactory",
     "ServiceOrderFactory",
 ]

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
-from mobile_config.models import MobileCriticalUpdateRange, MobileUpdatePolicy
+from mobile_config.models import MobileCriticalUpdateRange, MobileHomeBanner, MobileUpdatePolicy
 from unfold.admin import TabularInline
 
 from core.admin import BaseModelAdmin
@@ -54,3 +54,27 @@ class MobileCriticalUpdateRangeAdmin(BaseModelAdmin):
     list_filter = ("is_active", "policy__platform")
     search_fields = ("minimum_version", "maximum_version", "policy__latest_version")
     ordering = ("-created_at",)
+
+
+@admin.register(MobileHomeBanner)
+class MobileHomeBannerAdmin(BaseModelAdmin):
+    list_display = (
+        "id",
+        "title",
+        "tag",
+        "icon",
+        "sort_order",
+        "is_active",
+        "created_at",
+    )
+    list_filter = ("is_active",)
+    search_fields = (
+        "title_en",
+        "title_ru",
+        "title_uz",
+        "description_en",
+        "description_ru",
+        "description_uz",
+    )
+    list_editable = ("sort_order", "is_active")
+    ordering = ("sort_order", "id")

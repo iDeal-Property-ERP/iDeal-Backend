@@ -25,6 +25,7 @@ from tests.factories import (
     DistrictFactory,
     LeaseFactory,
     ListingFactory,
+    MobileHomeBannerFactory,
     OwnerAgreementFactory,
     PropertyFactory,
     PropertyPhotoFactory,
@@ -38,6 +39,7 @@ MAP_URL = "/api/v1/mobile/home/listings/map/"
 LISTING_DETAIL_URL = "/api/v1/mobile/home/listings/"
 FILTERS_URL = "/api/v1/mobile/home/filters/"
 RECOMMENDED_URL = "/api/v1/mobile/home/listings/recommended/"
+BANNERS_URL = "/api/v1/mobile/home/banners/"
 
 
 def _make_jwt(user, **overrides):
@@ -1333,3 +1335,88 @@ class TestMobileHomeAvailabilityFilters:
             },
         )
         assert response.status_code == 400
+
+
+class TestMobileHomeBanners:
+    def test_anonymous_get_banners_success(self, api_client):
+        from mobile_config.models import MobileHomeBanner
+
+        MobileHomeBanner.objects.all().delete()
+        b2 = MobileHomeBannerFactory(
+            title_en="Verified Properties",
+            description_en="Our team inspects each home.",
+            icon="shield_check",
+            sort_order=2,
+            is_active=True,
+        )
+        b1 = MobileHomeBannerFactory(
+            title_en="100% Actual Listings",
+            description_en="Whatever you see is available.",
+            icon="circle_check",
+            sort_order=1,
+            is_active=True,
+        )
+        MobileHomeBannerFactory(
+            title_en="Inactive Offer",
+            description_en="Not visible.",
+            sort_order=0,
+            is_active=False,
+        )
+
+        response = api_client.get(BANNERS_URL)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        items = data["data"]["items"]
+        assert len(items) == 2
+        # Verify ordering by sort_order
+        assert items[0]["id"] == b1.id
+        assert items[0]["title"] == "100% Actual Listings"
+        assert items[0]["description"] == "Whatever you see is available."
+        assert items[0]["icon"] == "circle_check"
+        assert items[0]["tag"] is None
+        assert items[0]["sort_order"] == 1
+
+        assert items[1]["id"] == b2.id
+        assert items[1]["title"] == "Verified Properties"
+        assert items[1]["sort_order"] == 2
+
+    def test_banners_localized_response(self, api_client):
+        from mobile_config.models import MobileHomeBanner
+
+        MobileHomeBanner.objects.all().delete()
+        MobileHomeBanner.objects.create(
+            title_en="100% Actual Listings",
+            title_ru="Только актуальные объявления",
+            title_uz="Faqat dolzarb e'lonlar",
+            description_en="Whatever you see is available.",
+            description_ru="Всё, что вы видите — доступно.",
+            description_uz="Ko'rib turgan barcha takliflar mavjud.",
+            tag_en="iDeal Guarantee",
+            tag_ru="Гарантия iDeal",
+            tag_uz="iDeal kafolati",
+            icon="circle_check",
+            sort_order=1,
+            is_active=True,
+        )
+
+        # English
+        res_en = api_client.get(BANNERS_URL, HTTP_ACCEPT_LANGUAGE="en")
+        assert res_en.status_code == 200
+        item_en = res_en.json()["data"]["items"][0]
+        assert item_en["title"] == "100% Actual Listings"
+        assert item_en["tag"] == "iDeal Guarantee"
+
+        # Russian
+        res_ru = api_client.get(BANNERS_URL, HTTP_ACCEPT_LANGUAGE="ru")
+        assert res_ru.status_code == 200
+        item_ru = res_ru.json()["data"]["items"][0]
+        assert item_ru["title"] == "Только актуальные объявления"
+        assert item_ru["tag"] == "Гарантия iDeal"
+
+        # Uzbek
+        res_uz = api_client.get(BANNERS_URL, HTTP_ACCEPT_LANGUAGE="uz")
+        assert res_uz.status_code == 200
+        item_uz = res_uz.json()["data"]["items"][0]
+        assert item_uz["title"] == "Faqat dolzarb e'lonlar"
+        assert item_uz["tag"] == "iDeal kafolati"

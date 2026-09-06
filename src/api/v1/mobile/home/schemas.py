@@ -355,3 +355,27 @@ class MobileActivityRecordRequest(APIModel):
 
 class MobileActivityRecordResponse(APIModel):
     recorded: bool = True
+
+
+class MobileHomeBannerItem(APIModel):
+    id: int
+    title: str
+    description: str
+    icon: str
+    tag: str | None = None
+    sort_order: int
+
+    @classmethod
+    def from_banner(cls, banner) -> MobileHomeBannerItem:
+        return cls(
+            id=banner.id,
+            title=banner.title,
+            description=banner.description,
+            icon=banner.icon,
+            tag=banner.tag or None,
+            sort_order=banner.sort_order,
+        )
+
+
+class MobileHomeBannersResponse(APIModel):
+    items: list[MobileHomeBannerItem]

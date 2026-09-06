@@ -1343,6 +1343,33 @@ Table mobile_critical_update_ranges {
   }
 }
 
+Table mobile_home_banners {
+  id             bigint       [pk, increment]
+  created_at     timestamptz  [not null]
+  updated_at     timestamptz  [not null]
+  title          varchar(200) [not null]
+  title_en       varchar(200) [note: 'Title [en]']
+  title_uz       varchar(200) [note: 'Title [uz]']
+  title_ru       varchar(200) [note: 'Title [ru]']
+  description    text         [not null]
+  description_en text         [note: 'Description [en]']
+  description_uz text         [note: 'Description [uz]']
+  description_ru text         [note: 'Description [ru]']
+  tag            varchar(100) [default: '']
+  tag_en         varchar(100) [default: '', note: 'Tag [en]']
+  tag_uz         varchar(100) [default: '', note: 'Tag [uz]']
+  tag_ru         varchar(100) [default: '', note: 'Tag [ru]']
+  icon           varchar(50)  [not null, default: 'circle_check', note: 'Icon Name']
+  sort_order     smallint     [not null, default: 0]
+  is_active      boolean      [not null, default: true]
+
+  indexes {
+    created_at
+    sort_order
+    is_active
+  }
+}
+
 // iDeal DBML Domain: Notification (app: notification)
 
 Table notifications {
@@ -1818,6 +1845,7 @@ TableGroup Marketplace {
 
 TableGroup Mobile_Config {
   mobile_critical_update_ranges
+  mobile_home_banners
   mobile_update_policies
 }
 

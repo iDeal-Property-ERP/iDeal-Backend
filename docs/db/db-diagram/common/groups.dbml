@@ -63,6 +63,7 @@ TableGroup Marketplace {
 
 TableGroup Mobile_Config {
   mobile_critical_update_ranges
+  mobile_home_banners
   mobile_update_policies
 }
 

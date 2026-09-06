@@ -15,11 +15,14 @@ from marketplace.services.listings import (
     published_listings_queryset,
 )
 from marketplace.services.recommendations import RecommendationService
+from mobile_config.models import MobileHomeBanner
 from property.models import District
 
 from api.v1.mobile.home.schemas import (
     MobileActivityRecordRequest,
     MobileActivityRecordResponse,
+    MobileHomeBannerItem,
+    MobileHomeBannersResponse,
     MobileHomeFeedQuery,
     MobileHomeMapQuery,
     MobileListingCard,
@@ -160,13 +163,29 @@ class MobileHomeFiltersView(BaseController):
         tariffs = [{"value": value, "label": str(_(label))} for value, label in TariffChoices.CHOICES]
         furnishings = [{"value": value, "label": str(_(label))} for value, label in FurnishingType.CHOICES]
         property_types = [{"value": value, "label": str(_(label))} for value, label in PropertyType.CHOICES]
+        price_min = price_bounds["min"]
+        price_max = price_bounds["max"]
+        room_min = room_bounds["min"]
+        room_max = room_bounds["max"]
+        try:
+            min_price = float(price_min) if price_min is not None else None
+            max_price = float(price_max) if price_max is not None else None
+        except ValueError, TypeError:
+            min_price, max_price = None, None
+
+        try:
+            min_rooms = int(room_min) if room_min is not None else None
+            max_rooms = int(room_max) if room_max is not None else None
+        except ValueError, TypeError:
+            min_rooms, max_rooms = None, None
+
         price = {
-            "min": float(price_bounds["min"]) if price_bounds["min"] is not None else None,
-            "max": float(price_bounds["max"]) if price_bounds["max"] is not None else None,
+            "min": min_price,
+            "max": max_price,
         }
         rooms = {
-            "min": int(room_bounds["min"]) if room_bounds["min"] is not None else None,
-            "max": int(room_bounds["max"]) if room_bounds["max"] is not None else None,
+            "min": min_rooms,
+            "max": max_rooms,
         }
         return self.ok(
             {
@@ -214,3 +233,12 @@ class MobileHomeRecommendedListingsView(BaseController):
             except Http404, Listing.DoesNotExist:
                 return self.fail(error="listing_not_found", status_code=HTTPStatus.NOT_FOUND)
         return self.ok(MobileActivityRecordResponse(recorded=True), status_code=HTTPStatus.OK)
+
+
+class MobileHomeBannersView(BaseController):
+    auth = ()
+
+    def get(self) -> SuccessResponse[MobileHomeBannersResponse]:
+        banners = MobileHomeBanner.objects.filter(is_active=True).order_by("sort_order", "id")
+        items = [MobileHomeBannerItem.from_banner(b) for b in banners]
+        return self.ok(MobileHomeBannersResponse(items=items))

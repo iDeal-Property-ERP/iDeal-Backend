@@ -1,7 +1,13 @@
+# type: ignore
 import pytest
 from pydantic import ValidationError
 
-from api.v1.mobile.home.schemas import MobileHomeMapQuery, parse_bbox
+from api.v1.mobile.home.schemas import (
+    MobileHomeBannerItem,
+    MobileHomeBannersResponse,
+    MobileHomeMapQuery,
+    parse_bbox,
+)
 
 
 @pytest.mark.parametrize(
@@ -35,3 +41,31 @@ def test_map_query_requires_bbox():
 
 def test_parse_bbox_returns_validated_coordinates():
     assert parse_bbox("69,41,70,42") == (69.0, 41.0, 70.0, 42.0)
+
+
+def test_home_banner_item_validation():
+    item = MobileHomeBannerItem(
+        id=1,
+        title="100% Actual Listings",
+        description="Whatever you see is available.",
+        icon="circle_check",
+        tag="iDeal Guarantee",
+        sort_order=1,
+    )
+    assert item.id == 1
+    assert item.title == "100% Actual Listings"
+    assert item.tag == "iDeal Guarantee"
+    assert item.sort_order == 1
+
+
+def test_home_banners_response_validation():
+    item = MobileHomeBannerItem(
+        id=1,
+        title="100% Actual Listings",
+        description="Whatever you see is available.",
+        icon="circle_check",
+        sort_order=1,
+    )
+    response = MobileHomeBannersResponse(items=[item])
+    assert len(response.items) == 1
+    assert response.items[0].tag is None

@@ -129,3 +129,44 @@ class MobileCriticalUpdateRange(TimestampedModel):
 
         if errors:
             raise ValidationError(errors)
+
+
+class MobileHomeBanner(TimestampedModel):
+    title = models.CharField(
+        max_length=200,
+        verbose_name=_("Title"),
+    )
+    description = models.TextField(
+        verbose_name=_("Description"),
+    )
+    tag = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        default="",
+        verbose_name=_("Tag"),
+    )
+    icon = models.CharField(
+        max_length=50,
+        default="circle_check",
+        verbose_name=_("Icon Name"),
+    )
+    sort_order = models.PositiveSmallIntegerField(
+        default=0,
+        db_index=True,
+        verbose_name=_("Sort Order"),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name=_("Is Active"),
+    )
+
+    class Meta:
+        verbose_name = _("Mobile Home Banner")
+        verbose_name_plural = _("Mobile Home Banners")
+        db_table = "mobile_home_banners"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.title} (#{self.id})"
