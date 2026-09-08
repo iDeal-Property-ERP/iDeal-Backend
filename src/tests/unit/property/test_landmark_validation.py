@@ -159,6 +159,8 @@ class TestLandmarkSchemas:
                 {
                     "property_type": "apartment",
                     "district_id": 1,
+                    "map_lat": 41.311081,
+                    "map_lon": 69.240562,
                     "rooms": 1,
                     "area_sqm": 40,
                     "floor": 1,

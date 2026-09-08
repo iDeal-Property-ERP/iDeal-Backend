@@ -92,6 +92,8 @@ class TestMobilePropertyUploadSubmit:
             "name": "Cozy Apartment",
             "property_type": "apartment",
             "district_id": district.id,
+            "map_lat": 41.311081,
+            "map_lon": 69.240562,
             "rooms": 2,
             "floor": 3,
             "total_floors": 9,
@@ -120,6 +122,8 @@ class TestMobilePropertyUploadSubmit:
             "name": "Cozy Apartment",
             "property_type": "apartment",
             "district_id": district.id,
+            "map_lat": 41.311081,
+            "map_lon": 69.240562,
             "rooms": 2,
             "floor": 3,
             "total_floors": 9,
@@ -147,6 +151,8 @@ class TestMobilePropertyUploadSubmit:
             "name": "Cozy Apartment",
             "property_type": "apartment",
             "district_id": district.id,
+            "map_lat": 41.311081,
+            "map_lon": 69.240562,
             "rooms": 2,
             "floor": 10,
             "total_floors": 9,  # floor > total_floors
@@ -166,6 +172,56 @@ class TestMobilePropertyUploadSubmit:
         )
         assert res.status_code == 400
 
+    def test_missing_coordinates_rejected(self, api_client):
+        user = UserFactory()
+        district = DistrictFactory()
+        payload = {
+            "name": "Cozy Apartment",
+            "property_type": "apartment",
+            "district_id": district.id,
+            "rooms": 2,
+            "floor": 3,
+            "total_floors": 9,
+            "area_sqm": 65,
+            "furnishing": "furnished",
+            "monthly_price": 500,
+            "accept_offer": True,
+        }
+        files = [SimpleUploadedFile(f"p{i}.png", _PNG, content_type="image/png") for i in range(5)]
+        res = api_client.post(
+            SUBMIT_URL,
+            data={"payload": json.dumps(payload), "images": files},
+            **_make_jwt(user),
+        )
+        assert res.status_code == 400
+        assert "map_lat" in res.json()["error"] or "latitude" in res.json()["error"]
+
+    def test_invalid_coordinates_range_rejected(self, api_client):
+        user = UserFactory()
+        district = DistrictFactory()
+        payload = {
+            "name": "Cozy Apartment",
+            "property_type": "apartment",
+            "district_id": district.id,
+            "map_lat": 95.0,  # > 90
+            "map_lon": 69.240562,
+            "rooms": 2,
+            "floor": 3,
+            "total_floors": 9,
+            "area_sqm": 65,
+            "furnishing": "furnished",
+            "monthly_price": 500,
+            "accept_offer": True,
+        }
+        files = [SimpleUploadedFile(f"p{i}.png", _PNG, content_type="image/png") for i in range(5)]
+        res = api_client.post(
+            SUBMIT_URL,
+            data={"payload": json.dumps(payload), "images": files},
+            **_make_jwt(user),
+        )
+        assert res.status_code == 400
+        assert "Latitude must be between -90 and 90" in res.json()["error"]
+
     def test_successful_submit(self, api_client):
         user = UserFactory(first_name="Jasur", role=UserRole.TENANT)
         district = DistrictFactory(name="Yunusabad")
@@ -176,6 +232,9 @@ class TestMobilePropertyUploadSubmit:
             "name": "Modern 2-room apartment in Yunusabad",
             "property_type": "apartment",
             "district_id": district.id,
+            "address": "Amir Temur street, 45",
+            "map_lat": 41.311081,
+            "map_lon": 69.240562,
             "rooms": 2,
             "floor": 4,
             "total_floors": 9,
@@ -213,6 +272,9 @@ class TestMobilePropertyUploadSubmit:
         # Verify DB records
         prop = Property.objects.get(pk=data["property_id"])
         assert prop.name == payload["name"]
+        assert prop.address == "Amir Temur street, 45"
+        assert float(prop.map_lat) == pytest.approx(41.311081)
+        assert float(prop.map_lon) == pytest.approx(69.240562)
         assert prop.owner == user
         assert prop.status == PropertyStatus.PENDING_REVIEW
         assert prop.rooms == 2
@@ -251,6 +313,8 @@ class TestMobilePropertyUploadSubmit:
         payload = {
             "property_type": "apartment",
             "district_id": district.id,
+            "latitude": 41.311081,
+            "longitude": 69.240562,
             "rooms": 3,
             "floor": 2,
             "total_floors": 5,

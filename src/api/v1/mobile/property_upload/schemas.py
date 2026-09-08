@@ -61,7 +61,14 @@ class MobilePropertyUploadInput(pydantic.BaseModel):
     name: str | None = None
     property_type: str
     district_id: int
+    address: str | None = None
     landmark: str | None = None
+    map_lat: Decimal = pydantic.Field(
+        validation_alias=pydantic.AliasChoices("map_lat", "latitude"),
+    )
+    map_lon: Decimal = pydantic.Field(
+        validation_alias=pydantic.AliasChoices("map_lon", "longitude"),
+    )
     rooms: int = pydantic.Field(ge=1)
     floor: int = pydantic.Field(ge=0)
     total_floors: int | None = pydantic.Field(default=None, ge=0)
@@ -87,6 +94,20 @@ class MobilePropertyUploadInput(pydantic.BaseModel):
     @classmethod
     def normalize_landmark(cls, v: str | None) -> str | None:
         return validate_and_normalize_landmark(v)
+
+    @field_validator("map_lat")
+    @classmethod
+    def validate_latitude(cls, v: Decimal) -> Decimal:
+        if v < Decimal("-90.0") or v > Decimal("90.0"):
+            raise ValueError("Latitude must be between -90 and 90 degrees.")
+        return v
+
+    @field_validator("map_lon")
+    @classmethod
+    def validate_longitude(cls, v: Decimal) -> Decimal:
+        if v < Decimal("-180.0") or v > Decimal("180.0"):
+            raise ValueError("Longitude must be between -180 and 180 degrees.")
+        return v
 
     @pydantic.model_validator(mode="after")
     def validate_floor_bounds(self):

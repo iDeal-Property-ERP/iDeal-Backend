@@ -269,6 +269,13 @@ Enum servicerequest_status {
   cancelled
 }
 
+Enum supportinquiry_status {
+  new
+  in_progress [note: 'In Progress']
+  resolved
+  spam
+}
+
 Enum user_role {
   mgmt [note: 'Management']
   owner

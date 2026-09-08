@@ -477,6 +477,8 @@ class PropertySubmissionService:
                     status=PropertyStatus.PENDING_REVIEW,
                     description=prop_desc,
                     tariff=data.get("tariff", TariffChoices.STANDARD),
+                    map_lat=data.get("map_lat"),
+                    map_lon=data.get("map_lon"),
                     ask_price=monthly_price,
                     ask_currency=currency,
                     owner_guaranteed_price=monthly_price,
@@ -619,6 +621,10 @@ class PropertySubmissionService:
                 prop.address = data.get("address") or prop.address or (district.name if district else "")
                 if "landmark" in data:
                     prop.landmark = validate_and_normalize_landmark(data.get("landmark"))
+                if "map_lat" in data:
+                    prop.map_lat = data.get("map_lat")
+                if "map_lon" in data:
+                    prop.map_lon = data.get("map_lon")
                 prop.district = district
                 prop.property_type = data.get("property_type") or prop.property_type
                 prop.rooms = data.get("rooms") or prop.rooms

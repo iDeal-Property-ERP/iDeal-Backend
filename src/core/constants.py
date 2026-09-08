@@ -599,6 +599,19 @@ class NotificationCategory(ConstantChoices):
     ]
 
 
+class SupportInquiryStatus(ConstantChoices):
+    NEW = "new"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    SPAM = "spam"
+    CHOICES = [
+        (NEW, _("New")),
+        (IN_PROGRESS, _("In Progress")),
+        (RESOLVED, _("Resolved")),
+        (SPAM, _("Spam")),
+    ]
+
+
 class DevicePlatform(ConstantChoices):
     ANDROID = "android"
     IOS = "ios"

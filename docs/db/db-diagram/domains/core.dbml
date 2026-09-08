@@ -1,0 +1,21 @@
+// iDeal DBML Domain: Core (app: core)
+
+Table core_supportinquiry {
+  id          bigint                [pk, increment]
+  created_at  timestamptz           [not null]
+  updated_at  timestamptz           [not null]
+  name        varchar(255)          [not null, note: 'Full Name']
+  email       varchar(254)          [not null, note: 'Email Address']
+  message     text                  [not null]
+  status      supportinquiry_status [not null, default: 'new']
+  ip_address  varchar              
+  user_agent  varchar(512)          [not null]
+  admin_notes text                  [not null, note: 'Staff Notes']
+  resolved_at timestamptz          
+
+  indexes {
+    created_at
+    email
+    status
+  }
+}

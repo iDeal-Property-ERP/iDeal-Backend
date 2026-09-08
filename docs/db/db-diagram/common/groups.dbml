@@ -26,6 +26,10 @@ TableGroup Contract {
   public_offers
 }
 
+TableGroup Core {
+  core_supportinquiry
+}
+
 TableGroup Finance {
   exchange_rates
   owner_settlements
