@@ -96,6 +96,29 @@ def test_request_and_verify_provisions_user_and_returns_valid_jwt(api_client, mo
     assert authenticated_response.json()["data"]["email"] is None
 
 
+@pytest.mark.django_db
+def test_app_review_credentials_login_without_dev_bypass(api_client, monkeypatch):
+    monkeypatch.setattr(settings, "OTP_DEV_BYPASS_CODE", "")
+    monkeypatch.setattr(settings, "REVIEW_PHONE_NUMBER", "+998001234567")
+    monkeypatch.setattr(settings, "REVIEW_OTP_CODE", "154544")
+
+    # 1. Request OTP for review phone - dispatches without calling SMS provider
+    request_resp = _request_otp(api_client, phone="+998001234567")
+    assert request_resp.status_code == 200
+
+    # 2. Verify with static review OTP code 154544
+    verify_resp = _verify_otp(api_client, phone="+998001234567", code="154544")
+    assert verify_resp.status_code == 200, verify_resp.content
+    assert "access_token" in verify_resp.json()["data"]
+
+    user = User.objects.get(phone="+998001234567")
+    assert user.is_verified is True
+
+    # 3. Wrong code for review phone is rejected
+    wrong_resp = _verify_otp(api_client, phone="+998001234567", code="000000")
+    assert wrong_resp.status_code == 400
+
+
 def test_otp_request_dispatches_login_message_purpose(api_client, monkeypatch):
     dispatched = []
     monkeypatch.setattr(views.otp_service, "generate_otp", lambda: "123456")

@@ -81,7 +81,13 @@ class OTPRequestView(BaseController):
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
-        code = otp_service.generate_otp()
+        review_phone = getattr(settings, "REVIEW_PHONE_NUMBER", None)
+        review_code = getattr(settings, "REVIEW_OTP_CODE", None)
+        code = (
+            review_code
+            if (review_phone and phone == review_phone and review_code)
+            else otp_service.generate_otp()
+        )
         otp_service.clear_otp_attempts(phone)
         otp_service.set_otp(phone, code)
         try:
@@ -140,7 +146,11 @@ class OTPVerifyView(JWTMixin, BaseController):
 
         code = parsed_body.code.strip()
         bypass_code = settings.OTP_DEV_BYPASS_CODE
-        if not ((bypass_code and code == bypass_code) or code == otp_service.get_otp(phone)):
+        review_phone = getattr(settings, "REVIEW_PHONE_NUMBER", None)
+        review_code = getattr(settings, "REVIEW_OTP_CODE", None)
+        is_review_auth = bool(review_phone and review_code and phone == review_phone and code == review_code)
+
+        if not (is_review_auth or (bypass_code and code == bypass_code) or code == otp_service.get_otp(phone)):
             otp_service.increment_otp_attempts(phone)
             return self.fail(
                 error=str(_("Invalid or expired code")),

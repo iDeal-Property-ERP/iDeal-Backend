@@ -69,7 +69,13 @@ class PublicAccountDeletionOTPRequestView(BaseController):
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
-        code = otp_service.generate_otp()
+        review_phone = getattr(settings, "REVIEW_PHONE_NUMBER", None)
+        review_code = getattr(settings, "REVIEW_OTP_CODE", None)
+        code = (
+            review_code
+            if (review_phone and phone == review_phone and review_code)
+            else otp_service.generate_otp()
+        )
         otp_service.clear_otp_attempts(phone, purpose=PUBLIC_ACCOUNT_DELETION_OTP_PURPOSE)
         otp_service.set_otp(phone, code, purpose=PUBLIC_ACCOUNT_DELETION_OTP_PURPOSE)
         try:
@@ -107,8 +113,12 @@ class PublicAccountDeletionConfirmView(BaseController):
 
         code = parsed_body.code.strip()
         bypass_code = settings.OTP_DEV_BYPASS_CODE
+        review_phone = getattr(settings, "REVIEW_PHONE_NUMBER", None)
+        review_code = getattr(settings, "REVIEW_OTP_CODE", None)
+        is_review_auth = bool(review_phone and review_code and phone == review_phone and code == review_code)
         if not (
-            (bypass_code and code == bypass_code)
+            is_review_auth
+            or (bypass_code and code == bypass_code)
             or code == otp_service.get_otp(phone, purpose=PUBLIC_ACCOUNT_DELETION_OTP_PURPOSE)
         ):
             otp_service.increment_otp_attempts(phone, purpose=PUBLIC_ACCOUNT_DELETION_OTP_PURPOSE)

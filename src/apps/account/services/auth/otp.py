@@ -101,6 +101,11 @@ class OTPService:
             logger.info("OTP dev bypass enabled; generated code=%s", code)
             return
 
+        review_phone = getattr(settings, "REVIEW_PHONE_NUMBER", None)
+        if review_phone and phone == review_phone:
+            logger.info("OTP review account bypass for phone=%s", phone)
+            return
+
         provider = self.providers.get(channel)
         if provider is None:
             raise OTPDeliveryError("Unsupported OTP channel")

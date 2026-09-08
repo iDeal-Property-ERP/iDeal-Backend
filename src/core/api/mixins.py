@@ -1,3 +1,4 @@
+# pyright: reportAttributeAccessIssue=false
 import datetime as dt
 
 from django.conf import settings

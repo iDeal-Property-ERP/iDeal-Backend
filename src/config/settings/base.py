@@ -214,6 +214,8 @@ PROJECT_NAME = config("PROJECT_NAME", default="iDeal Backend")
 
 # OTP delivery
 OTP_DEV_BYPASS_CODE = config("OTP_DEV_BYPASS_CODE", default="")
+REVIEW_PHONE_NUMBER = config("REVIEW_PHONE_NUMBER", default="+998001234567")
+REVIEW_OTP_CODE = config("REVIEW_OTP_CODE", default="154544")
 RATE_LIMIT_ENABLED = True
 OTP_TELEGRAM_ENABLED = config("OTP_TELEGRAM_ENABLED", default=True, cast=bool)
 OTP_SMS_ENABLED = config("OTP_SMS_ENABLED", default=True, cast=bool)
